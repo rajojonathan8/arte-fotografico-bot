@@ -210,10 +210,16 @@ app.post('/webhook', async (req, res) => {
 
       // Prefijo para forzar modo IA (lo dejamos por si tú lo quieres usar)
       const usaIAForzado = textoLower.startsWith('ia:');
-
+        const esOpcion1 =
+        textoLower === '1' ||
+        textoLower.includes('foto estudio') ||
+        textoLower.includes('fotoestudio') ||
+        textoLower.includes('estudio de fotos');
+  
       let replyText = '';
 
       if (usaIAForzado) {
+        
         const pregunta = texto.substring(3).trim() || 'Responde como asistente de Arte Fotográfico.';
         console.log('🤖 Enviando a Gemini (modo ia:):', pregunta);
         replyText = await preguntarAGemini(pregunta);
@@ -229,6 +235,28 @@ app.post('/webhook', async (req, res) => {
           '3️⃣ SERVICIO DE IMPRESIÓN FOTOGRÁFICA\n' +
           '4️⃣ CONSULTAR ORDEN\n' +
           '5️⃣ AGENDA TU CITA';
+      }else if (esOpcion1) {
+        // 🔹 Opción 1 – SERVICIO FOTO ESTUDIO
+        replyText =
+          '📷 *SERVICIO FOTO ESTUDIO*\n\n' +
+          'En Foto Estudio ofrecemos:\n\n' +
+          '🔸 *Fotografías para títulos y documentos:*\n' +
+          '- Título de Bachiller\n' +
+          '- Título Universitario 7x9 (Uso Universidad de Sonsonate)\n' +
+          '- Título Universitario 6x8 (Uso Universidad Modular Abierta)\n' +
+          '- Certificados, Escalafón, Carnets y más.\n\n' +
+          '🔸 *Fotografías para servicios migratorios:*\n' +
+          '- VISA Americana (2x2 / 50x50 mm) — 💲10.00\n' +
+          '- VISA Canadiense (3.5x4.5 cm) — 💲10.00\n' +
+          '- VISA Mexicana (3.2x2.6 cm) — 💲10.00\n' +
+          '(Todas incluyen 4 fotografías impresas)\n\n' +
+          '🔸 *Sesiones fotográficas:*\n' +
+          '- Personales, de pareja, familiares, bebés, portafolio profesional, graduados, navideñas y más 🎉\n' +
+          '(Precios disponibles directamente en el local)\n\n' +
+          '🔸 *Retratos especiales:*\n' +
+          '- Blanco y negro, contemporáneos y artísticos.\n\n' +
+          'Si deseas más información o agendar tu sesión, dime y con gusto te ayudo 😊';
+
       } else {
         // 🧠 Cualquier otro mensaje → IA automática (Gemini)
         const pregunta =
