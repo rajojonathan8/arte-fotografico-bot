@@ -7,7 +7,58 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+async function preguntarAGemini(mensajeUsuario) {
+  if (!GEMINI_API_KEY) {
+    console.error('⚠️ No hay GEMINI_API_KEY configurada');
+    return 'Por el momento no puedo usar la IA gratuita, pero con gusto te atiendo como asistente básico de Arte Fotográfico. 😊';
+  }
+
+  const url =
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' +
+    GEMINI_API_KEY;
+
+  try {
+    const response = await axios.post(url, {
+      contents: [
+        {
+          parts: [
+            {
+              text:
+                'Eres el Asistente Arte Fotográfico. Eres amable, profesional, claro y ordenado. ' +
+                'Atiendes a clientes de un estudio fotográfico en Sonsonate, El Salvador. ' +
+                'Respondes siempre en español, de forma breve y útil.\n\n' +
+                'Mensaje del cliente: ' +
+                mensajeUsuario
+            }
+          ]
+        }
+      ]
+    });
+
+    const texto =
+      response.data &&
+      response.data.candidates &&
+      response.data.candidates[0] &&
+      response.data.candidates[0].content &&
+      response.data.candidates[0].content.parts &&
+      response.data.candidates[0].content.parts[0] &&
+      response.data.candidates[0].content.parts[0].text;
+
+    return texto ? texto.trim() : 'La IA no pudo generar una respuesta en este momento.';
+  } catch (error) {
+    console.error('❌ Error al llamar a Gemini:');
+    if (error.response) {
+      console.error(error.response.data);
+    } else {
+      console.error(error.message);
+    }
+    return 'Ocurrió un problema al usar la IA gratuita (Gemini). Por favor, intenta de nuevo más tarde.';
+  }
+}
+
 
 async function preguntarAChatGPT(mensajeUsuario) {
   if (!OPENAI_API_KEY) {
@@ -159,8 +210,8 @@ app.post('/webhook', async (req, res) => {
 
       if (usaIA) {
         const pregunta = texto.substring(3).trim() || 'Responde como asistente de Arte Fotográfico.';
-        console.log('🤖 Enviando a ChatGPT la pregunta:', pregunta);
-        replyText = await preguntarAChatGPT(pregunta);
+        console.log('🤖 Enviando a Gemini la pregunta:', pregunta);
+        replyText = await preguntarAGemini(pregunta);
       } else if (esSaludo) {
         replyText =
           '👋 ¡Hola! Gracias por contactar con Arte Fotográfico 📸\n' +
@@ -173,7 +224,6 @@ app.post('/webhook', async (req, res) => {
           '4️⃣ CONSULTAR ORDEN\n' +
           '5️⃣ AGENDA TU CITA';
       } else {
-        // Respuesta genérica por ahora
         replyText =
           '👋 ¡Hola! Gracias por escribir a Arte Fotográfico 📸.\n' +
           'Por favor selecciona una opción del menú principal enviando un número del 1 al 5.\n\n' +
