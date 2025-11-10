@@ -215,7 +215,17 @@ app.post('/webhook', async (req, res) => {
         textoLower.includes('foto estudio') ||
         textoLower.includes('fotoestudio') ||
         textoLower.includes('estudio de fotos');
-  
+        const esOpcion2 =
+        textoLower === '2' ||
+        textoLower.includes('eventos sociales') ||
+        textoLower.includes('evento social') ||
+        textoLower.includes('paquetes de eventos') ||
+        textoLower.includes('bodas') ||
+        textoLower.includes('15 años') ||
+        textoLower.includes('quince años') ||
+        textoLower.includes('bautizos') ||
+        textoLower.includes('bautizo');
+
       let replyText = '';
 
       if (usaIAForzado) {
@@ -243,7 +253,7 @@ app.post('/webhook', async (req, res) => {
           '🔸 *Fotografías para títulos y documentos:*\n' +
           '- Título de Bachiller\n' +
           '- Título Universitario 7x9 (Uso Universidad de Sonsonate)\n' +
-          '- Título Universitario 6x8 (Uso Universidad Modular Abierta)\n' +
+          '- Título Universitario 6x8 (UMA Universidad Modular Abierta)\n' +
           '- Certificados, Escalafón, Carnets y más.\n\n' +
           '🔸 *Fotografías para servicios migratorios:*\n' +
           '- VISA Americana (2x2 / 50x50 mm) — 💲10.00\n' +
@@ -257,6 +267,24 @@ app.post('/webhook', async (req, res) => {
           '- Blanco y negro, contemporáneos y artísticos.\n\n' +
           'Si deseas más información o agendar tu sesión, dime y con gusto te ayudo 😊';
 
+      }else if (esOpcion2) {
+        // 🔹 Opción 2 — COTIZACIÓN DE EVENTOS SOCIALES
+        replyText =
+          '💍 *COTIZACIÓN DE PAQUETES DE EVENTOS SOCIALES*\n\n' +
+          'En Arte Fotográfico tenemos paquetes personalizados para:\n' +
+          '- Bodas\n' +
+          '- 15 años\n' +
+          '- Bautizos\n' +
+          '- Comuniones\n' +
+          '- Baby showers\n' +
+          '- Fiestas infantiles\n' +
+          '- Sesiones pre 15 años\n' +
+          '- Sesiones en exteriores (outdoors)\n\n' +
+          '👉 Para brindarte una cotización personalizada, por favor dime:\n' +
+          '- Tipo de evento\n' +
+          '- Fecha del evento\n' +
+          '- Lugar (salón, iglesia, casa, ciudad, etc.)\n\n' +
+          'Si prefieres hablar con una persona, también puedo comunicarte con nuestro personal 📞';
       } else {
         // 🧠 Cualquier otro mensaje → IA automática (Gemini)
         const pregunta =
