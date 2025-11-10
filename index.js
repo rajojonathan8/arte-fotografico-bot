@@ -16,8 +16,9 @@ async function preguntarAGemini(mensajeUsuario) {
     return 'Por el momento no puedo usar la IA gratuita, pero con gusto te atiendo como asistente básico de Arte Fotográfico. 😊';
   }
 
+  // 🔹 OJO: usamos gemini-2.5-flash en v1beta
   const url =
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' +
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' +
     GEMINI_API_KEY;
 
   try {
