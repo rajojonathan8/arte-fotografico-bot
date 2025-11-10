@@ -231,6 +231,14 @@ app.post('/webhook', async (req, res) => {
         textoLower.includes('impresion fotografica') ||
         textoLower.includes('imprimir fotos') ||
         textoLower.includes('impresiones de fotos');
+              const esOpcion4 =
+        textoLower === '4' ||
+        textoLower.includes('consultar orden') ||
+        textoLower.includes('consulta de orden') ||
+        textoLower.includes('estado de mi orden') ||
+        textoLower.includes('estado de mi pedido') ||
+        textoLower.includes('ver mi pedido') ||
+        textoLower.includes('rastrear pedido');
 
 
       let replyText = '';
@@ -303,6 +311,15 @@ app.post('/webhook', async (req, res) => {
           '- ✉️ Desde tu correo electrónico\n\n' +
           'Si deseas cotizar o hacer un pedido, puedo comunicarte con nuestro personal para ayudarte con tamaños, precios y tiempos de entrega. 😊\n\n' +
           '¿Te gustaría que te atienda un colaborador para tu impresión fotográfica?';
+      }else if (esOpcion4) {
+        // 🔹 Opción 4 — CONSULTAR ORDEN
+        replyText =
+          '📦 *CONSULTAR ORDEN*\n\n' +
+          'Para ayudarte a consultar el estado de tu orden, por favor envíame uno de estos datos:\n' +
+          '- Número de orden (si lo tienes)\n' +
+          'o\n' +
+          '- Nombre completo con el que hiciste el pedido\n\n' +
+          'Con esa información, comunicaré tu consulta a nuestro personal para que te brinden el estado actualizado de tu pedido. 😊';
       } else {
         // 🧠 Cualquier otro mensaje → IA automática (Gemini)
         const pregunta =
