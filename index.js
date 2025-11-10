@@ -16,12 +16,9 @@ async function preguntarAGemini(mensajeUsuario) {
     return 'Por el momento no puedo usar la IA gratuita, pero con gusto te atiendo como asistente básico de Arte Fotográfico. 😊';
   }
 
-      const url =
-    'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=' +
+  const url =
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' +
     GEMINI_API_KEY;
-
-
-
 
   try {
     const response = await axios.post(url, {
@@ -61,6 +58,7 @@ async function preguntarAGemini(mensajeUsuario) {
     return 'Ocurrió un problema al usar la IA gratuita (Gemini). Por favor, intenta de nuevo más tarde.';
   }
 }
+
 
 
 async function preguntarAChatGPT(mensajeUsuario) {
