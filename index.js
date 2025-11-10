@@ -1,5 +1,7 @@
 require('dotenv').config();
 
+const { google } = require('googleapis');
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
@@ -9,6 +11,73 @@ const PORT = process.env.PORT || 3000;
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+
+function getCalendarClient() {
+  if (!serviceAccount) {
+    console.error('⚠️ No hay serviceAccount cargado');
+    return null;
+  }
+
+  const jwtClient = new google.auth.JWT(
+    serviceAccount.client_email,
+    null,
+    serviceAccount.private_key,
+    ['https://www.googleapis.com/auth/calendar']
+  );
+
+  const calendar = google.calendar({
+    version: 'v3',
+    auth: jwtClient
+  });
+
+  return calendar;
+}
+
+async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
+  try {
+    const calendar = getCalendarClient();
+    if (!calendar) return false;
+    if (!GOOGLE_CALENDAR_ID) {
+      console.error('⚠️ Falta GOOGLE_CALENDAR_ID');
+      return false;
+    }
+
+    const ahora = new Date();
+    const inicio = new Date(ahora.getTime() + 60 * 60 * 1000); // dentro de 1 hora
+    const fin = new Date(inicio.getTime() + 30 * 60 * 1000);   // dura 30 minutos
+
+    const evento = {
+      summary: `Cita de prueba con ${nombreCliente || 'cliente de WhatsApp'}`,
+      description: `Cita creada automáticamente desde el bot de Arte Fotográfico. Teléfono: ${telefono || ''}`,
+      start: {
+        dateTime: inicio.toISOString(),
+        timeZone: 'America/El_Salvador'
+      },
+      end: {
+        dateTime: fin.toISOString(),
+        timeZone: 'America/El_Salvador'
+      }
+    };
+
+    const res = await calendar.events.insert({
+      calendarId: GOOGLE_CALENDAR_ID,
+      requestBody: evento
+    });
+
+    console.log('✅ Evento de prueba creado en Calendar:', res.data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error al crear evento de prueba en Calendar:');
+    if (error.response) {
+      console.error(error.response.data);
+    } else {
+      console.error(error.message);
+    }
+    return false;
+  }
+}
+
 
 async function preguntarAGemini(mensajeUsuario) {
   if (!GEMINI_API_KEY) {
@@ -118,6 +187,18 @@ async function preguntarAChatGPT(mensajeUsuario) {
 const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO'; // mismo que usaste en Meta
 const WHATSAPP_TOKEN = 'EAFoXrBcgNOoBPxibp4RYEniZCpurZBtpDSBta4pX3u7TlaUkR7OZCekokzfpvluSVvHxbCmIb3aSeMn1vgfroAvaGpswPCiFazx4nhUmOzlZAVXWm7Grb2A0K7eMlbaZBmeiKTl0cW0ueEunGcvWnr5ZBQuXbrW7HYslT0zCuVujtXFVXwAulHZBjU8tJ9zxYIE53qbGcu2ehUaCjcSw3DxETWu0g80hlx8HZAuRDhGZCP4CbdZBbmZA6kowZAsKz1pXy1aSVtqsuArSAEfNhdF9nRPHxCIfDGtZC2O9D53MZD'; // EAAG...
 const PHONE_NUMBER_ID = '805856909285040';       // p.ej. 123456789012345
+const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT;
+const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
+
+let serviceAccount = null;
+
+if (GOOGLE_SERVICE_ACCOUNT) {
+  try {
+    serviceAccount = JSON.parse(GOOGLE_SERVICE_ACCOUNT);
+  } catch (e) {
+    console.error('❌ Error al parsear GOOGLE_SERVICE_ACCOUNT:', e.message);
+  }
+}
 
 app.use(bodyParser.json());
 
@@ -194,6 +275,7 @@ app.post('/webhook', async (req, res) => {
       // 🔹 RESPUESTA BÁSICA (luego la cambiamos por la lógica de Arte Fotográfico)
            const texto = msgBody.trim();
       const textoLower = texto.toLowerCase();
+      const esTestCalendar = textoLower === 'test calendar';
 
       // 👋 Detectar saludos básicos
        const esSaludo =
@@ -269,7 +351,18 @@ app.post('/webhook', async (req, res) => {
           '3️⃣ SERVICIO DE IMPRESIÓN FOTOGRÁFICA\n' +
           '4️⃣ CONSULTAR ORDEN\n' +
           '5️⃣ AGENDA TU CITA';
-      }else if (esOpcion1) {
+      }else if (esTestCalendar) {
+        const ok = await crearEventoDePruebaCalendar('Cliente de prueba', from);
+        if (ok) {
+          replyText =
+            '✅ He creado un *evento de prueba* en el calendario de Arte Fotográfico para dentro de 1 hora.\n' +
+            'Por favor revisa tu Google Calendar para verificarlo. 🗓️';
+        } else {
+          replyText =
+            '❌ No pude crear el evento de prueba en el calendario.\n' +
+            'Revisa las credenciales de Google y vuelve a intentarlo.';
+        }
+      } else if (esOpcion1) {
         // 🔹 Opción 1 – SERVICIO FOTO ESTUDIO
         replyText =
           '📷 *SERVICIO FOTO ESTUDIO*\n\n' +
