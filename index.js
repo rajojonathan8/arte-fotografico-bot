@@ -13,18 +13,24 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 
-function getCalendarClient() {
+async function getCalendarClient() {
   if (!serviceAccount) {
     console.error('⚠️ No hay serviceAccount cargado');
     return null;
   }
 
+  // La private_key viene con "\n" en una sola línea. Hay que convertirlo a saltos reales.
+  const privateKey = serviceAccount.private_key.replace(/\\n/g, '\n');
+
   const jwtClient = new google.auth.JWT(
     serviceAccount.client_email,
     null,
-    serviceAccount.private_key,
+    privateKey,
     ['https://www.googleapis.com/auth/calendar']
   );
+
+  // 🔐 Importante: autorizar el cliente para obtener el access token
+  await jwtClient.authorize();
 
   const calendar = google.calendar({
     version: 'v3',
@@ -34,9 +40,10 @@ function getCalendarClient() {
   return calendar;
 }
 
+
 async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
   try {
-    const calendar = getCalendarClient();
+    const calendar = await getCalendarClient();
     if (!calendar) return false;
     if (!GOOGLE_CALENDAR_ID) {
       console.error('⚠️ Falta GOOGLE_CALENDAR_ID');
@@ -77,6 +84,7 @@ async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
     return false;
   }
 }
+
 
 
 async function preguntarAGemini(mensajeUsuario) {
