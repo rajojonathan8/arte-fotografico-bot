@@ -9,6 +9,57 @@ const PORT = process.env.PORT || 3000;
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+async function preguntarAChatGPT(mensajeUsuario) {
+  if (!OPENAI_API_KEY) {
+    console.error('⚠️ No hay OPENAI_API_KEY configurada');
+    return 'Por el momento no puedo usar inteligencia artificial, pero con gusto te atiendo como asistente básico de Arte Fotográfico. 😊';
+  }
+
+  try {
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4.1-mini',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Eres el Asistente Arte Fotográfico. Eres amable, profesional, claro y ordenado. ' +
+              'Atiendes a clientes de un estudio fotográfico en Sonsonate, El Salvador. ' +
+              'Respondes siempre en español, de forma breve y útil.'
+          },
+          {
+            role: 'user',
+            content: mensajeUsuario
+          }
+        ]
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENAI_API_KEY}`
+        }
+      }
+    );
+
+    const respuesta =
+      response.data.choices &&
+      response.data.choices[0] &&
+      response.data.choices[0].message &&
+      response.data.choices[0].message.content;
+
+    return respuesta ? respuesta.trim() : 'No pude generar una respuesta en este momento.';
+  } catch (error) {
+    console.error('❌ Error al llamar a ChatGPT:');
+    if (error.response) {
+      console.error(error.response.data);
+    } else {
+      console.error(error.message);
+    }
+    return 'Ocurrió un problema al usar la IA en este momento. Por favor, intenta de nuevo más tarde.';
+  }
+}
+
 
 // ⚠️ PON AQUÍ TUS DATOS REALES
 const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO'; // mismo que usaste en Meta
@@ -88,22 +139,29 @@ app.post('/webhook', async (req, res) => {
       console.log(`📨 Mensaje de ${from}: ${msgBody}`);
 
       // 🔹 RESPUESTA BÁSICA (luego la cambiamos por la lógica de Arte Fotográfico)
-     const texto = msgBody.trim().toLowerCase();
+           const texto = msgBody.trim();
+      const textoLower = texto.toLowerCase();
 
       // 👋 Detectar saludos básicos
       const esSaludo =
-        texto.includes('hola') ||
-        texto.includes('buenos dias') ||
-        texto.includes('buenos días') ||
-        texto.includes('buenas tardes') ||
-        texto.includes('buenas noches') ||
-        texto.includes('hey') ||
-        texto.includes('qué tal') ||
-        texto.includes('que tal');
+        textoLower.includes('hola') ||
+        textoLower.includes('buenos dias') ||
+        textoLower.includes('buenos días') ||
+        textoLower.includes('buenas tardes') ||
+        textoLower.includes('buenas noches') ||
+        textoLower.includes('hey') ||
+        textoLower.includes('qué tal') ||
+        textoLower.includes('que tal');
+
+      const usaIA = textoLower.startsWith('ia:');
 
       let replyText = '';
 
-      if (esSaludo) {
+      if (usaIA) {
+        const pregunta = texto.substring(3).trim() || 'Responde como asistente de Arte Fotográfico.';
+        console.log('🤖 Enviando a ChatGPT la pregunta:', pregunta);
+        replyText = await preguntarAChatGPT(pregunta);
+      } else if (esSaludo) {
         replyText =
           '👋 ¡Hola! Gracias por contactar con Arte Fotográfico 📸\n' +
           'Soy un asistente virtual con inteligencia artificial.\n' +
@@ -118,10 +176,13 @@ app.post('/webhook', async (req, res) => {
         // Respuesta genérica por ahora
         replyText =
           '👋 ¡Hola! Gracias por escribir a Arte Fotográfico 📸.\n' +
-          'Por favor selecciona una opción del menú principal enviando un número del 1 al 5.';
+          'Por favor selecciona una opción del menú principal enviando un número del 1 al 5.\n\n' +
+          'Si quieres probar el modo IA, puedes escribir por ejemplo:\n' +
+          'ia: dame ideas para una sesión de fotos familiares.';
       }
 
       await sendWhatsAppMessage(from, replyText);
+
     }
   } catch (err) {
     console.error('⚠️ Error procesando el webhook:', err);
