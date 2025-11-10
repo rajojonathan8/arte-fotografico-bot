@@ -239,6 +239,15 @@ app.post('/webhook', async (req, res) => {
         textoLower.includes('estado de mi pedido') ||
         textoLower.includes('ver mi pedido') ||
         textoLower.includes('rastrear pedido');
+      const esOpcion5 =
+        textoLower === '5' ||
+        textoLower.includes('agenda tu cita') ||
+        textoLower.includes('agendar cita') ||
+        textoLower.includes('sacar cita') ||
+        textoLower.includes('hacer una cita') ||
+        textoLower.includes('reservar cita') ||
+        textoLower.includes('reservar sesión') ||
+        textoLower.includes('reservar sesion');
 
 
       let replyText = '';
@@ -320,6 +329,16 @@ app.post('/webhook', async (req, res) => {
           'o\n' +
           '- Nombre completo con el que hiciste el pedido\n\n' +
           'Con esa información, comunicaré tu consulta a nuestro personal para que te brinden el estado actualizado de tu pedido. 😊';
+      }else if (esOpcion5) {
+        // 🔹 Opción 5 — AGENDA TU CITA
+        replyText =
+          '🗓️ *AGENDA TU CITA*\n\n' +
+          'Con gusto podemos ayudarte a agendar una sesión o cita en Arte Fotográfico.\n\n' +
+          'Por favor envíame estos datos:\n' +
+          '- 📅 Fecha deseada\n' +
+          '- 📷 Tipo de sesión (por ejemplo: título, familiar, pareja, bebé, graduación, etc.)\n' +
+          '- 📞 Número de contacto\n\n' +
+          'Con esa información, comunicaré tu solicitud a uno de nuestros colaboradores para confirmar disponibilidad y horarios contigo. 😊';
       } else {
         // 🧠 Cualquier otro mensaje → IA automática (Gemini)
         const pregunta =
