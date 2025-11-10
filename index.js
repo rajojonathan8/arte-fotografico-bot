@@ -83,7 +83,38 @@ app.post('/webhook', async (req, res) => {
       console.log(`📨 Mensaje de ${from}: ${msgBody}`);
 
       // 🔹 RESPUESTA BÁSICA (luego la cambiamos por la lógica de Arte Fotográfico)
-      const replyText = '👋 ¡Hola! Gracias por escribir a Arte Fotográfico 📸. Este es un mensaje de prueba automático.';
+     const texto = msgBody.trim().toLowerCase();
+
+      // 👋 Detectar saludos básicos
+      const esSaludo =
+        texto.includes('hola') ||
+        texto.includes('buenos dias') ||
+        texto.includes('buenos días') ||
+        texto.includes('buenas tardes') ||
+        texto.includes('buenas noches') ||
+        texto.includes('hey') ||
+        texto.includes('qué tal') ||
+        texto.includes('que tal');
+
+      let replyText = '';
+
+      if (esSaludo) {
+        replyText =
+          '👋 ¡Hola! Gracias por contactar con Arte Fotográfico 📸\n' +
+          'Soy un asistente virtual con inteligencia artificial.\n' +
+          '¿En qué puedo servirte hoy?\n\n' +
+          'Por favor selecciona una opción escribiendo el número o el nombre del servicio que necesitas 👇\n' +
+          '1️⃣ SERVICIO FOTO ESTUDIO\n' +
+          '2️⃣ COTIZACIÓN DE PAQUETES DE EVENTOS SOCIALES\n' +
+          '3️⃣ SERVICIO DE IMPRESIÓN FOTOGRÁFICA\n' +
+          '4️⃣ CONSULTAR ORDEN\n' +
+          '5️⃣ AGENDA TU CITA';
+      } else {
+        // Respuesta genérica por ahora
+        replyText =
+          '👋 ¡Hola! Gracias por escribir a Arte Fotográfico 📸.\n' +
+          'Por favor selecciona una opción del menú principal enviando un número del 1 al 5.';
+      }
 
       await sendWhatsAppMessage(from, replyText);
     }
