@@ -1,9 +1,14 @@
+require('dotenv').config();
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
 
 // ⚠️ PON AQUÍ TUS DATOS REALES
 const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO'; // mismo que usaste en Meta
