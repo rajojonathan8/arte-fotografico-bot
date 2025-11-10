@@ -225,6 +225,13 @@ app.post('/webhook', async (req, res) => {
         textoLower.includes('quince años') ||
         textoLower.includes('bautizos') ||
         textoLower.includes('bautizo');
+              const esOpcion3 =
+        textoLower === '3' ||
+        textoLower.includes('impresión fotográfica') ||
+        textoLower.includes('impresion fotografica') ||
+        textoLower.includes('imprimir fotos') ||
+        textoLower.includes('impresiones de fotos');
+
 
       let replyText = '';
 
@@ -285,6 +292,17 @@ app.post('/webhook', async (req, res) => {
           '- Fecha del evento\n' +
           '- Lugar (salón, iglesia, casa, ciudad, etc.)\n\n' +
           'Si prefieres hablar con una persona, también puedo comunicarte con nuestro personal 📞';
+      }else if (esOpcion3) {
+        // 🔹 Opción 3 — SERVICIO DE IMPRESIÓN FOTOGRÁFICA
+        replyText =
+          '🖨️ *SERVICIO DE IMPRESIÓN FOTOGRÁFICA*\n\n' +
+          'Ofrecemos impresiones fotográficas de alta calidad en diferentes tamaños y acabados.\n\n' +
+          'Puedes enviarnos tus fotos de estas formas:\n' +
+          '- 📁 Desde USB\n' +
+          '- 📱 Enviándolas por WhatsApp\n' +
+          '- ✉️ Desde tu correo electrónico\n\n' +
+          'Si deseas cotizar o hacer un pedido, puedo comunicarte con nuestro personal para ayudarte con tamaños, precios y tiempos de entrega. 😊\n\n' +
+          '¿Te gustaría que te atienda un colaborador para tu impresión fotográfica?';
       } else {
         // 🧠 Cualquier otro mensaje → IA automática (Gemini)
         const pregunta =
