@@ -196,8 +196,10 @@ app.post('/webhook', async (req, res) => {
       const textoLower = texto.toLowerCase();
 
       // 👋 Detectar saludos básicos
-      const esSaludo =
+       const esSaludo =
         textoLower.includes('hola') ||
+        textoLower.includes('hola Mario') ||
+        textoLower.includes('hola Marito') ||
         textoLower.includes('buenos dias') ||
         textoLower.includes('buenos días') ||
         textoLower.includes('buenas tardes') ||
@@ -206,15 +208,17 @@ app.post('/webhook', async (req, res) => {
         textoLower.includes('qué tal') ||
         textoLower.includes('que tal');
 
-      const usaIA = textoLower.startsWith('ia:');
+      // Prefijo para forzar modo IA (lo dejamos por si tú lo quieres usar)
+      const usaIAForzado = textoLower.startsWith('ia:');
 
       let replyText = '';
 
-      if (usaIA) {
+      if (usaIAForzado) {
         const pregunta = texto.substring(3).trim() || 'Responde como asistente de Arte Fotográfico.';
-        console.log('🤖 Enviando a Gemini la pregunta:', pregunta);
+        console.log('🤖 Enviando a Gemini (modo ia:):', pregunta);
         replyText = await preguntarAGemini(pregunta);
       } else if (esSaludo) {
+        // 👋 Saludo + menú principal
         replyText =
           '👋 ¡Hola! Gracias por contactar con Arte Fotográfico 📸\n' +
           'Soy un asistente virtual con inteligencia artificial.\n' +
@@ -226,11 +230,17 @@ app.post('/webhook', async (req, res) => {
           '4️⃣ CONSULTAR ORDEN\n' +
           '5️⃣ AGENDA TU CITA';
       } else {
-        replyText =
-          '👋 ¡Hola! Gracias por escribir a Arte Fotográfico 📸.\n' +
-          'Por favor selecciona una opción del menú principal enviando un número del 1 al 5.\n\n' +
-          'Si quieres probar el modo IA, puedes escribir por ejemplo:\n' +
-          'ia: dame ideas para una sesión de fotos familiares.';
+        // 🧠 Cualquier otro mensaje → IA automática (Gemini)
+        const pregunta =
+          'Cliente de Arte Fotográfico dice: "' +
+          texto +
+          '". Responde como asistente del estudio fotográfico en Sonsonate. ' +
+          'Sé amable, profesional, breve (máximo 3 líneas) y en español. ' +
+          'Si la pregunta tiene que ver con horarios, dirección, servicios o paquetes, respóndelo claramente. ' +
+          'Si no entiendes, pide al cliente que aclare su duda.';
+
+        console.log('🤖 Enviando a Gemini (modo automático):', pregunta);
+        replyText = await preguntarAGemini(pregunta);
       }
 
       await sendWhatsAppMessage(from, replyText);
