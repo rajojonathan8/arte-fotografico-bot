@@ -42,7 +42,7 @@ async function getCalendarClient() {
   }
 
   const auth = new google.auth.GoogleAuth({
-    credentials: serviceAccount, // usamos el JSON TAL CUAL
+    credentials: serviceAccount,
     scopes: ['https://www.googleapis.com/auth/calendar']
   });
 
@@ -157,6 +157,37 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
     }
     return false;
   }
+}
+
+// 🕓 Horarios
+function esHorarioLaboral() {
+  const ahora = new Date();
+  const zonaLocal = ahora.toLocaleString('en-US', { timeZone: 'America/El_Salvador' });
+  const fechaLocal = new Date(zonaLocal);
+  const dia = fechaLocal.getDay(); // 0 = domingo, 6 = sábado
+  const hora = fechaLocal.getHours();
+  const minuto = fechaLocal.getMinutes();
+  const horaDecimal = hora + minuto / 60;
+
+  // Lunes a viernes: 8:00–12:30 y 14:00–18:00
+  if (dia >= 1 && dia <= 5) {
+    return (horaDecimal >= 8 && horaDecimal <= 12.5) || (horaDecimal >= 14 && horaDecimal <= 18);
+  }
+  // Sábado: 8:00–12:30
+  if (dia === 6) {
+    return horaDecimal >= 8 && horaDecimal <= 12.5;
+  }
+  // Domingo: cerrado
+  return false;
+}
+
+function esDomingo() {
+  const ahora = new Date();
+  const zonaLocal = ahora.toLocaleString('en-US', { timeZone: 'America/El_Salvador' });
+  const fechaLocal = new Date(zonaLocal);
+  const dia = fechaLocal.getDay(); // 0 = domingo
+
+  return dia === 0;
 }
 
 // ---- IA: Gemini ----
@@ -298,7 +329,7 @@ async function sendWhatsAppMessage(to, text) {
       {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`, // 👈 AQUÍ USAMOS EL TOKEN DEL ENV
+          Authorization: `Bearer ${token}`,
         },
       }
     );
@@ -326,19 +357,6 @@ app.post('/webhook', async (req, res) => {
     const messages = value && value.messages;
 
     if (messages && messages[0]) {
-      // 🕓 Si el mensaje llega fuera de horario
-if (!esHorarioLaboral()) {
-  const mensajeFueraHorario =
-    "🕓 ¡Gracias por contactarnos con Arte Fotográfico 📸!\n" +
-    "Nuestro horario de atención es:\n" +
-    "👉 Lunes a viernes de 8:00 a.m. a 12:30 p.m. y de 2:00 p.m. a 6:00 p.m.\n" +
-    "👉 Sábados de 8:00 a.m. a 12:30 p.m.\n\n" +
-    "Actualmente estamos fuera de horario, pero en cuanto volvamos te responderemos. 😊";
-
-  await sendWhatsAppMessage(from, mensajeFueraHorario);
-  return res.sendStatus(200); // evita seguir procesando
-}
-
       const message = messages[0];
 
       const from = message.from; // número del cliente
@@ -348,6 +366,35 @@ if (!esHorarioLaboral()) {
 
       const texto = msgBody.trim();
       const textoLower = texto.toLowerCase();
+
+      // 🕓 Si el mensaje llega fuera de horario
+      if (!esHorarioLaboral()) {
+        let mensajeRespuesta = '';
+
+        if (esDomingo()) {
+          // 🌞 Mensaje especial solo para domingos
+          mensajeRespuesta =
+            '📸 *¡Gracias por contactarnos con Arte Fotográfico!* 💬\n\n' +
+            'Hoy es *domingo* y nuestro estudio se encuentra *cerrado* por descanso del personal. 🛌\n\n' +
+            '🕓 *Nuestro horario de atención es:*\n' +
+            '👉 *Lunes a viernes:* de 8:00 a.m. a 12:30 p.m. y de 2:00 p.m. a 6:00 p.m.\n' +
+            '👉 *Sábados:* de 8:00 a.m. a 12:30 p.m.\n\n' +
+            'Puedes dejar tu mensaje con toda confianza y el lunes te responderemos en horario de atención. 😊';
+        } else {
+          // ⏰ Fuera de horario normal (entre semana o sábado fuera de hora)
+          mensajeRespuesta =
+            '📸 *¡Gracias por contactarnos con Arte Fotográfico!* 💬\n\n' +
+            'En este momento estamos *fuera de nuestro horario de atención*, pero con gusto te responderemos en cuanto estemos de vuelta. 😊\n\n' +
+            '🕓 *Nuestro horario de atención es:*\n' +
+            '👉 *Lunes a viernes:* de 8:00 a.m. a 12:30 p.m. y de 2:00 p.m. a 6:00 p.m.\n' +
+            '👉 *Sábados:* de 8:00 a.m. a 12:30 p.m.\n' +
+            '📍 *Sonsonate, El Salvador.*\n\n' +
+            '¡Gracias por tu mensaje y por elegirnos para capturar tus mejores momentos! 📷💖';
+        }
+
+        await sendWhatsAppMessage(from, mensajeRespuesta);
+        return res.sendStatus(200); // no seguimos procesando más lógica
+      }
 
       const esTestCalendar = textoLower === 'test calendar';
       const esComandoCita = textoLower.startsWith('cita:');
@@ -412,28 +459,6 @@ if (!esHorarioLaboral()) {
         textoLower.includes('reservar sesion');
 
       let replyText = '';
-
-      // 🕓 Verificación de horario laboral
-function esHorarioLaboral() {
-  const ahora = new Date();
-  const zonaLocal = ahora.toLocaleString("en-US", { timeZone: "America/El_Salvador" });
-  const fechaLocal = new Date(zonaLocal);
-  const dia = fechaLocal.getDay(); // 0=domingo, 6=sábado
-  const hora = fechaLocal.getHours();
-  const minuto = fechaLocal.getMinutes();
-  const horaDecimal = hora + minuto / 60;
-
-  // 🕓 Lunes a viernes: 8:00–12:30 y 14:00–18:00
-  // 🕓 Sábado: 8:00–12:30
-  if (dia >= 1 && dia <= 5) {
-    return (horaDecimal >= 8 && horaDecimal <= 12.5) || (horaDecimal >= 14 && horaDecimal <= 18);
-  } else if (dia === 6) {
-    return horaDecimal >= 8 && horaDecimal <= 12.5;
-  } else {
-    return false; // Domingo cerrado
-  }
-}
-
 
       if (usaIAForzado) {
         const pregunta = texto.substring(3).trim() || 'Responde como asistente de Arte Fotográfico.';
