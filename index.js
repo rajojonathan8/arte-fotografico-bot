@@ -675,8 +675,7 @@ app.post('/webhook', async (req, res) => {
           '2️⃣ COTIZACIÓN DE PAQUETES DE EVENTOS SOCIALES\n' +
           '3️⃣ SERVICIO DE IMPRESIÓN FOTOGRÁFICA\n' +
           '4️⃣ CONSULTAR ORDEN\n' +
-          '5️⃣ AGENDA TU CITA\n\n' +
-          
+          '5️⃣ AGENDA TU CITA\n\n';
 
       } else if (esComandoCita) {
         const sinPrefijo = texto.substring(5).trim(); // quita "cita:"
