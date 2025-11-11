@@ -124,9 +124,12 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
     const [anio, mes, dia] = fechaStr.split('-').map(Number);
     const [hora, minuto] = horaStr.split(':').map(Number);
 
-    // Mes en JS es 0-based (enero=0)
-    const inicio = new Date(Date.UTC(anio, mes - 1, dia, hora, minuto));
+    // 🔹 Crear fecha/hora "normal" (sin UTC) y dejar que Calendar la interprete con la zona America/El_Salvador
+    const inicio = new Date(anio, mes - 1, dia, hora, minuto);
     const fin = new Date(inicio.getTime() + 60 * 60 * 1000); // duración 1h
+
+    console.log('💠 Horario cita - inicio:', inicio.toISOString(), 'fin:', fin.toISOString());
+
 
     const evento = {
       summary: `Sesión ${tipoSesion || 'fotográfica'} - Cliente WhatsApp`,
