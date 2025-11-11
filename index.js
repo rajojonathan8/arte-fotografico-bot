@@ -15,11 +15,15 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT;
 const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
 
-// ⚠️ PON AQUÍ TUS DATOS REALES (estos sí van en código)
-const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO'; // mismo que usaste en Meta
+// ⚠️ Datos fijos en código
+const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO';
 const PHONE_NUMBER_ID = '805856909285040';
 
-// ---- Google Calendar: service account ----
+// Estado simple por usuario para flujo de citas guiadas
+// { [from]: { paso: 'fecha' | 'tipo' | 'telefono', fechaHora, tipoSesion } }
+const estadosUsuarios = {};
+
+// --------- GOOGLE CALENDAR (service account) ----------
 let serviceAccount = null;
 
 if (GOOGLE_SERVICE_ACCOUNT) {
@@ -66,8 +70,8 @@ async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
     }
 
     const ahora = new Date();
-    const inicio = new Date(ahora.getTime() + 60 * 60 * 1000); // dentro de 1 hora
-    const fin = new Date(inicio.getTime() + 30 * 60 * 1000);   // dura 30 minutos
+    const inicio = new Date(ahora.getTime() + 60 * 60 * 1000);
+    const fin = new Date(inicio.getTime() + 30 * 60 * 1000);
 
     const evento = {
       summary: `Cita de prueba con ${nombreCliente || 'cliente de WhatsApp'}`,
@@ -91,47 +95,42 @@ async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
     return true;
   } catch (error) {
     console.error('❌ Error al crear evento de prueba en Calendar:');
-    if (error.response) {
-      console.error(error.response.data);
-    } else {
-      console.error(error.message);
-    }
+    if (error.response) console.error(error.response.data);
+    else console.error(error.message);
     return false;
   }
 }
 
+// ---------- CREAR CITA ----------
 async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
   try {
     console.log('💠 crearCitaEnCalendar =>', { fechaHoraTexto, tipoSesion, telefono });
 
     const calendar = await getCalendarClient();
     if (!calendar) {
-      console.log('💠 Calendar debug: getCalendarClient() devolvió null en crearCitaEnCalendar');
+      console.log('💠 Calendar debug: getCalendarClient() devolvió null');
       return false;
     }
     if (!GOOGLE_CALENDAR_ID) {
-      console.log('💠 Calendar debug: Falta GOOGLE_CALENDAR_ID en crearCitaEnCalendar');
+      console.log('💠 Calendar debug: Falta GOOGLE_CALENDAR_ID');
       return false;
     }
 
-    // Esperamos formato: "YYYY-MM-DD HH:mm"
+    // Esperamos "YYYY-MM-DD HH:mm"
     const [fechaStr, horaStr] = fechaHoraTexto.split(' ');
     if (!fechaStr || !horaStr) {
-      console.log('💠 Fecha/hora con formato inválido:', fechaHoraTexto);
+      console.log('💠 Fecha/hora inválida:', fechaHoraTexto);
       return false;
     }
 
-        const [anio, mes, dia] = fechaStr.split('-').map(Number);
+    const [anio, mes, dia] = fechaStr.split('-').map(Number);
     const [hora, minuto] = horaStr.split(':').map(Number);
 
-    // Función para rellenar con 2 dígitos
     const pad2 = (n) => String(n).padStart(2, '0');
 
-    // 🔹 Construimos fecha/hora LOCAL en texto, sin "Z" (sin UTC)
     const inicioLocal = `${anio}-${pad2(mes)}-${pad2(dia)}T${pad2(hora)}:${pad2(minuto)}:00`;
 
-    // 🔹 Sumamos 1 hora para la hora de fin
-    const totalMinutosInicio = hora * 60 + minuto + 60; // +60 min = 1h
+    const totalMinutosInicio = hora * 60 + minuto + 60; // +1h
     const horaFin = Math.floor(totalMinutosInicio / 60);
     const minutoFin = totalMinutosInicio % 60;
     const finLocal = `${anio}-${pad2(mes)}-${pad2(dia)}T${pad2(horaFin)}:${pad2(minutoFin)}:00`;
@@ -142,15 +141,14 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
       summary: `Sesión ${tipoSesion || 'fotográfica'} - Cliente WhatsApp`,
       description: `Sesión agendada desde el bot de Arte Fotográfico.\nTeléfono: ${telefono || ''}`,
       start: {
-        dateTime: inicioLocal,              // 👈 ya NO usamos toISOString()
+        dateTime: inicioLocal,
         timeZone: 'America/El_Salvador'
       },
       end: {
-        dateTime: finLocal,                 // 👈 también sin toISOString()
+        dateTime: finLocal,
         timeZone: 'America/El_Salvador'
       }
     };
-
 
     const res = await calendar.events.insert({
       calendarId: GOOGLE_CALENDAR_ID,
@@ -169,8 +167,9 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
     return false;
   }
 }
+
+// ---- helper para formatear fecha local ----
 function formatearFechaHoraLocal(dateObj) {
-  // Convierte un Date a "YYYY-MM-DD HH:mm" en zona America/El_Salvador
   const opciones = {
     timeZone: 'America/El_Salvador',
     year: 'numeric',
@@ -178,7 +177,7 @@ function formatearFechaHoraLocal(dateObj) {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    hour12: false
   };
 
   const partes = new Intl.DateTimeFormat('en-CA', opciones).formatToParts(dateObj);
@@ -195,10 +194,7 @@ function formatearFechaHoraLocal(dateObj) {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
-
-
-
-// ---- CANCELAR CITA EN CALENDAR (versión con búsqueda por día completo) ----
+// ---------- CANCELAR CITA ----------
 async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
   try {
     console.log('💠 cancelarCitaEnCalendar =>', { fechaHoraTexto, telefono });
@@ -207,7 +203,6 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
     if (!calendar) return false;
     if (!GOOGLE_CALENDAR_ID) return false;
 
-    // Esperamos formato: "YYYY-MM-DD HH:mm"
     const [fechaStr, horaStr] = fechaHoraTexto.split(' ');
     if (!fechaStr || !horaStr) {
       console.log('💠 Fecha/hora inválida en cancelarCitaEnCalendar:', fechaHoraTexto);
@@ -217,10 +212,7 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
     const [anio, mes, dia] = fechaStr.split('-').map(Number);
     const [hora, minuto] = horaStr.split(':').map(Number);
 
-    // Fecha/hora local en El Salvador
     const fechaLocal = new Date(anio, mes - 1, dia, hora, minuto);
-
-    // Rango del día completo en hora local
     const inicioDiaLocal = new Date(anio, mes - 1, dia, 0, 0, 0);
     const finDiaLocal = new Date(anio, mes - 1, dia, 23, 59, 59);
 
@@ -232,7 +224,7 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
       timeMin,
       timeMax,
       singleEvents: true,
-      orderBy: 'startTime',
+      orderBy: 'startTime'
     });
 
     const items = listRes.data.items || [];
@@ -247,29 +239,23 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
       const desc = (ev.description || '').toLowerCase();
       const resumen = (ev.summary || '').toLowerCase();
 
-      // Fecha/hora del evento en local
       let fechaEventoTexto = '';
       if (ev.start && ev.start.dateTime) {
         const fechaEv = new Date(ev.start.dateTime);
-        fechaEventoTexto = formatearFechaHoraLocal(fechaEv); // "YYYY-MM-DD HH:mm"
+        fechaEventoTexto = formatearFechaHoraLocal(fechaEv);
       }
 
       console.log('➡️ Revisando evento:', {
         id: ev.id,
         summary: ev.summary,
-        fechaEventoTexto,
+        fechaEventoTexto
       });
 
-      // 1) Coincide EXACTAMENTE la fecha/hora
-      if (fechaEventoTexto !== fechaHoraTexto) {
-        continue;
-      }
+      if (fechaEventoTexto !== fechaHoraTexto) continue;
 
-      // 2) Coincide el teléfono (completo o últimos 4)
-      const textoBuscado = telefonoLimpio;
       const coincideTelefono =
-        desc.includes(textoBuscado) ||
-        resumen.includes(textoBuscado) ||
+        desc.includes(telefonoLimpio) ||
+        resumen.includes(telefonoLimpio) ||
         (ultimos4 && desc.includes(ultimos4));
 
       if (coincideTelefono) {
@@ -286,7 +272,7 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
 
     await calendar.events.delete({
       calendarId: GOOGLE_CALENDAR_ID,
-      eventId: eventoAEliminar.id,
+      eventId: eventoAEliminar.id
     });
 
     console.log('✅ Cita eliminada en Calendar:', eventoAEliminar.id);
@@ -302,28 +288,22 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
   }
 }
 
-
-
-
-// 🕓 Horarios
+// ---------- HORARIO ----------
 function esHorarioLaboral() {
   const ahora = new Date();
   const zonaLocal = ahora.toLocaleString('en-US', { timeZone: 'America/El_Salvador' });
   const fechaLocal = new Date(zonaLocal);
-  const dia = fechaLocal.getDay(); // 0 = domingo, 6 = sábado
+  const dia = fechaLocal.getDay(); // 0 domingo, 6 sábado
   const hora = fechaLocal.getHours();
   const minuto = fechaLocal.getMinutes();
   const horaDecimal = hora + minuto / 60;
 
-  // Lunes a viernes: 8:00–12:30 y 14:00–18:00
   if (dia >= 1 && dia <= 5) {
     return (horaDecimal >= 8 && horaDecimal <= 12.5) || (horaDecimal >= 14 && horaDecimal <= 18);
   }
-  // Sábado: 8:00–12:30
   if (dia === 6) {
     return horaDecimal >= 8 && horaDecimal <= 12.5;
   }
-  // Domingo: cerrado
   return false;
 }
 
@@ -331,12 +311,11 @@ function esDomingo() {
   const ahora = new Date();
   const zonaLocal = ahora.toLocaleString('en-US', { timeZone: 'America/El_Salvador' });
   const fechaLocal = new Date(zonaLocal);
-  const dia = fechaLocal.getDay(); // 0 = domingo
-
+  const dia = fechaLocal.getDay();
   return dia === 0;
 }
 
-// ---- IA: Gemini ----
+// ---------- IA: GEMINI ----------
 async function preguntarAGemini(mensajeUsuario) {
   if (!GEMINI_API_KEY) {
     console.error('⚠️ No hay GEMINI_API_KEY configurada');
@@ -377,16 +356,13 @@ async function preguntarAGemini(mensajeUsuario) {
     return texto ? texto.trim() : 'La IA no pudo generar una respuesta en este momento.';
   } catch (error) {
     console.error('❌ Error al llamar a Gemini:');
-    if (error.response) {
-      console.error(error.response.data);
-    } else {
-      console.error(error.message);
-    }
+    if (error.response) console.error(error.response.data);
+    else console.error(error.message);
     return 'Ocurrió un problema al usar la IA gratuita (Gemini). Por favor, intenta de nuevo más tarde.';
   }
 }
 
-// ---- IA: ChatGPT (opcional) ----
+// ---------- IA: CHATGPT (opcional) ----------
 async function preguntarAChatGPT(mensajeUsuario) {
   if (!OPENAI_API_KEY) {
     console.error('⚠️ No hay OPENAI_API_KEY configurada');
@@ -429,23 +405,20 @@ async function preguntarAChatGPT(mensajeUsuario) {
     return respuesta ? respuesta.trim() : 'No pude generar una respuesta en este momento.';
   } catch (error) {
     console.error('❌ Error al llamar a ChatGPT:');
-    if (error.response) {
-      console.error(error.response.data);
-    } else {
-      console.error(error.message);
-    }
+    if (error.response) console.error(error.response.data);
+    else console.error(error.message);
     return 'Ocurrió un problema al usar la IA en este momento. Por favor, intenta de nuevo más tarde.';
   }
 }
 
 app.use(bodyParser.json());
 
-// Ruta simple de prueba
+// --------- RUTA DE PRUEBA ----------
 app.get('/', (req, res) => {
   res.send('Servidor Arte Fotográfico activo 🚀');
 });
 
-// ✅ WEBHOOK DE VERIFICACIÓN (GET)
+// --------- WEBHOOK GET (verificación) ----------
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const tokenVerify = req.query['hub.verify_token'];
@@ -460,7 +433,7 @@ app.get('/webhook', (req, res) => {
   }
 });
 
-// ✅ FUNCIÓN PARA ENVIAR MENSAJES DE WHATSAPP
+// ---------- ENVIAR MENSAJE WHATSAPP ----------
 async function sendWhatsAppMessage(to, text) {
   const url = `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`;
 
@@ -475,23 +448,20 @@ async function sendWhatsAppMessage(to, text) {
       {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+          Authorization: `Bearer ${token}`
+        }
       }
     );
 
     console.log('✅ Mensaje enviado a WhatsApp:', response.data);
   } catch (error) {
     console.error('❌ Error al enviar mensaje a WhatsApp:');
-    if (error.response) {
-      console.error(error.response.data);
-    } else {
-      console.error(error.message);
-    }
+    if (error.response) console.error(error.response.data);
+    else console.error(error.message);
   }
 }
 
-// ✅ WEBHOOK PARA RECIBIR MENSAJES (POST)
+// ---------- WEBHOOK POST (mensajes) ----------
 app.post('/webhook', async (req, res) => {
   console.log('📩 Webhook recibido:');
   console.dir(req.body, { depth: null });
@@ -505,7 +475,7 @@ app.post('/webhook', async (req, res) => {
     if (messages && messages[0]) {
       const message = messages[0];
 
-      const from = message.from; // número del cliente
+      const from = message.from;
       const msgBody = message.text && message.text.body ? message.text.body : '';
 
       console.log(`📨 Mensaje de ${from}: ${msgBody}`);
@@ -513,12 +483,11 @@ app.post('/webhook', async (req, res) => {
       const texto = msgBody.trim();
       const textoLower = texto.toLowerCase();
 
-      // 🕓 Si el mensaje llega fuera de horario
+      // 🕓 Mensajes fuera de horario
       if (!esHorarioLaboral()) {
         let mensajeRespuesta = '';
 
         if (esDomingo()) {
-          // 🌞 Mensaje especial solo para domingos
           mensajeRespuesta =
             '📸 *¡Gracias por contactarnos con Arte Fotográfico!* 💬\n\n' +
             'Hoy es *domingo* y nuestro estudio se encuentra *cerrado* por descanso del personal. 🛌\n\n' +
@@ -527,7 +496,6 @@ app.post('/webhook', async (req, res) => {
             '👉 *Sábados:* de 8:00 a.m. a 12:30 p.m.\n\n' +
             'Puedes dejar tu mensaje con toda confianza y el lunes te responderemos en horario de atención. 😊';
         } else {
-          // ⏰ Fuera de horario normal (entre semana o sábado fuera de hora)
           mensajeRespuesta =
             '📸 *¡Gracias por contactarnos con Arte Fotográfico!* 💬\n\n' +
             'En este momento estamos *fuera de nuestro horario de atención*, pero con gusto te responderemos en cuanto estemos de vuelta. 😊\n\n' +
@@ -539,18 +507,78 @@ app.post('/webhook', async (req, res) => {
         }
 
         await sendWhatsAppMessage(from, mensajeRespuesta);
-        return res.sendStatus(200); // no seguimos procesando más lógica
+        return res.sendStatus(200);
+      }
+
+      // 👉 Flujo guiado de cita (si el usuario ya está en proceso)
+      const estado = estadosUsuarios[from];
+      if (estado) {
+        // permitir cancelar el flujo con texto
+        if (textoLower === 'cancelar cita' || textoLower === 'cancelar') {
+          delete estadosUsuarios[from];
+          await sendWhatsAppMessage(
+            from,
+            '🛑 He cancelado el proceso de agendar cita. Si deseas intentarlo de nuevo, selecciona la opción 5 del menú.'
+          );
+          return res.sendStatus(200);
+        }
+
+        if (estado.paso === 'fecha') {
+          // aquí esperamos "YYYY-MM-DD HH:mm"
+          estado.fechaHora = texto;
+          estado.paso = 'tipo';
+          await sendWhatsAppMessage(
+            from,
+            '📸 Perfecto. Ahora dime el *tipo de sesión* que deseas (ejemplo: sesión familiar, fotos para título, sesión de pareja, etc.).'
+          );
+          return res.sendStatus(200);
+        }
+
+        if (estado.paso === 'tipo') {
+          estado.tipoSesion = texto;
+          estado.paso = 'telefono';
+          await sendWhatsAppMessage(
+            from,
+            '📞 Genial. Por último, envíame tu *número de contacto* (ejemplo: 5037XXXXXX).'
+          );
+          return res.sendStatus(200);
+        }
+
+        if (estado.paso === 'telefono') {
+          const telefonoCliente = texto || from;
+
+          const fechaHoraTexto = estado.fechaHora;
+          const tipoSesion = estado.tipoSesion || 'fotográfica';
+
+          const ok = await crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefonoCliente);
+          delete estadosUsuarios[from];
+
+          if (ok) {
+            await sendWhatsAppMessage(
+              from,
+              '✅ He creado tu cita en el calendario de Arte Fotográfico.\n' +
+                `📅 Fecha y hora: *${fechaHoraTexto}*\n` +
+                `📸 Tipo de sesión: *${tipoSesion}*\n` +
+                `📞 Contacto: *${telefonoCliente}*`
+            );
+          } else {
+            await sendWhatsAppMessage(
+              from,
+              '❌ Ocurrió un problema al crear la cita en el calendario.\n' +
+                'Por favor revisa el formato y vuelve a intentarlo, o avisa a un colaborador.'
+            );
+          }
+
+          return res.sendStatus(200);
+        }
       }
 
       const esTestCalendar = textoLower === 'test calendar';
       const esComandoCita = textoLower.startsWith('cita:');
       const esComandoCancelar = textoLower.startsWith('cancelar:');
 
-      // 👋 Detectar saludos básicos
       const esSaludo =
         textoLower.includes('hola') ||
-        textoLower.includes('hola mario') ||
-        textoLower.includes('hola marito') ||
         textoLower.includes('buenos dias') ||
         textoLower.includes('buenos días') ||
         textoLower.includes('buenas tardes') ||
@@ -559,7 +587,6 @@ app.post('/webhook', async (req, res) => {
         textoLower.includes('qué tal') ||
         textoLower.includes('que tal');
 
-      // Prefijo para forzar modo IA
       const usaIAForzado = textoLower.startsWith('ia:');
 
       const esOpcion1 =
@@ -612,10 +639,9 @@ app.post('/webhook', async (req, res) => {
         console.log('🤖 Enviando a Gemini (modo ia:):', pregunta);
         replyText = await preguntarAGemini(pregunta);
 
-      }else if (esComandoCancelar) {
-        // cancelar: YYYY-MM-DD HH:mm; telefono
+      } else if (esComandoCancelar) {
         const sinPrefijo = texto.substring(9).trim(); // quita "cancelar:"
-        const partes = sinPrefijo.split(';').map(p => p.trim());
+        const partes = sinPrefijo.split(';').map((p) => p.trim());
 
         const fechaHoraTexto = partes[0];
         const telefonoCliente = partes[1] || from;
@@ -637,7 +663,9 @@ app.post('/webhook', async (req, res) => {
               '❌ No encontré una cita que coincida con esa fecha/hora y teléfono.\n' +
               'Por favor verifica los datos o consulta con un colaborador.';
           }
-        }}  else if (esSaludo) {
+        }
+
+      } else if (esSaludo) {
         replyText =
           '👋 ¡Hola! Gracias por contactar con Arte Fotográfico 📸\n' +
           'Soy un asistente virtual con inteligencia artificial.\n' +
@@ -647,11 +675,14 @@ app.post('/webhook', async (req, res) => {
           '2️⃣ COTIZACIÓN DE PAQUETES DE EVENTOS SOCIALES\n' +
           '3️⃣ SERVICIO DE IMPRESIÓN FOTOGRÁFICA\n' +
           '4️⃣ CONSULTAR ORDEN\n' +
-          '5️⃣ AGENDA TU CITA';
+          '5️⃣ AGENDA TU CITA\n\n' +
+          '📝 También puedes usar:\n' +
+          '• "cita: 2025-11-15 15:00; sesión familiar; 5037XXXXXX"\n' +
+          '• "cancelar: 2025-11-15 15:00; 5037XXXXXX"';
 
       } else if (esComandoCita) {
         const sinPrefijo = texto.substring(5).trim(); // quita "cita:"
-        const partes = sinPrefijo.split(';').map(p => p.trim());
+        const partes = sinPrefijo.split(';').map((p) => p.trim());
 
         const fechaHoraTexto = partes[0];
         const tipoSesion = partes[1] || 'fotográfica';
@@ -749,14 +780,15 @@ app.post('/webhook', async (req, res) => {
           'Con esa información, comunicaré tu consulta a nuestro personal para que te brinden el estado actualizado de tu pedido. 😊';
 
       } else if (esOpcion5) {
+        // 🚀 Inicio del flujo guiado de cita
+        estadosUsuarios[from] = { paso: 'fecha' };
         replyText =
-          '🗓️ *AGENDA TU CITA*\n\n' +
-          'Con gusto podemos ayudarte a agendar una sesión o cita en Arte Fotográfico.\n\n' +
-          'Por favor envíame estos datos:\n' +
-          '- 📅 Fecha deseada\n' +
-          '- 📷 Tipo de sesión (por ejemplo: título, familiar, pareja, bebé, graduación, etc.)\n' +
-          '- 📞 Número de contacto\n\n' +
-          'Con esa información, comunicaré tu solicitud a uno de nuestros colaboradores para confirmar disponibilidad y horarios contigo. 😊';
+          '🗓️ *Agendar cita en Arte Fotográfico*\n\n' +
+          'Perfecto, te ayudo a reservar tu sesión.\n\n' +
+          '1️⃣ Primero, indícame la *fecha y hora* en el siguiente formato:\n' +
+          '👉 `2025-11-15 15:00`\n\n' +
+          'Ejemplo: 2025-11-15 15:00 (15 de noviembre de 2025 a las 3:00 p.m.)\n\n' +
+          'Si deseas cancelar este proceso escribe *"cancelar cita"*.';
 
       } else {
         const pregunta =
