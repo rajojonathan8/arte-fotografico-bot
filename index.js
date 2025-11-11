@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const { google } = require('googleapis');
-
+const token = process.env.WHATSAPP_TOKEN;
 let serviceAccount = null;
 
 if (process.env.GOOGLE_SERVICE_ACCOUNT) {
@@ -211,7 +211,7 @@ async function preguntarAGemini(mensajeUsuario) {
 
 
 async function preguntarAChatGPT(mensajeUsuario) {
-  if (!OPENAI_API_KEY) {
+  if (!token) {
     console.error('⚠️ No hay OPENAI_API_KEY configurada');
     return 'Por el momento no puedo usar inteligencia artificial, pero con gusto te atiendo como asistente básico de Arte Fotográfico. 😊';
   }
@@ -238,7 +238,7 @@ async function preguntarAChatGPT(mensajeUsuario) {
       {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${OPENAI_API_KEY}`
+          Authorization: `Bearer ${token}`
         }
       }
     );
@@ -264,7 +264,7 @@ async function preguntarAChatGPT(mensajeUsuario) {
 
 // ⚠️ PON AQUÍ TUS DATOS REALES
 const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO'; // mismo que usaste en Meta
-const WHATSAPP_TOKEN = 'EAFoXrBcgNOoBP54CrWZCILVFtZCpY6MI9vUEedy8w3NO3oqH920ha9ihUZBMzIpSiZBix5cSRtcy3NnvW96xvByh0melQvVltBnhC38rv6XCpXb1ff58WZAZBOzFyZAfsEhD7HSW7AghefKecv3MgWgtOuQmBZC1Bfd5vj91YhwpGBN7wwyMEjL0OVHi49rMIhFxFFs1PB2Egdu1Eoid2zaAOPx3CFVMLx3QBrW3AtCE2fhWwauwrU4lbCOHaOQFgvZBE4oFYobtZBRjEKIZBwIpwUHBuCNk1oRdJaedknpeQZDZD'; // EAAG...
+
 const PHONE_NUMBER_ID = '805856909285040';       // p.ej. 123456789012345
 const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT;
 const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
@@ -316,7 +316,7 @@ async function sendWhatsAppMessage(to, text) {
       {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          Authorization: `Bearer ${token}`,
         },
       }
     );
