@@ -209,7 +209,7 @@ const PHONE_NUMBER_ID = '805856909285040';       // p.ej. 123456789012345
 const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT;
 const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
 
-let serviceAccount = null;
+
 
 if (GOOGLE_SERVICE_ACCOUNT) {
   try {
