@@ -432,18 +432,7 @@ app.post('/webhook', async (req, res) => {
           '3️⃣ SERVICIO DE IMPRESIÓN FOTOGRÁFICA\n' +
           '4️⃣ CONSULTAR ORDEN\n' +
           '5️⃣ AGENDA TU CITA';
-      }else if (esTestCalendar) {
-        const ok = await crearEventoDePruebaCalendar('Cliente de prueba', from);
-        if (ok) {
-          replyText =
-            '✅ He creado un *evento de prueba* en el calendario de Arte Fotográfico para dentro de 1 hora.\n' +
-            'Por favor revisa tu Google Calendar para verificarlo. 🗓️';
-        } else {
-          replyText =
-            '❌ No pude crear el evento de prueba en el calendario.\n' +
-            'Revisa las credenciales de Google y vuelve a intentarlo.';
-        }
-      } } else if (esComandoCita) {
+      }else if (esComandoCita) {
         // Formato esperado:
         // cita: YYYY-MM-DD HH:mm; tipo de sesión; telefono
         // ejemplo:
@@ -474,9 +463,18 @@ app.post('/webhook', async (req, res) => {
               '❌ Ocurrió un problema al crear la cita en el calendario.\n' +
               'Por favor revisa el formato y vuelve a intentarlo, o avisa a un colaborador.';
           }
+        }}else if (esTestCalendar) {
+        const ok = await crearEventoDePruebaCalendar('Cliente de prueba', from);
+        if (ok) {
+          replyText =
+            '✅ He creado un *evento de prueba* en el calendario de Arte Fotográfico para dentro de 1 hora.\n' +
+            'Por favor revisa tu Google Calendar para verificarlo. 🗓️';
+        } else {
+          replyText =
+            '❌ No pude crear el evento de prueba en el calendario.\n' +
+            'Revisa las credenciales de Google y vuelve a intentarlo.';
         }
-
-      }else if (esOpcion1) {
+      } else if (esOpcion1) {
         // 🔹 Opción 1 – SERVICIO FOTO ESTUDIO
         replyText =
           '📷 *SERVICIO FOTO ESTUDIO*\n\n' +
