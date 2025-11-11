@@ -19,22 +19,26 @@ async function getCalendarClient() {
     return null;
   }
 
-  // La private_key viene con "\n" en una sola línea. Hay que convertirlo a saltos reales.
+  if (!serviceAccount.client_email || !serviceAccount.private_key) {
+    console.error('⚠️ serviceAccount sin client_email o private_key');
+    return null;
+  }
+
   const privateKey = serviceAccount.private_key.replace(/\\n/g, '\n');
 
-  const jwtClient = new google.auth.JWT(
-    serviceAccount.client_email,
-    null,
-    privateKey,
-    ['https://www.googleapis.com/auth/calendar']
-  );
+  const auth = new google.auth.GoogleAuth({
+    credentials: {
+      client_email: serviceAccount.client_email,
+      private_key: privateKey
+    },
+    scopes: ['https://www.googleapis.com/auth/calendar']
+  });
 
-  // 🔐 Importante: autorizar el cliente para obtener el access token
-  await jwtClient.authorize();
+  const authClient = await auth.getClient();
 
   const calendar = google.calendar({
     version: 'v3',
-    auth: jwtClient
+    auth: authClient
   });
 
   return calendar;
