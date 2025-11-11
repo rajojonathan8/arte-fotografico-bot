@@ -169,8 +169,36 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
     return false;
   }
 }
+function formatearFechaHoraLocal(dateObj) {
+  // Convierte un Date a "YYYY-MM-DD HH:mm" en zona America/El_Salvador
+  const opciones = {
+    timeZone: 'America/El_Salvador',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  };
 
-// ---- CANCELAR CITA EN CALENDAR (versión mejorada) ----
+  const partes = new Intl.DateTimeFormat('en-CA', opciones).formatToParts(dateObj);
+
+  let year, month, day, hour, minute;
+  for (const p of partes) {
+    if (p.type === 'year') year = p.value;
+    if (p.type === 'month') month = p.value;
+    if (p.type === 'day') day = p.value;
+    if (p.type === 'hour') hour = p.value;
+    if (p.type === 'minute') minute = p.value;
+  }
+
+  return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
+
+
+
+// ---- CANCELAR CITA EN CALENDAR (versión con búsqueda por día completo) ----
 async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
   try {
     console.log('💠 cancelarCitaEnCalendar =>', { fechaHoraTexto, telefono });
@@ -189,12 +217,15 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
     const [anio, mes, dia] = fechaStr.split('-').map(Number);
     const [hora, minuto] = horaStr.split(':').map(Number);
 
-    // Convertimos a hora local
-    const inicio = new Date(anio, mes - 1, dia, hora, minuto);
+    // Fecha/hora local en El Salvador
+    const fechaLocal = new Date(anio, mes - 1, dia, hora, minuto);
 
-    // Buscamos eventos cercanos a esa hora (-30 min, +90 min)
-    const timeMin = new Date(inicio.getTime() - 30 * 60 * 1000).toISOString();
-    const timeMax = new Date(inicio.getTime() + 90 * 60 * 1000).toISOString();
+    // Rango del día completo en hora local
+    const inicioDiaLocal = new Date(anio, mes - 1, dia, 0, 0, 0);
+    const finDiaLocal = new Date(anio, mes - 1, dia, 23, 59, 59);
+
+    const timeMin = inicioDiaLocal.toISOString();
+    const timeMax = finDiaLocal.toISOString();
 
     const listRes = await calendar.events.list({
       calendarId: GOOGLE_CALENDAR_ID,
@@ -205,38 +236,54 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
     });
 
     const items = listRes.data.items || [];
-    console.log(`💠 Se encontraron ${items.length} eventos entre ${timeMin} y ${timeMax}`);
+    console.log(`💠 Se encontraron ${items.length} eventos el día ${fechaStr}`);
 
-    // Normalizamos el teléfono (quitamos espacios, signos y prefijos)
     const telefonoLimpio = telefono.replace(/[^0-9]/g, '');
+    const ultimos4 = telefonoLimpio.slice(-4);
+
     let eventoAEliminar = null;
 
     for (const ev of items) {
       const desc = (ev.description || '').toLowerCase();
       const resumen = (ev.summary || '').toLowerCase();
 
-      // Mostrar en consola los posibles eventos encontrados
-      console.log(`➡️ Revisando evento: ${resumen}`);
-      console.log(`   descripción: ${desc}`);
+      // Fecha/hora del evento en local
+      let fechaEventoTexto = '';
+      if (ev.start && ev.start.dateTime) {
+        const fechaEv = new Date(ev.start.dateTime);
+        fechaEventoTexto = formatearFechaHoraLocal(fechaEv); // "YYYY-MM-DD HH:mm"
+      }
 
-      // Buscamos coincidencias de número de teléfono o parte del mismo
-      if (
-        desc.includes(telefonoLimpio) ||
-        resumen.includes(telefonoLimpio) ||
-        (telefonoLimpio.length >= 4 && desc.includes(telefonoLimpio.slice(-4)))
-      ) {
+      console.log('➡️ Revisando evento:', {
+        id: ev.id,
+        summary: ev.summary,
+        fechaEventoTexto,
+      });
+
+      // 1) Coincide EXACTAMENTE la fecha/hora
+      if (fechaEventoTexto !== fechaHoraTexto) {
+        continue;
+      }
+
+      // 2) Coincide el teléfono (completo o últimos 4)
+      const textoBuscado = telefonoLimpio;
+      const coincideTelefono =
+        desc.includes(textoBuscado) ||
+        resumen.includes(textoBuscado) ||
+        (ultimos4 && desc.includes(ultimos4));
+
+      if (coincideTelefono) {
         eventoAEliminar = ev;
-        console.log('✅ Coincidencia encontrada ->', ev.id);
+        console.log('✅ Coincidencia encontrada para cancelar ->', ev.id);
         break;
       }
     }
 
     if (!eventoAEliminar) {
-      console.log('❌ No se encontró evento que coincida con el teléfono.');
+      console.log('❌ No se encontró evento que coincida con fecha/hora y teléfono.');
       return false;
     }
 
-    // Eliminamos el evento
     await calendar.events.delete({
       calendarId: GOOGLE_CALENDAR_ID,
       eventId: eventoAEliminar.id,
