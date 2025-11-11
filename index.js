@@ -326,6 +326,19 @@ app.post('/webhook', async (req, res) => {
     const messages = value && value.messages;
 
     if (messages && messages[0]) {
+      // 🕓 Si el mensaje llega fuera de horario
+if (!esHorarioLaboral()) {
+  const mensajeFueraHorario =
+    "🕓 ¡Gracias por contactarnos con Arte Fotográfico 📸!\n" +
+    "Nuestro horario de atención es:\n" +
+    "👉 Lunes a viernes de 8:00 a.m. a 12:30 p.m. y de 2:00 p.m. a 6:00 p.m.\n" +
+    "👉 Sábados de 8:00 a.m. a 12:30 p.m.\n\n" +
+    "Actualmente estamos fuera de horario, pero en cuanto volvamos te responderemos. 😊";
+
+  await sendWhatsAppMessage(from, mensajeFueraHorario);
+  return res.sendStatus(200); // evita seguir procesando
+}
+
       const message = messages[0];
 
       const from = message.from; // número del cliente
@@ -399,6 +412,28 @@ app.post('/webhook', async (req, res) => {
         textoLower.includes('reservar sesion');
 
       let replyText = '';
+
+      // 🕓 Verificación de horario laboral
+function esHorarioLaboral() {
+  const ahora = new Date();
+  const zonaLocal = ahora.toLocaleString("en-US", { timeZone: "America/El_Salvador" });
+  const fechaLocal = new Date(zonaLocal);
+  const dia = fechaLocal.getDay(); // 0=domingo, 6=sábado
+  const hora = fechaLocal.getHours();
+  const minuto = fechaLocal.getMinutes();
+  const horaDecimal = hora + minuto / 60;
+
+  // 🕓 Lunes a viernes: 8:00–12:30 y 14:00–18:00
+  // 🕓 Sábado: 8:00–12:30
+  if (dia >= 1 && dia <= 5) {
+    return (horaDecimal >= 8 && horaDecimal <= 12.5) || (horaDecimal >= 14 && horaDecimal <= 18);
+  } else if (dia === 6) {
+    return horaDecimal >= 8 && horaDecimal <= 12.5;
+  } else {
+    return false; // Domingo cerrado
+  }
+}
+
 
       if (usaIAForzado) {
         const pregunta = texto.substring(3).trim() || 'Responde como asistente de Arte Fotográfico.';
