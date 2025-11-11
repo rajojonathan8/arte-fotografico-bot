@@ -1,18 +1,6 @@
 require('dotenv').config();
 
 const { google } = require('googleapis');
-const token = process.env.WHATSAPP_TOKEN;
-let serviceAccount = null;
-
-if (process.env.GOOGLE_SERVICE_ACCOUNT) {
-  try {
-    serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
-  } catch (e) {
-    console.error('❌ Error al parsear GOOGLE_SERVICE_ACCOUNT:', e.message);
-  }
-}
-
-
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
@@ -20,9 +8,27 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 🔐 Tokens y claves desde Render
+const token = process.env.WHATSAPP_TOKEN;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT;
+const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
 
+// ⚠️ PON AQUÍ TUS DATOS REALES (estos sí van en código)
+const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO'; // mismo que usaste en Meta
+const PHONE_NUMBER_ID = '805856909285040';
+
+// ---- Google Calendar: service account ----
+let serviceAccount = null;
+
+if (GOOGLE_SERVICE_ACCOUNT) {
+  try {
+    serviceAccount = JSON.parse(GOOGLE_SERVICE_ACCOUNT);
+  } catch (e) {
+    console.error('❌ Error al parsear GOOGLE_SERVICE_ACCOUNT:', e.message);
+  }
+}
 
 async function getCalendarClient() {
   if (!serviceAccount) {
@@ -49,8 +55,6 @@ async function getCalendarClient() {
 
   return calendar;
 }
-
-
 
 async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
   try {
@@ -96,7 +100,6 @@ async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
   }
 }
 
-
 async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
   try {
     console.log('💠 crearCitaEnCalendar =>', { fechaHoraTexto, tipoSesion, telefono });
@@ -111,7 +114,7 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
       return false;
     }
 
-    // Esperamos formato: "YYYY-MM-DD HH:mm" (hora 24h, zona America/El_Salvador)
+    // Esperamos formato: "YYYY-MM-DD HH:mm"
     const [fechaStr, horaStr] = fechaHoraTexto.split(' ');
     if (!fechaStr || !horaStr) {
       console.log('💠 Fecha/hora con formato inválido:', fechaHoraTexto);
@@ -156,15 +159,13 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
   }
 }
 
-
-
+// ---- IA: Gemini ----
 async function preguntarAGemini(mensajeUsuario) {
   if (!GEMINI_API_KEY) {
     console.error('⚠️ No hay GEMINI_API_KEY configurada');
     return 'Por el momento no puedo usar la IA gratuita, pero con gusto te atiendo como asistente básico de Arte Fotográfico. 😊';
   }
 
-  // 🔹 OJO: usamos gemini-2.5-flash en v1beta
   const url =
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' +
     GEMINI_API_KEY;
@@ -208,10 +209,9 @@ async function preguntarAGemini(mensajeUsuario) {
   }
 }
 
-
-
+// ---- IA: ChatGPT (opcional) ----
 async function preguntarAChatGPT(mensajeUsuario) {
-  if (!token) {
+  if (!OPENAI_API_KEY) {
     console.error('⚠️ No hay OPENAI_API_KEY configurada');
     return 'Por el momento no puedo usar inteligencia artificial, pero con gusto te atiendo como asistente básico de Arte Fotográfico. 😊';
   }
@@ -238,7 +238,7 @@ async function preguntarAChatGPT(mensajeUsuario) {
       {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${OPENAI_API_KEY}`
         }
       }
     );
@@ -261,24 +261,6 @@ async function preguntarAChatGPT(mensajeUsuario) {
   }
 }
 
-
-// ⚠️ PON AQUÍ TUS DATOS REALES
-const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO'; // mismo que usaste en Meta
-
-const PHONE_NUMBER_ID = '805856909285040';       // p.ej. 123456789012345
-const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT;
-const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
-
-
-
-if (GOOGLE_SERVICE_ACCOUNT) {
-  try {
-    serviceAccount = JSON.parse(GOOGLE_SERVICE_ACCOUNT);
-  } catch (e) {
-    console.error('❌ Error al parsear GOOGLE_SERVICE_ACCOUNT:', e.message);
-  }
-}
-
 app.use(bodyParser.json());
 
 // Ruta simple de prueba
@@ -289,10 +271,10 @@ app.get('/', (req, res) => {
 // ✅ WEBHOOK DE VERIFICACIÓN (GET)
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
+  const tokenVerify = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  if (mode && token && mode === 'subscribe' && token === VERIFY_TOKEN) {
+  if (mode && tokenVerify && mode === 'subscribe' && tokenVerify === VERIFY_TOKEN) {
     console.log('✅ Webhook verificado correctamente');
     res.status(200).send(challenge);
   } else {
@@ -316,7 +298,7 @@ async function sendWhatsAppMessage(to, text) {
       {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`, // 👈 AQUÍ USAMOS EL TOKEN DEL ENV
         },
       }
     );
@@ -351,18 +333,17 @@ app.post('/webhook', async (req, res) => {
 
       console.log(`📨 Mensaje de ${from}: ${msgBody}`);
 
-      // 🔹 RESPUESTA BÁSICA (luego la cambiamos por la lógica de Arte Fotográfico)
-           const texto = msgBody.trim();
+      const texto = msgBody.trim();
       const textoLower = texto.toLowerCase();
-      const esTestCalendar = textoLower === 'test calendar';
-     const esComandoCita = textoLower.startsWith('cita:');
 
+      const esTestCalendar = textoLower === 'test calendar';
+      const esComandoCita = textoLower.startsWith('cita:');
 
       // 👋 Detectar saludos básicos
-       const esSaludo =
+      const esSaludo =
         textoLower.includes('hola') ||
-        textoLower.includes('hola Mario') ||
-        textoLower.includes('hola Marito') ||
+        textoLower.includes('hola mario') ||
+        textoLower.includes('hola marito') ||
         textoLower.includes('buenos dias') ||
         textoLower.includes('buenos días') ||
         textoLower.includes('buenas tardes') ||
@@ -371,14 +352,16 @@ app.post('/webhook', async (req, res) => {
         textoLower.includes('qué tal') ||
         textoLower.includes('que tal');
 
-      // Prefijo para forzar modo IA (lo dejamos por si tú lo quieres usar)
+      // Prefijo para forzar modo IA
       const usaIAForzado = textoLower.startsWith('ia:');
-        const esOpcion1 =
+
+      const esOpcion1 =
         textoLower === '1' ||
         textoLower.includes('foto estudio') ||
         textoLower.includes('fotoestudio') ||
         textoLower.includes('estudio de fotos');
-        const esOpcion2 =
+
+      const esOpcion2 =
         textoLower === '2' ||
         textoLower.includes('eventos sociales') ||
         textoLower.includes('evento social') ||
@@ -388,13 +371,15 @@ app.post('/webhook', async (req, res) => {
         textoLower.includes('quince años') ||
         textoLower.includes('bautizos') ||
         textoLower.includes('bautizo');
-              const esOpcion3 =
+
+      const esOpcion3 =
         textoLower === '3' ||
         textoLower.includes('impresión fotográfica') ||
         textoLower.includes('impresion fotografica') ||
         textoLower.includes('imprimir fotos') ||
         textoLower.includes('impresiones de fotos');
-              const esOpcion4 =
+
+      const esOpcion4 =
         textoLower === '4' ||
         textoLower.includes('consultar orden') ||
         textoLower.includes('consulta de orden') ||
@@ -402,6 +387,7 @@ app.post('/webhook', async (req, res) => {
         textoLower.includes('estado de mi pedido') ||
         textoLower.includes('ver mi pedido') ||
         textoLower.includes('rastrear pedido');
+
       const esOpcion5 =
         textoLower === '5' ||
         textoLower.includes('agenda tu cita') ||
@@ -412,16 +398,14 @@ app.post('/webhook', async (req, res) => {
         textoLower.includes('reservar sesión') ||
         textoLower.includes('reservar sesion');
 
-
       let replyText = '';
 
       if (usaIAForzado) {
-        
         const pregunta = texto.substring(3).trim() || 'Responde como asistente de Arte Fotográfico.';
         console.log('🤖 Enviando a Gemini (modo ia:):', pregunta);
         replyText = await preguntarAGemini(pregunta);
+
       } else if (esSaludo) {
-        // 👋 Saludo + menú principal
         replyText =
           '👋 ¡Hola! Gracias por contactar con Arte Fotográfico 📸\n' +
           'Soy un asistente virtual con inteligencia artificial.\n' +
@@ -432,12 +416,8 @@ app.post('/webhook', async (req, res) => {
           '3️⃣ SERVICIO DE IMPRESIÓN FOTOGRÁFICA\n' +
           '4️⃣ CONSULTAR ORDEN\n' +
           '5️⃣ AGENDA TU CITA';
-      }else if (esComandoCita) {
-        // Formato esperado:
-        // cita: YYYY-MM-DD HH:mm; tipo de sesión; telefono
-        // ejemplo:
-        // cita: 2025-11-15 15:00; sesión familiar; 50370000000
 
+      } else if (esComandoCita) {
         const sinPrefijo = texto.substring(5).trim(); // quita "cita:"
         const partes = sinPrefijo.split(';').map(p => p.trim());
 
@@ -463,7 +443,9 @@ app.post('/webhook', async (req, res) => {
               '❌ Ocurrió un problema al crear la cita en el calendario.\n' +
               'Por favor revisa el formato y vuelve a intentarlo, o avisa a un colaborador.';
           }
-        }}else if (esTestCalendar) {
+        }
+
+      } else if (esTestCalendar) {
         const ok = await crearEventoDePruebaCalendar('Cliente de prueba', from);
         if (ok) {
           replyText =
@@ -474,8 +456,8 @@ app.post('/webhook', async (req, res) => {
             '❌ No pude crear el evento de prueba en el calendario.\n' +
             'Revisa las credenciales de Google y vuelve a intentarlo.';
         }
+
       } else if (esOpcion1) {
-        // 🔹 Opción 1 – SERVICIO FOTO ESTUDIO
         replyText =
           '📷 *SERVICIO FOTO ESTUDIO*\n\n' +
           'En Foto Estudio ofrecemos:\n\n' +
@@ -496,8 +478,7 @@ app.post('/webhook', async (req, res) => {
           '- Blanco y negro, contemporáneos y artísticos.\n\n' +
           'Si deseas más información o agendar tu sesión, dime y con gusto te ayudo 😊';
 
-      }else if (esOpcion2) {
-        // 🔹 Opción 2 — COTIZACIÓN DE EVENTOS SOCIALES
+      } else if (esOpcion2) {
         replyText =
           '💍 *COTIZACIÓN DE PAQUETES DE EVENTOS SOCIALES*\n\n' +
           'En Arte Fotográfico tenemos paquetes personalizados para:\n' +
@@ -514,8 +495,8 @@ app.post('/webhook', async (req, res) => {
           '- Fecha del evento\n' +
           '- Lugar (salón, iglesia, casa, ciudad, etc.)\n\n' +
           'Si prefieres hablar con una persona, también puedo comunicarte con nuestro personal 📞';
-      }else if (esOpcion3) {
-        // 🔹 Opción 3 — SERVICIO DE IMPRESIÓN FOTOGRÁFICA
+
+      } else if (esOpcion3) {
         replyText =
           '🖨️ *SERVICIO DE IMPRESIÓN FOTOGRÁFICA*\n\n' +
           'Ofrecemos impresiones fotográficas de alta calidad en diferentes tamaños y acabados.\n\n' +
@@ -525,8 +506,8 @@ app.post('/webhook', async (req, res) => {
           '- ✉️ Desde tu correo electrónico\n\n' +
           'Si deseas cotizar o hacer un pedido, puedo comunicarte con nuestro personal para ayudarte con tamaños, precios y tiempos de entrega. 😊\n\n' +
           '¿Te gustaría que te atienda un colaborador para tu impresión fotográfica?';
-      }else if (esOpcion4) {
-        // 🔹 Opción 4 — CONSULTAR ORDEN
+
+      } else if (esOpcion4) {
         replyText =
           '📦 *CONSULTAR ORDEN*\n\n' +
           'Para ayudarte a consultar el estado de tu orden, por favor envíame uno de estos datos:\n' +
@@ -534,8 +515,8 @@ app.post('/webhook', async (req, res) => {
           'o\n' +
           '- Nombre completo con el que hiciste el pedido\n\n' +
           'Con esa información, comunicaré tu consulta a nuestro personal para que te brinden el estado actualizado de tu pedido. 😊';
-      }else if (esOpcion5) {
-        // 🔹 Opción 5 — AGENDA TU CITA
+
+      } else if (esOpcion5) {
         replyText =
           '🗓️ *AGENDA TU CITA*\n\n' +
           'Con gusto podemos ayudarte a agendar una sesión o cita en Arte Fotográfico.\n\n' +
@@ -544,8 +525,8 @@ app.post('/webhook', async (req, res) => {
           '- 📷 Tipo de sesión (por ejemplo: título, familiar, pareja, bebé, graduación, etc.)\n' +
           '- 📞 Número de contacto\n\n' +
           'Con esa información, comunicaré tu solicitud a uno de nuestros colaboradores para confirmar disponibilidad y horarios contigo. 😊';
+
       } else {
-        // 🧠 Cualquier otro mensaje → IA automática (Gemini)
         const pregunta =
           'Cliente de Arte Fotográfico dice: "' +
           texto +
@@ -559,13 +540,11 @@ app.post('/webhook', async (req, res) => {
       }
 
       await sendWhatsAppMessage(from, replyText);
-
     }
   } catch (err) {
     console.error('⚠️ Error procesando el webhook:', err);
   }
 
-  // Meta siempre espera 200 rápido
   res.sendStatus(200);
 });
 
