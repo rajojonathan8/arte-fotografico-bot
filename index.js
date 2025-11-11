@@ -170,20 +170,14 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
   }
 }
 
-// ---- CANCELAR CITA EN CALENDAR ----
+// ---- CANCELAR CITA EN CALENDAR (versión mejorada) ----
 async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
   try {
     console.log('💠 cancelarCitaEnCalendar =>', { fechaHoraTexto, telefono });
 
     const calendar = await getCalendarClient();
-    if (!calendar) {
-      console.log('💠 Calendar debug: getCalendarClient() devolvió null en cancelarCitaEnCalendar');
-      return false;
-    }
-    if (!GOOGLE_CALENDAR_ID) {
-      console.log('💠 Calendar debug: Falta GOOGLE_CALENDAR_ID en cancelarCitaEnCalendar');
-      return false;
-    }
+    if (!calendar) return false;
+    if (!GOOGLE_CALENDAR_ID) return false;
 
     // Esperamos formato: "YYYY-MM-DD HH:mm"
     const [fechaStr, horaStr] = fechaHoraTexto.split(' ');
@@ -195,10 +189,10 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
     const [anio, mes, dia] = fechaStr.split('-').map(Number);
     const [hora, minuto] = horaStr.split(':').map(Number);
 
-    // Fecha/hora local
+    // Convertimos a hora local
     const inicio = new Date(anio, mes - 1, dia, hora, minuto);
 
-    // Buscamos eventos en una ventana alrededor de esa hora (-30 min, +90 min)
+    // Buscamos eventos cercanos a esa hora (-30 min, +90 min)
     const timeMin = new Date(inicio.getTime() - 30 * 60 * 1000).toISOString();
     const timeMax = new Date(inicio.getTime() + 90 * 60 * 1000).toISOString();
 
@@ -211,24 +205,38 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
     });
 
     const items = listRes.data.items || [];
-    console.log(`💠 Se encontraron ${items.length} eventos en la ventana de tiempo`);
+    console.log(`💠 Se encontraron ${items.length} eventos entre ${timeMin} y ${timeMax}`);
 
-    // Intentamos encontrar un evento que contenga el teléfono en la descripción
+    // Normalizamos el teléfono (quitamos espacios, signos y prefijos)
+    const telefonoLimpio = telefono.replace(/[^0-9]/g, '');
     let eventoAEliminar = null;
+
     for (const ev of items) {
-      const desc = (ev.description || '').toString();
-      const summary = (ev.summary || '').toString();
-      if (telefono && (desc.includes(telefono) || summary.includes(telefono))) {
+      const desc = (ev.description || '').toLowerCase();
+      const resumen = (ev.summary || '').toLowerCase();
+
+      // Mostrar en consola los posibles eventos encontrados
+      console.log(`➡️ Revisando evento: ${resumen}`);
+      console.log(`   descripción: ${desc}`);
+
+      // Buscamos coincidencias de número de teléfono o parte del mismo
+      if (
+        desc.includes(telefonoLimpio) ||
+        resumen.includes(telefonoLimpio) ||
+        (telefonoLimpio.length >= 4 && desc.includes(telefonoLimpio.slice(-4)))
+      ) {
         eventoAEliminar = ev;
+        console.log('✅ Coincidencia encontrada ->', ev.id);
         break;
       }
     }
 
     if (!eventoAEliminar) {
-      console.log('💠 No se encontró evento que coincida con la fecha/hora y teléfono');
+      console.log('❌ No se encontró evento que coincida con el teléfono.');
       return false;
     }
 
+    // Eliminamos el evento
     await calendar.events.delete({
       calendarId: GOOGLE_CALENDAR_ID,
       eventId: eventoAEliminar.id,
@@ -246,6 +254,7 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
     return false;
   }
 }
+
 
 
 
