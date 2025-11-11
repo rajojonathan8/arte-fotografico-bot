@@ -676,9 +676,7 @@ app.post('/webhook', async (req, res) => {
           '3️⃣ SERVICIO DE IMPRESIÓN FOTOGRÁFICA\n' +
           '4️⃣ CONSULTAR ORDEN\n' +
           '5️⃣ AGENDA TU CITA\n\n' +
-          '📝 También puedes usar:\n' +
-          '• "cita: 2025-11-15 15:00; sesión familiar; 5037XXXXXX"\n' +
-          '• "cancelar: 2025-11-15 15:00; 5037XXXXXX"';
+          
 
       } else if (esComandoCita) {
         const sinPrefijo = texto.substring(5).trim(); // quita "cita:"
