@@ -97,6 +97,66 @@ async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
 }
 
 
+async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
+  try {
+    console.log('💠 crearCitaEnCalendar =>', { fechaHoraTexto, tipoSesion, telefono });
+
+    const calendar = await getCalendarClient();
+    if (!calendar) {
+      console.log('💠 Calendar debug: getCalendarClient() devolvió null en crearCitaEnCalendar');
+      return false;
+    }
+    if (!GOOGLE_CALENDAR_ID) {
+      console.log('💠 Calendar debug: Falta GOOGLE_CALENDAR_ID en crearCitaEnCalendar');
+      return false;
+    }
+
+    // Esperamos formato: "YYYY-MM-DD HH:mm" (hora 24h, zona America/El_Salvador)
+    const [fechaStr, horaStr] = fechaHoraTexto.split(' ');
+    if (!fechaStr || !horaStr) {
+      console.log('💠 Fecha/hora con formato inválido:', fechaHoraTexto);
+      return false;
+    }
+
+    const [anio, mes, dia] = fechaStr.split('-').map(Number);
+    const [hora, minuto] = horaStr.split(':').map(Number);
+
+    // Mes en JS es 0-based (enero=0)
+    const inicio = new Date(Date.UTC(anio, mes - 1, dia, hora, minuto));
+    const fin = new Date(inicio.getTime() + 60 * 60 * 1000); // duración 1h
+
+    const evento = {
+      summary: `Sesión ${tipoSesion || 'fotográfica'} - Cliente WhatsApp`,
+      description: `Sesión agendada desde el bot de Arte Fotográfico.\nTeléfono: ${telefono || ''}`,
+      start: {
+        dateTime: inicio.toISOString(),
+        timeZone: 'America/El_Salvador'
+      },
+      end: {
+        dateTime: fin.toISOString(),
+        timeZone: 'America/El_Salvador'
+      }
+    };
+
+    const res = await calendar.events.insert({
+      calendarId: GOOGLE_CALENDAR_ID,
+      requestBody: evento
+    });
+
+    console.log('✅ Cita creada en Calendar:', res.data.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error al crear cita en Calendar:');
+    if (error.response && error.response.data) {
+      console.error(JSON.stringify(error.response.data, null, 2));
+    } else {
+      console.error(error.message);
+    }
+    return false;
+  }
+}
+
+
 
 async function preguntarAGemini(mensajeUsuario) {
   if (!GEMINI_API_KEY) {
@@ -295,6 +355,8 @@ app.post('/webhook', async (req, res) => {
            const texto = msgBody.trim();
       const textoLower = texto.toLowerCase();
       const esTestCalendar = textoLower === 'test calendar';
+     const esComandoCita = textoLower.startsWith('cita:');
+
 
       // 👋 Detectar saludos básicos
        const esSaludo =
@@ -381,7 +443,40 @@ app.post('/webhook', async (req, res) => {
             '❌ No pude crear el evento de prueba en el calendario.\n' +
             'Revisa las credenciales de Google y vuelve a intentarlo.';
         }
-      } else if (esOpcion1) {
+      } } else if (esComandoCita) {
+        // Formato esperado:
+        // cita: YYYY-MM-DD HH:mm; tipo de sesión; telefono
+        // ejemplo:
+        // cita: 2025-11-15 15:00; sesión familiar; 50370000000
+
+        const sinPrefijo = texto.substring(5).trim(); // quita "cita:"
+        const partes = sinPrefijo.split(';').map(p => p.trim());
+
+        const fechaHoraTexto = partes[0];
+        const tipoSesion = partes[1] || 'fotográfica';
+        const telefonoCliente = partes[2] || from;
+
+        if (!fechaHoraTexto) {
+          replyText =
+            '⚠️ Formato de cita inválido.\n' +
+            'Usa por ejemplo:\n' +
+            'cita: 2025-11-15 15:00; sesión familiar; 50370000000';
+        } else {
+          const ok = await crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefonoCliente);
+          if (ok) {
+            replyText =
+              '✅ He creado tu cita en el calendario de Arte Fotográfico.\n' +
+              `📅 Fecha y hora: *${fechaHoraTexto}*\n` +
+              `📸 Tipo de sesión: *${tipoSesion}*\n` +
+              `📞 Contacto: *${telefonoCliente}*`;
+          } else {
+            replyText =
+              '❌ Ocurrió un problema al crear la cita en el calendario.\n' +
+              'Por favor revisa el formato y vuelve a intentarlo, o avisa a un colaborador.';
+          }
+        }
+
+      }else if (esOpcion1) {
         // 🔹 Opción 1 – SERVICIO FOTO ESTUDIO
         replyText =
           '📷 *SERVICIO FOTO ESTUDIO*\n\n' +
