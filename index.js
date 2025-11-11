@@ -121,28 +121,36 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
       return false;
     }
 
-    const [anio, mes, dia] = fechaStr.split('-').map(Number);
+        const [anio, mes, dia] = fechaStr.split('-').map(Number);
     const [hora, minuto] = horaStr.split(':').map(Number);
 
-    // 🔹 Crear fecha/hora "normal" (sin UTC) y dejar que Calendar la interprete con la zona America/El_Salvador
-    const inicio = new Date(anio, mes - 1, dia, hora, minuto);
-    const fin = new Date(inicio.getTime() + 60 * 60 * 1000); // duración 1h
+    // Función para rellenar con 2 dígitos
+    const pad2 = (n) => String(n).padStart(2, '0');
 
-    console.log('💠 Horario cita - inicio:', inicio.toISOString(), 'fin:', fin.toISOString());
+    // 🔹 Construimos fecha/hora LOCAL en texto, sin "Z" (sin UTC)
+    const inicioLocal = `${anio}-${pad2(mes)}-${pad2(dia)}T${pad2(hora)}:${pad2(minuto)}:00`;
 
+    // 🔹 Sumamos 1 hora para la hora de fin
+    const totalMinutosInicio = hora * 60 + minuto + 60; // +60 min = 1h
+    const horaFin = Math.floor(totalMinutosInicio / 60);
+    const minutoFin = totalMinutosInicio % 60;
+    const finLocal = `${anio}-${pad2(mes)}-${pad2(dia)}T${pad2(horaFin)}:${pad2(minutoFin)}:00`;
+
+    console.log('💠 Horario cita - inicioLocal:', inicioLocal, 'finLocal:', finLocal);
 
     const evento = {
       summary: `Sesión ${tipoSesion || 'fotográfica'} - Cliente WhatsApp`,
       description: `Sesión agendada desde el bot de Arte Fotográfico.\nTeléfono: ${telefono || ''}`,
       start: {
-        dateTime: inicio.toISOString(),
+        dateTime: inicioLocal,              // 👈 ya NO usamos toISOString()
         timeZone: 'America/El_Salvador'
       },
       end: {
-        dateTime: fin.toISOString(),
+        dateTime: finLocal,                 // 👈 también sin toISOString()
         timeZone: 'America/El_Salvador'
       }
     };
+
 
     const res = await calendar.events.insert({
       calendarId: GOOGLE_CALENDAR_ID,
