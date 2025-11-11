@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "arte-fotografico-bot",
+  "private_key_id": "91cae4c173ea49987a73610b6f1733c97b279d62",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDGgBywYY/CElom\nYmzXXCbBLLgmKmq8bw4Yekd1cheEpYjWoF6HNpPGVcgBdYOAUg6MFMF78mhOsoh0\ngR5CaUVREHKZswicfE3yP/dkY/1yAVjTo3OxI+dw4WjCFy0ZfUlt30qwBhke6cp1\nB4xkOSusDC0oEdytkHbm+F1KEaCKQOun+Mmo5FQqEsZDTLF8OZgwWfyGV2KUtxj+\np8Nnq6kfEaIHvMq7OJ68Y9HLxt445yhVVV7iQwn8iuR3OkQI6xNet3lvOSbLxxFC\n8wqdM6utyZiyV8ThikD817gaLwybz8xDSLXr6u/Bb/CxQbGn63Xx2nPwkfdMZnoC\nAKysE6H5AgMBAAECggEAGQ/iz2g6ANxVUoRZzqUdZYVyaKsxV8JDytZhgFQb4Q0P\nZl3QIY1EAiYhfwGpzUFPAeO6/B3CirEi5mbI/cSR0mbbuUkv/KX7J2tpHl07ijHe\nV7ZK7KImXguvsNXBRXcalss7AFd8w3jsLXN7B8pqF6pf5y++J5HWWVohWTE5jkrj\nz4shW2b2U2LJoqrUDQUYUP3UyMZucYVeKNy78Dca1xE1IWOzy62ojSH5z8Z/sQR8\n4qAD4AS+vqeaxMW53316f5h4Tv1xwxhDrYZMiC/CB9ZBgq5FSOK9E2CFQfd0z1Om\nEMUHxKtIWbCeiWbjq1Uv2x0fyPdl4vAqAUJHAC706QKBgQD76wI4HdUkgjE2zNub\nGq9qXbpa62hhbEIi9EQentZck7SJwUu5wOdREiO3LcOTMOAzOadTatRgqOKoI1xy\nksuuxxWAoAgWhPAPncF8AAzcTpm+/d53R26W1kMWtvv00auptfoXVFfuyg6+OvIj\nxD84Oc0SA0UCX/cO1z+DeuyrJQKBgQDJt4US8TFR1PxeLdx/tzAzHEyBtFPPhNBc\n8zwwGg+J86vLytkLbZSCj4y5hlHkp9WFVu4WWxbFzwdfqcBwC4taWXKL2G82CS3D\nylnyCPKUSr5Dw4wxLiHagP7CsW+tYjRtaPeKyQsPSqq3HCiR0751Pn7t/3SvrEho\nMwWWsyQtRQKBgALTROgaNYy+RQ0HSSM5LmRz/qYMY9RL4YYA1U6+m0rYgTrWRyIj\nLrTzDiF8yue4sZsBd4Xw+cbHvhsCooPKb6xbITubD9woy4RxUX0xhvNlkkXZFQij\nbXMVnhUAIl1BiLpThyWB1aag739kq9iI1+iqhUlBbiGzr9KjyVuRIlxdAoGAQAxW\nY5pTx6Dx9NFpBuBanI/qtvBUADsykaDlxnwv3OSS8uVYnylPE1mTHEFK9WhZArqE\nZHLNu0cuFzDmGm1/9NMb7M1vGmA1uMoiXxh6NZ255fhMJj14oFF/EsCWLh5VeTvw\nBZAqQ9O4euWk+BCck8uhL96B5Vm1r+graRs+bGUCgYA8G/qGR3CwplJ7xKn4D7Xh\n+R84rM5+hN/Ri/a3PijdTcOjoMMAper+meid3r/bbDzC6p8X7LY/RBD67RYwmN30\nLIfHxb9tl8FATmKm1ZJJnaAsERP/cpnsrx9QgX5+79T9ILeQrHrA/QlKVc47MfFD\nlsgeixhuVticXYxq89c7LA==\n-----END PRIVATE KEY-----\n",
+  "client_email": "bot-calendar-access@arte-fotografico-bot.iam.gserviceaccount.com",
+  "client_id": "116353704683057942072",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/bot-calendar-access%40arte-fotografico-bot.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
