@@ -170,6 +170,85 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono) {
   }
 }
 
+// ---- CANCELAR CITA EN CALENDAR ----
+async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
+  try {
+    console.log('💠 cancelarCitaEnCalendar =>', { fechaHoraTexto, telefono });
+
+    const calendar = await getCalendarClient();
+    if (!calendar) {
+      console.log('💠 Calendar debug: getCalendarClient() devolvió null en cancelarCitaEnCalendar');
+      return false;
+    }
+    if (!GOOGLE_CALENDAR_ID) {
+      console.log('💠 Calendar debug: Falta GOOGLE_CALENDAR_ID en cancelarCitaEnCalendar');
+      return false;
+    }
+
+    // Esperamos formato: "YYYY-MM-DD HH:mm"
+    const [fechaStr, horaStr] = fechaHoraTexto.split(' ');
+    if (!fechaStr || !horaStr) {
+      console.log('💠 Fecha/hora inválida en cancelarCitaEnCalendar:', fechaHoraTexto);
+      return false;
+    }
+
+    const [anio, mes, dia] = fechaStr.split('-').map(Number);
+    const [hora, minuto] = horaStr.split(':').map(Number);
+
+    // Fecha/hora local
+    const inicio = new Date(anio, mes - 1, dia, hora, minuto);
+
+    // Buscamos eventos en una ventana alrededor de esa hora (-30 min, +90 min)
+    const timeMin = new Date(inicio.getTime() - 30 * 60 * 1000).toISOString();
+    const timeMax = new Date(inicio.getTime() + 90 * 60 * 1000).toISOString();
+
+    const listRes = await calendar.events.list({
+      calendarId: GOOGLE_CALENDAR_ID,
+      timeMin,
+      timeMax,
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+
+    const items = listRes.data.items || [];
+    console.log(`💠 Se encontraron ${items.length} eventos en la ventana de tiempo`);
+
+    // Intentamos encontrar un evento que contenga el teléfono en la descripción
+    let eventoAEliminar = null;
+    for (const ev of items) {
+      const desc = (ev.description || '').toString();
+      const summary = (ev.summary || '').toString();
+      if (telefono && (desc.includes(telefono) || summary.includes(telefono))) {
+        eventoAEliminar = ev;
+        break;
+      }
+    }
+
+    if (!eventoAEliminar) {
+      console.log('💠 No se encontró evento que coincida con la fecha/hora y teléfono');
+      return false;
+    }
+
+    await calendar.events.delete({
+      calendarId: GOOGLE_CALENDAR_ID,
+      eventId: eventoAEliminar.id,
+    });
+
+    console.log('✅ Cita eliminada en Calendar:', eventoAEliminar.id);
+    return true;
+  } catch (error) {
+    console.error('❌ Error al cancelar cita en Calendar:');
+    if (error.response && error.response.data) {
+      console.error(JSON.stringify(error.response.data, null, 2));
+    } else {
+      console.error(error.message);
+    }
+    return false;
+  }
+}
+
+
+
 // 🕓 Horarios
 function esHorarioLaboral() {
   const ahora = new Date();
@@ -409,6 +488,7 @@ app.post('/webhook', async (req, res) => {
 
       const esTestCalendar = textoLower === 'test calendar';
       const esComandoCita = textoLower.startsWith('cita:');
+      const esComandoCancelar = textoLower.startsWith('cancelar:');
 
       // 👋 Detectar saludos básicos
       const esSaludo =
@@ -476,7 +556,32 @@ app.post('/webhook', async (req, res) => {
         console.log('🤖 Enviando a Gemini (modo ia:):', pregunta);
         replyText = await preguntarAGemini(pregunta);
 
-      } else if (esSaludo) {
+      }else if (esComandoCancelar) {
+        // cancelar: YYYY-MM-DD HH:mm; telefono
+        const sinPrefijo = texto.substring(9).trim(); // quita "cancelar:"
+        const partes = sinPrefijo.split(';').map(p => p.trim());
+
+        const fechaHoraTexto = partes[0];
+        const telefonoCliente = partes[1] || from;
+
+        if (!fechaHoraTexto) {
+          replyText =
+            '⚠️ Formato de cancelación inválido.\n' +
+            'Usa por ejemplo:\n' +
+            'cancelar: 2025-11-15 15:00; 50370000000';
+        } else {
+          const ok = await cancelarCitaEnCalendar(fechaHoraTexto, telefonoCliente);
+          if (ok) {
+            replyText =
+              '✅ He cancelado la cita en el calendario de Arte Fotográfico.\n' +
+              `📅 Fecha y hora: *${fechaHoraTexto}*\n` +
+              `📞 Contacto: *${telefonoCliente}*`;
+          } else {
+            replyText =
+              '❌ No encontré una cita que coincida con esa fecha/hora y teléfono.\n' +
+              'Por favor verifica los datos o consulta con un colaborador.';
+          }
+        }}  else if (esSaludo) {
         replyText =
           '👋 ¡Hola! Gracias por contactar con Arte Fotográfico 📸\n' +
           'Soy un asistente virtual con inteligencia artificial.\n' +
