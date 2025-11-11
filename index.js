@@ -2,6 +2,17 @@ require('dotenv').config();
 
 const { google } = require('googleapis');
 
+let serviceAccount = null;
+
+if (process.env.GOOGLE_SERVICE_ACCOUNT) {
+  try {
+    serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+  } catch (e) {
+    console.error('❌ Error al parsear GOOGLE_SERVICE_ACCOUNT:', e.message);
+  }
+}
+
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
@@ -24,13 +35,8 @@ async function getCalendarClient() {
     return null;
   }
 
-  const privateKey = serviceAccount.private_key.replace(/\\n/g, '\n');
-
   const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: serviceAccount.client_email,
-      private_key: privateKey
-    },
+    credentials: serviceAccount, // usamos el JSON TAL CUAL
     scopes: ['https://www.googleapis.com/auth/calendar']
   });
 
@@ -43,6 +49,7 @@ async function getCalendarClient() {
 
   return calendar;
 }
+
 
 
 async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
