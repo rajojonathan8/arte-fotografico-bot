@@ -362,7 +362,7 @@ async function listarCitasPorTelefono(telefono) {
 
 // ================== HORARIOS ==================
 
-function esHorarioLaboral() {
+/*function esHorarioLaboral() {
   const ahora = new Date();
   const zonaLocal = ahora.toLocaleString('en-US', { timeZone: 'America/El_Salvador' });
   const fechaLocal = new Date(zonaLocal);
@@ -380,7 +380,7 @@ function esHorarioLaboral() {
     return horaDecimal >= 8 && horaDecimal <= 12.5;
   }
   // Domingo: cerrado
-  return true;
+  return false;
 }
 
 function esDomingo() {
@@ -390,7 +390,7 @@ function esDomingo() {
   const dia = fechaLocal.getDay(); // 0 = domingo
   return dia === 0;
 }
-
+*/
 // ================== IA: GEMINI / CHATGPT ==================
 
 async function preguntarAGemini(mensajeUsuario) {
