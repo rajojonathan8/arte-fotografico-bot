@@ -11,25 +11,25 @@ const { google } = require('googleapis');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/* ======================= ENTORNO ======================= */
-const WHATSAPP_TOKEN       = process.env.WHATSAPP_TOKEN;
-const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT; // OK
-const GOOGLE_CALENDAR_ID   = process.env.GOOGLE_CALENDAR_ID;
-const OPENAI_API_KEY       = process.env.OPENAI_API_KEY; // opcional (si no hay, sigue funcionando)
+// ====== Entorno
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT;
+const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY; // ← usa OpenAI
 
-/* ======================= CONFIG ======================== */
-const VERIFY_TOKEN     = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO';
-const PHONE_NUMBER_ID  = '805856909285040';
+// ====== Config fijos
+const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO';
+const PHONE_NUMBER_ID = '805856909285040';
 
-/* =============== ESTADO (flujo guiado) ================= */
-const estadosUsuarios = {}; 
-// estadosUsuarios[telefono] = { paso: 'esperandoNombre'|'esperandoFecha'|'esperandoTipo'|'esperandoTelefono', datos:{...} }
+// ====== Estado por usuario (flujo guiado de citas)
+const estadosUsuarios = {}; // { [tel]: { paso, datos: { nombre, fechaHora, tipoSesion, telefono } } }
 
-/* =======================================================
-   CATÁLOGO LOCAL (lee tu servicios.json jerárquico)
-======================================================= */
-let CATALOGO = [];
+// =====================================================================================
+//                        CARGA DE CATÁLOGO + CONTEXTO PARA LA IA
+// =====================================================================================
 const CATALOGO_PATH = path.join(process.cwd(), 'servicios.json');
+let CATALOGO = [];            // índice utilitario para búsquedas rápidas
+let CONTEXTO_SERVICIOS = '';  // string compacto que enviamos a OpenAI
 
 function normalizarTexto(t) {
   return (t || '')
@@ -40,111 +40,202 @@ function normalizarTexto(t) {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
 function claves(...arr) {
-  return arr.flat().filter(Boolean).map((x) => normalizarTexto(x));
+  return arr
+    .flat()
+    .filter(Boolean)
+    .map((x) => normalizarTexto(x));
 }
 
-function cargarCatalogo() {
+// Construye un contexto “compacto” para la IA a partir del JSON
+function construirContextoIA(data) {
+  try {
+    const parts = [];
+    parts.push(`NEGOCIO: Arte Fotográfico (Sonsonate, El Salvador)`);
+    if (data?.direccion) parts.push(`DIRECCION: ${data.direccion}`);
+
+    // Horario
+    if (data?.horario) {
+      const hv = (xs) => (xs || []).map(r => `${r.inicio}-${r.fin}`).join(', ');
+      parts.push(
+        `HORARIO: L-V ${hv(data.horario.lunes_viernes)}; SAB ${hv(data.horario.sabado)}; DOM: cerrado`
+      );
+    }
+
+    // Menú principal
+    if (Array.isArray(data?.menu_principal)) {
+      parts.push(
+        'MENU: ' + data.menu_principal.map(x => `${x.id}-${x.nombre}`).join(' | ')
+      );
+    }
+
+    // Foto estudio → títulos/documentos
+    for (const it of data?.foto_estudio?.titulos_documentos || []) {
+      parts.push(
+        [
+          `SERVICIO:${it.servicio}`,
+          it.tamano ? `TAM:${it.tamano}` : '',
+          it.precio != null ? `PRECIO:$${Number(it.precio).toFixed(2)}` : '',
+          it.duracion_min ? `DUR:${it.duracion_min}min` : '',
+          it.tipo_foto ? `FOTO:${it.tipo_foto}` : '',
+          it.vestimenta_senoritas ? `VEST_S:${it.vestimenta_senoritas}` : '',
+          it.vestimenta_caballeros ? `VEST_C:${it.vestimenta_caballeros}` : '',
+          it.observaciones ? `OBS:${it.observaciones}` : ''
+        ].filter(Boolean).join(' | ')
+      );
+    }
+
+    // Migratorios
+    for (const it of data?.foto_estudio?.migratorios || []) {
+      parts.push(
+        [
+          `SERVICIO:${it.servicio}`,
+          it.tamano ? `TAM:${it.tamano}` : '',
+          it.precio != null ? `PRECIO:$${Number(it.precio).toFixed(2)}` : '',
+          it.duracion_min ? `DUR:${it.duracion_min}min` : '',
+          it.cantidad_fotos ? `CANT_FOTOS:${it.cantidad_fotos}` : '',
+          it.tipo_foto ? `FOTO:${it.tipo_foto}` : '',
+          it.vestimenta_senoritas ? `VEST_S:${it.vestimenta_senoritas}` : '',
+          it.vestimenta_caballeros ? `VEST_C:${it.vestimenta_caballeros}` : '',
+          it.observaciones ? `OBS:${it.observaciones}` : ''
+        ].filter(Boolean).join(' | ')
+      );
+    }
+
+    // Impresión
+    if (data?.impresion_fotografica?.aficionado?.precios?.length) {
+      parts.push('IMPRESION_AFICIONADO: ' + data.impresion_fotografica.aficionado.precios
+        .map(p => `${p.tamano}=$${Number(p.precio).toFixed(2)}`).join(', '));
+    }
+    if (data?.impresion_fotografica?.profesional?.precios?.length) {
+      parts.push('IMPRESION_PRO: ' + data.impresion_fotografica.professional?.nota_tecnica || 'Línea profesional');
+      parts.push('IMPRESION_PRO_PRECIOS: ' + data.impresion_fotografica.profesional.precios
+        .map(p => `${p.tamano}=$${Number(p.precio).toFixed(2)}`).join(', '));
+    }
+
+    // Sesiones / retratos (solo notas)
+    if (data?.foto_estudio?.sesiones_fotograficas?.nota_atencion) {
+      parts.push('SESIONES_NOTA: ' + data.foto_estudio.sesiones_fotograficas.nota_atencion);
+    }
+    if (data?.foto_estudio?.retratos_especiales?.nota_atencion) {
+      parts.push('RETRATOS_NOTA: ' + data.foto_estudio.retratos_especiales.nota_atencion);
+    }
+
+    // Compactar y truncar a ~12k caracteres para no gastar tokens de más
+    let ctx = parts.join('\n');
+    const LIMITE = 12000;
+    if (ctx.length > LIMITE) ctx = ctx.slice(0, LIMITE) + '\n...';
+    return ctx;
+  } catch {
+    return '';
+  }
+}
+
+// Índice para búsqueda por palabras del usuario (rápido)
+function construirIndiceBusqueda(data) {
+  const items = [];
+
+  for (const it of data?.foto_estudio?.titulos_documentos || []) {
+    items.push({
+      tipo: 'servicio',
+      nombre: it.servicio,
+      precio: it.precio,
+      duracion_min: it.duracion_min,
+      tamano: it.tamano,
+      requisitos: it.tipo_foto,
+      cantidad_fotos: it.cantidad_fotos,
+      vestimenta_senoritas: it.vestimenta_senoritas,
+      vestimenta_caballeros: it.vestimenta_caballeros,
+      observaciones: it.observaciones,
+      _nombres: claves(it.servicio, it.tamano, 'titulo', 'foto titulo', 'fotografia titulo')
+    });
+  }
+
+  for (const it of data?.foto_estudio?.migratorios || []) {
+    items.push({
+      tipo: 'servicio',
+      nombre: it.servicio,
+      precio: it.precio,
+      duracion_min: it.duracion_min,
+      tamano: it.tamano,
+      requisitos: it.tipo_foto,
+      cantidad_fotos: it.cantidad_fotos,
+      vestimenta_senoritas: it.vestimenta_senoritas,
+      vestimenta_caballeros: it.vestimenta_caballeros,
+      observaciones: it.observaciones,
+      _nombres: claves(it.servicio, 'visa', 'foto visa', 'foto para visa', it.tamano)
+    });
+  }
+
+  for (const it of data?.impresion_fotografica?.aficionado?.precios || []) {
+    items.push({
+      tipo: 'impresion',
+      linea: 'aficionado',
+      nombre: `Impresión ${it.tamano}`,
+      tamano: it.tamano,
+      precio: it.precio,
+      detalles: data?.impresion_fotografica?.aficionado?.nota_tecnica,
+      _nombres: claves(`impresion ${it.tamano}`, `foto ${it.tamano}`, it.tamano, it.tamano?.replace('x', ' x '))
+    });
+  }
+  for (const it of data?.impresion_fotografica?.profesional?.precios || []) {
+    items.push({
+      tipo: 'impresion',
+      linea: 'profesional',
+      nombre: `Impresión ${it.tamano}`,
+      tamano: it.tamano,
+      precio: it.precio,
+      detalles: 'Línea profesional',
+      _nombres: claves(`impresion ${it.tamano}`, `foto ${it.tamano}`, it.tamano, it.tamano?.replace('x', ' x '))
+    });
+  }
+
+  // informativos
+  if (data?.foto_estudio?.sesiones_fotograficas?.tipos?.length) {
+    items.push({
+      tipo: 'informativo',
+      nombre: 'Sesiones fotográficas',
+      detalles: data.foto_estudio.sesiones_fotograficas.nota_atencion,
+      _nombres: claves('sesion', 'sesiones', ...data.foto_estudio.sesiones_fotograficas.tipos)
+    });
+  }
+  if (data?.foto_estudio?.retratos_especiales?.tipos?.length) {
+    items.push({
+      tipo: 'informativo',
+      nombre: 'Retratos especiales',
+      detalles: data.foto_estudio.retratos_especiales.nota_atencion,
+      _nombres: claves('retratos', 'retrato', ...data.foto_estudio.retratos_especiales.tipos)
+    });
+  }
+
+  return items;
+}
+
+function cargarCatalogoYContexto() {
   try {
     if (!fs.existsSync(CATALOGO_PATH)) {
-      console.warn('⚠️ No existe servicios.json en la raíz.');
+      console.warn('⚠️ No existe servicios.json en la raíz. (IA seguirá respondiendo sin contexto específico)');
+      CATALOGO = [];
+      CONTEXTO_SERVICIOS = '';
       return;
     }
     const raw = fs.readFileSync(CATALOGO_PATH, 'utf8');
     const data = JSON.parse(raw);
 
-    const items = [];
+    CATALOGO = construirIndiceBusqueda(data);
+    CONTEXTO_SERVICIOS = construirContextoIA(data);
 
-    // Foto estudio: títulos/documentos
-    for (const it of data?.foto_estudio?.titulos_documentos || []) {
-      items.push({
-        tipo: 'servicio',
-        nombre: it.servicio,
-        precio: it.precio,
-        duracion_min: it.duracion_min,
-        tamano: it.tamano,
-        requisitos: it.tipo_foto,
-        vestimenta_senoritas: it.vestimenta_senoritas,
-        vestimenta_caballeros: it.vestimenta_caballeros,
-        observaciones: it.observaciones,
-        _nombres: claves(
-          it.servicio,
-          it.tamano ? `${it.servicio} ${it.tamano}` : null,
-          'titulo', 'foto titulo', 'fotografia titulo'
-        ),
-      });
-    }
-
-    // Migratorios (Visa)
-    for (const it of data?.foto_estudio?.migratorios || []) {
-      items.push({
-        tipo: 'servicio',
-        nombre: it.servicio,
-        precio: it.precio,
-        duracion_min: it.duracion_min,
-        tamano: it.tamano,
-        requisitos: it.tipo_foto,
-        cantidad_fotos: it.cantidad_fotos,
-        vestimenta_senoritas: it.vestimenta_senoritas,
-        vestimenta_caballeros: it.vestimenta_caballeros,
-        observaciones: it.observaciones,
-        _nombres: claves(
-          it.servicio, 'visa', it.tamano, 'foto visa', 'foto para visa',
-          it.servicio && `foto ${it.servicio}`
-        ),
-      });
-    }
-
-    // Impresión fotográfica
-    for (const it of data?.impresion_fotografica?.aficionado?.precios || []) {
-      items.push({
-        tipo: 'impresion',
-        linea: 'aficionado',
-        nombre: `Impresión ${it.tamano}`,
-        tamano: it.tamano,
-        precio: it.precio,
-        detalles: data?.impresion_fotografica?.aficionado?.nota_tecnica,
-        _nombres: claves(`impresion ${it.tamano}`, `foto ${it.tamano}`, it.tamano, it.tamano?.replace('x', ' x ')),
-      });
-    }
-    for (const it of data?.impresion_fotografica?.profesional?.precios || []) {
-      items.push({
-        tipo: 'impresion',
-        linea: 'profesional',
-        nombre: `Impresión ${it.tamano}`,
-        tamano: it.tamano,
-        precio: it.precio,
-        detalles: 'Línea profesional',
-        _nombres: claves(`impresion ${it.tamano}`, `foto ${it.tamano}`, it.tamano, it.tamano?.replace('x', ' x ')),
-      });
-    }
-
-    // Informativos: sesiones y retratos (sin precio fijo)
-    if (data?.foto_estudio?.sesiones_fotograficas?.tipos?.length) {
-      items.push({
-        tipo: 'informativo',
-        nombre: 'Sesiones fotográficas',
-        detalles: data.foto_estudio.sesiones_fotograficas.nota_atencion,
-        _nombres: claves('sesion', 'sesiones', ...data.foto_estudio.sesiones_fotograficas.tipos),
-      });
-    }
-    if (data?.foto_estudio?.retratos_especiales?.tipos?.length) {
-      items.push({
-        tipo: 'informativo',
-        nombre: 'Retratos especiales',
-        detalles: data.foto_estudio.retratos_especiales.nota_atencion,
-        _nombres: claves('retratos', 'retrato', ...data.foto_estudio.retratos_especiales.tipos),
-      });
-    }
-
-    CATALOGO = items;
-    console.log(`📚 Catálogo indexado: ${CATALOGO.length} ítems.`);
+    console.log(`📚 Catálogo indexado: ${CATALOGO.length} ítems. Contexto IA: ${CONTEXTO_SERVICIOS.length} chars`);
   } catch (e) {
     console.error('❌ Error cargando servicios.json:', e.message);
+    CATALOGO = [];
+    CONTEXTO_SERVICIOS = '';
   }
 }
-cargarCatalogo();
+cargarCatalogoYContexto();
 
+// Buscador tolerante
 function buscarEnCatalogo(mensajeUsuario) {
   const q = normalizarTexto(mensajeUsuario);
   if (!q || !CATALOGO.length) return null;
@@ -159,13 +250,15 @@ function buscarEnCatalogo(mensajeUsuario) {
   }
   return mejor;
 }
-function money(n) { return typeof n === 'number' ? `$${n.toFixed(2)}` : n; }
+
+function dinero(n) { return typeof n === 'number' ? `$${n.toFixed(2)}` : n; }
+
 function formatearRespuestaCatalogo(it) {
   if (!it) return null;
 
   if (it.tipo === 'servicio') {
     let out = `ℹ️ *${it.nombre}*\n\n`;
-    if (it.precio != null) out += `💲 Precio: ${money(it.precio)}\n`;
+    if (it.precio != null) out += `💲 Precio: ${dinero(it.precio)}\n`;
     if (it.duracion_min) out += `⏱️ Duración: ${it.duracion_min} minutos\n`;
     if (it.tamano) out += `📐 Tamaño: ${it.tamano}\n`;
     if (it.requisitos) out += `📌 Requisitos: ${it.requisitos}\n`;
@@ -179,7 +272,7 @@ function formatearRespuestaCatalogo(it) {
 
   if (it.tipo === 'impresion') {
     let out = `🖨️ *${it.nombre}* (${it.linea})\n`;
-    if (it.precio != null) out += `💲 Precio: ${money(it.precio)}\n`;
+    if (it.precio != null) out += `💲 Precio: ${dinero(it.precio)}\n`;
     if (it.detalles) out += `📝 Detalles: ${it.detalles}\n`;
     out += `\n¿Cantidad y tamaños que necesitas? Puedo ayudarte a calcular el total.`;
     return out.trim();
@@ -191,14 +284,51 @@ function formatearRespuestaCatalogo(it) {
   return out.trim();
 }
 
-/* =======================================================
-   GOOGLE CALENDAR
-======================================================= */
+// =====================================================================================
+//                                      OPENAI (IA)
+// =====================================================================================
+async function askOpenAIConContexto(mensaje) {
+  if (!OPENAI_API_KEY) return null;
+  try {
+    const systemPrompt =
+`Eres el *Asistente Arte Fotográfico*. Atiendes a clientes de un estudio en *Sonsonate, El Salvador*.
+Tono: amable, profesional, claro y conciso. Responde SIEMPRE en español.
+Usa el siguiente CONTEXTO para dar respuestas exactas (precios, tamaños, vestimenta, notas).
+Si el usuario pide algo no presente en el contexto, responde útilmente y sugiere visitar el local o hablar con un asesor.
+No inventes precios no listados. Cuando corresponda, sugiere "Agenda tu cita (envía 5)".`;
+
+    const contexto = CONTEXTO_SERVICIOS || '(Sin contexto cargado)';
+
+    const r = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o-mini',
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'system', content: `CONTEXTO_SERVICIOS (resumido):\n${contexto}` },
+          { role: 'user', content: mensaje }
+        ]
+      },
+      { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
+    );
+
+    return r.data?.choices?.[0]?.message?.content?.trim() || null;
+  } catch (e) {
+    console.error('❌ OpenAI:', e.response?.data || e.message);
+    return null;
+  }
+}
+
+// =====================================================================================
+//                                  GOOGLE CALENDAR
+// =====================================================================================
 let serviceAccount = null;
 if (GOOGLE_SERVICE_ACCOUNT) {
   try { serviceAccount = JSON.parse(GOOGLE_SERVICE_ACCOUNT); }
   catch (e) { console.error('❌ GOOGLE_SERVICE_ACCOUNT inválido:', e.message); }
 }
+
 async function getCalendarClient() {
   try {
     if (!serviceAccount?.client_email || !serviceAccount?.private_key) return null;
@@ -213,12 +343,14 @@ async function getCalendarClient() {
     return null;
   }
 }
+
 function formatearFechaHoraLocal(dateObj) {
   const opt = { timeZone: 'America/El_Salvador', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
   const parts = new Intl.DateTimeFormat('en-CA', opt).formatToParts(dateObj);
   const grab = t => parts.find(p => p.type === t)?.value;
   return `${grab('year')}-${grab('month')}-${grab('day')} ${grab('hour')}:${grab('minute')}`;
 }
+
 async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono, nombreCliente) {
   try {
     const calendar = await getCalendarClient();
@@ -230,7 +362,7 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono, nombreC
     const pad2 = (n) => String(n).padStart(2, '0');
 
     const ini = `${Y}-${pad2(M)}-${pad2(D)}T${pad2(h)}:${pad2(m)}:00`;
-    const minutos = h * 60 + m + 60; // 1 hora de duración
+    const minutos = h * 60 + m + 60;
     const hf = Math.floor(minutos / 60);
     const mf = minutos % 60;
     const fin = `${Y}-${pad2(M)}-${pad2(D)}T${pad2(hf)}:${pad2(mf)}:00`;
@@ -242,7 +374,7 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono, nombreC
         (nombreCliente ? `Nombre: ${nombreCliente}\n` : '') +
         `Teléfono: ${telefono || ''}`,
       start: { dateTime: ini, timeZone: 'America/El_Salvador' },
-      end:   { dateTime: fin, timeZone: 'America/El_Salvador' },
+      end: { dateTime: fin, timeZone: 'America/El_Salvador' },
     };
 
     await calendar.events.insert({ calendarId: GOOGLE_CALENDAR_ID, requestBody: evento });
@@ -252,6 +384,7 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono, nombreC
     return false;
   }
 }
+
 async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
   try {
     const calendar = await getCalendarClient();
@@ -273,10 +406,10 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
 
     for (const ev of resp.data.items || []) {
       const desc = (ev.description || '').toLowerCase();
-      const sum  = (ev.summary || '').toLowerCase();
+      const sum = (ev.summary || '').toLowerCase();
       const fechaTxt = ev.start?.dateTime ? formatearFechaHoraLocal(new Date(ev.start.dateTime)) : '';
       const coincideFecha = fechaTxt === fechaHoraTexto;
-      const coincideTel   = desc.includes(tel) || sum.includes(tel) || (ult4 && desc.includes(ult4));
+      const coincideTel = desc.includes(tel) || sum.includes(tel) || (ult4 && desc.includes(ult4));
       if (coincideFecha && coincideTel) {
         await calendar.events.delete({ calendarId: GOOGLE_CALENDAR_ID, eventId: ev.id });
         return true;
@@ -288,13 +421,13 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
     return false;
   }
 }
+
 async function listarCitasPorTelefono(telefono) {
   try {
     const calendar = await getCalendarClient();
     if (!calendar || !GOOGLE_CALENDAR_ID) return [];
     const ahora = new Date();
-    const en30  = new Date(ahora.getTime() + 30 * 24 * 60 * 60 * 1000);
-
+    const en30 = new Date(ahora.getTime() + 30 * 24 * 60 * 60 * 1000);
     const resp = await calendar.events.list({
       calendarId: GOOGLE_CALENDAR_ID,
       timeMin: ahora.toISOString(),
@@ -309,7 +442,7 @@ async function listarCitasPorTelefono(telefono) {
 
     for (const ev of resp.data.items || []) {
       const desc = (ev.description || '').toLowerCase();
-      const sum  = (ev.summary || '').toLowerCase();
+      const sum = (ev.summary || '').toLowerCase();
       const coincideTel = desc.includes(tel) || sum.includes(tel) || (ult4 && desc.includes(ult4));
       if (!coincideTel) continue;
       const fecha = ev.start?.dateTime ? formatearFechaHoraLocal(new Date(ev.start.dateTime)) : '';
@@ -322,9 +455,9 @@ async function listarCitasPorTelefono(telefono) {
   }
 }
 
-/* =======================================================
-   HORARIO
-======================================================= */
+// =====================================================================================
+//                                      HORARIO
+// =====================================================================================
 function esHorarioLaboralActual() {
   const loc = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/El_Salvador' }));
   const d = loc.getDay(); // 0 dom, 6 sáb
@@ -332,7 +465,7 @@ function esHorarioLaboralActual() {
   const m = loc.getMinutes();
   const hd = h + m / 60;
   if (d >= 1 && d <= 5) return (hd >= 8 && hd <= 12.5) || (hd >= 14 && hd <= 18);
-  if (d === 6)       return hd >= 8 && hd <= 12.5;
+  if (d === 6) return hd >= 8 && hd <= 12.5;
   return false;
 }
 function esDomingo() {
@@ -345,12 +478,12 @@ function esHorarioLaboralEnFecha(fechaHoraTexto) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return false;
   if (!/^([01]?\d|2[0-3]):([0-5]\d)$/.test(hRaw)) return false;
   const [Y, M, D] = f.split('-').map(Number);
-  const [h, m]    = hRaw.split(':').map(Number);
+  const [h, m] = hRaw.split(':').map(Number);
   const d = new Date(Y, M - 1, D, h, m);
   const dow = d.getDay();
-  const hd  = h + m / 60;
+  const hd = h + m / 60;
   if (dow >= 1 && dow <= 5) return (hd >= 8 && hd <= 12.5) || (hd >= 14 && hd <= 18);
-  if (dow === 6)            return hd >= 8 && hd <= 12.5;
+  if (dow === 6) return hd >= 8 && hd <= 12.5;
   return false;
 }
 function normalizarHora(h) {
@@ -358,38 +491,9 @@ function normalizarHora(h) {
   return `${String(H).padStart(2, '0')}:${String(M).padStart(2, '0')}`;
 }
 
-/* =======================================================
-   IA (OpenAI opcional)
-======================================================= */
-async function askOpenAI(prompt) {
-  if (!OPENAI_API_KEY) return null;
-  try {
-    const r = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-4o-mini',
-        temperature: 0.2,
-        messages: [
-          {
-            role: 'system',
-            content:
-              'Eres el Asistente Arte Fotográfico. Responde en español, amable, profesional y conciso. Negocio en Sonsonate, El Salvador. Usa datos del catálogo si están presentes; si no, sé útil sin inventar precios.',
-          },
-          { role: 'user', content: prompt },
-        ],
-      },
-      { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
-    );
-    return r.data?.choices?.[0]?.message?.content?.trim() || null;
-  } catch (e) {
-    console.error('❌ OpenAI:', e.response?.data || e.message);
-    return null;
-  }
-}
-
-/* =======================================================
-   WHATSAPP
-======================================================= */
+// =====================================================================================
+//                                      WHATSAPP
+// =====================================================================================
 app.use(bodyParser.json());
 
 app.get('/', (_, res) => res.send('Servidor Arte Fotográfico activo 🚀'));
@@ -423,20 +527,20 @@ app.post('/webhook', async (req, res) => {
     const message = req.body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
     if (!message) return res.sendStatus(200);
 
-    const from  = message.from;
+    const from = message.from;
     const texto = (message.text?.body || '').trim();
-    const low   = texto.toLowerCase();
+    const low = texto.toLowerCase();
 
-    // Fuera de horario (actual)
+    // Fuera de horario actual
     if (!esHorarioLaboralActual()) {
       const out = esDomingo()
-        ? '📸 *Gracias por contactarnos con Arte Fotográfico.*\n\nHoy es *domingo* y estamos *cerrados* por descanso.\n\n🕓 *Horario:*\nL-V: 8:00–12:30 y 14:00–18:00\nSáb: 8:00–12:30\n\nDéjanos tu mensaje y te respondemos al abrir. 😊'
-        : '📸 *Gracias por contactarnos con Arte Fotográfico.*\n\nAhora estamos *fuera de horario*. Te responderemos en cuanto estemos de vuelta. 😊\n\n🕓 *Horario:*\nL-V: 8:00–12:30 y 14:00–18:00\nSáb: 8:00–12:30';
+        ? '📸 *Gracias por contactarnos con Arte Fotográfico.*\n\nHoy es *domingo* y estamos *cerrados* por descanso del personal.\n\n🕓 *Horario:*\nL-V: 8:00–12:30 y 14:00–18:00\nSáb: 8:00–12:30\n\nDéjanos tu mensaje y te respondemos al abrir. 😊'
+        : '📸 *Gracias por contactarnos con Arte Fotográfico.*\n\nAhora estamos *fuera de horario*, te responderemos en cuanto estemos de vuelta. 😊\n\n🕓 *Horario:*\nL-V: 8:00–12:30 y 14:00–18:00\nSáb: 8:00–12:30';
       await sendWhatsAppMessage(from, out);
       return res.sendStatus(200);
     }
 
-    /* ===== cancelar flujo guiado */
+    // ================== Cancelar flujo guiado
     const estado = estadosUsuarios[from];
     if (estado && low === 'cancelar cita') {
       delete estadosUsuarios[from];
@@ -444,7 +548,7 @@ app.post('/webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    /* ===== flujo guiado en progreso */
+    // ================== Flujo guiado en progreso
     if (estado) {
       if (estado.paso === 'esperandoNombre') {
         estado.datos.nombre = texto;
@@ -501,10 +605,10 @@ app.post('/webhook', async (req, res) => {
       }
     }
 
-    /* ===== comandos / opciones */
-    const esComandoCita     = low.startsWith('cita:');       // cita: YYYY-MM-DD HH:mm; tipo; tel
-    const esComandoCancelar = low.startsWith('cancelar:');   // cancelar: YYYY-MM-DD HH:mm; tel
-    const esMisCitas        = low === 'mis citas' || low.includes('ver mis citas');
+    // ================== Comandos / opciones
+    const esComandoCita = low.startsWith('cita:');       // cita: YYYY-MM-DD HH:mm; tipo; tel
+    const esComandoCancelar = low.startsWith('cancelar:'); // cancelar: YYYY-MM-DD HH:mm; tel
+    const esMisCitas = low === 'mis citas' || low.includes('ver mis citas');
 
     const esSaludo =
       low.includes('hola') || low.includes('buenos dias') || low.includes('buenos días') ||
@@ -557,7 +661,7 @@ app.post('/webhook', async (req, res) => {
       const partes = sin.split(';').map(p => p.trim());
       const [f, hRaw] = (partes[0] || '').split(' ');
       const tipo = partes[1] || 'fotográfica';
-      const tel  = partes[2] || from;
+      const tel = partes[2] || from;
       const fOK = /^\d{4}-\d{2}-\d{2}$/.test(f || '');
       const hOK = /^([01]?\d|2[0-3]):([0-5]\d)$/.test(hRaw || '');
       if (!fOK || !hOK) {
@@ -586,7 +690,8 @@ app.post('/webhook', async (req, res) => {
       replyText =
         '💍 *PAQUETES DE EVENTOS SOCIALES*\n\n' +
         'Bodas, 15 años, bautizos, comuniones, baby showers, infantiles, pre-15 y exteriores.\n' +
-        'Cuéntame *tipo de evento, fecha y lugar* para cotizar (precios personalizados).';
+        'Cuéntame *tipo de evento, fecha y lugar* para cotizar (precios personalizados). ' +
+        'Si lo prefieres, puedo comunicarte con un asesor.';
 
     } else if (esOpcion3) {
       replyText =
@@ -606,15 +711,14 @@ app.post('/webhook', async (req, res) => {
         'Puedes escribir *cancelar cita* para terminar el proceso.';
 
     } else {
-      // MOTOR HÍBRIDO: Catálogo → (si no hay) OpenAI → fallback neutro
+      // ================== MOTOR HÍBRIDO: Catálogo → OpenAI con CONTEXTO
       const hit = buscarEnCatalogo(texto);
       if (hit) {
         replyText = formatearRespuestaCatalogo(hit);
       } else {
-        const ia = await askOpenAI(
-          `Cliente pregunta: "${texto}". Responde como asistente del estudio Arte Fotográfico (Sonsonate). 
-           Si la pregunta es sobre precios/vestimenta/impresión y no hay dato en catálogo, 
-           responde útilmente y sugiere visitarnos sin inventar precios.`
+        const ia = await askOpenAIConContexto(
+          `Cliente: "${texto}". Responde con datos del CONTEXTO si aplica (precios, tamaños, vestimenta). ` +
+          `Si no existe en el contexto, da una respuesta útil y sugiere visitar el local o hablar con un asesor.`
         );
         replyText = ia || 'Gracias por tu mensaje. ¿Podrías darme un poco más de detalle para ayudarte mejor?';
       }
