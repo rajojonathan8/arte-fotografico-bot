@@ -362,7 +362,7 @@ async function listarCitasPorTelefono(telefono) {
 
 // ================== HORARIOS ==================
 
-function esHorarioLaboral() {
+/*function esHorarioLaboral() {
   const ahora = new Date();
   const zonaLocal = ahora.toLocaleString('en-US', { timeZone: 'America/El_Salvador' });
   const fechaLocal = new Date(zonaLocal);
@@ -380,9 +380,9 @@ function esHorarioLaboral() {
     return horaDecimal >= 8 && horaDecimal <= 12.5;
   }
   // Domingo: cerrado
-  return true;
+  return false;
 }
-
+*/
 function esDomingo() {
   const ahora = new Date();
   const zonaLocal = ahora.toLocaleString('en-US', { timeZone: 'America/El_Salvador' });
@@ -574,7 +574,7 @@ app.post('/webhook', async (req, res) => {
     const textoLower = texto.toLowerCase();
 
     // 🕓 Mensajes fuera de horario
-    if (!esHorarioLaboral()) {
+    /*if (!esHorarioLaboral()) {
       let mensajeRespuesta = '';
 
       if (esDomingo()) {
@@ -599,7 +599,7 @@ app.post('/webhook', async (req, res) => {
       await sendWhatsAppMessage(from, mensajeRespuesta);
       return res.sendStatus(200);
     }
-
+*/
     // ================== FLUJO GUIADO DE CITA (OPCIÓN 5) ==================
     const estado = estadosUsuarios[from];
 
