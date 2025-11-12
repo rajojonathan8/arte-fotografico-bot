@@ -1,3 +1,4 @@
+// index.js
 require('dotenv').config();
 
 const fs = require('fs');
@@ -10,25 +11,29 @@ const { google } = require('googleapis');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/* ===================== ENTORNO ===================== */
+// ===== Entorno
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT;
 const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const STAFF_PHONE = (process.env.STAFF_PHONE || '').replace(/[^0-9]/g, ''); // para “humano”
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''; // opcional
 
-/* ===================== CONFIG ====================== */
+// ===== Config fijos
 const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO';
 const PHONE_NUMBER_ID = '805856909285040';
-const TIMEZONE = 'America/El_Salvador';
-const MAPS_LINK = 'https://maps.app.goo.gl/RGm8K3yqk2Q7kRrj6'; // Puedes cambiarlo por el pin exacto
 
-/* ===== Estado por usuario (flujo de cita + confirmaciones) ===== */
-const estadosUsuarios = {}; // { [tel]: { paso, datos:{...}, confirmandoReserva?: true } }
+// ===== Dirección fija (bypassa IA) — CAMBIA EL LINK POR TU PIN EXACTO
+const ADDRESS_TEXT =
+  'Calle Masferrer, Av. Morazán, 2ª Av. Norte #1-2, entre Piedra Lisa y Casa de Cultura de Sonsonate, enfrente de Academia Patty.';
+const MAPS_LINK = 'https://maps.app.goo.gl/RGm8K3yqk2Q7kRrj6';
 
-/* ============== Helpers genéricos ============== */
-const money = (n) => (typeof n === 'number' ? `$${n.toFixed(2)}` : n);
-const nowLocal = () => new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
+// ===== Estado por usuario (flujo guiado de citas)
+const estadosUsuarios = {}; // { [tel]: { paso, datos: { nombre, fechaHora, tipoSesion, telefono } } }
+
+// =====================================================================================
+//                                    CATÁLOGO LOCAL
+// =====================================================================================
+let CATALOGO = [];
+const CATALOGO_PATH = path.join(process.cwd(), 'servicios.json');
 
 function normalizarTexto(t) {
   return (t || '')
@@ -39,22 +44,8 @@ function normalizarTexto(t) {
     .replace(/\s+/g, ' ')
     .trim();
 }
-function pad2(n) { return String(n).padStart(2, '0'); }
-function normalizarHora(h) {
-  const [H, M] = h.split(':').map(Number);
-  return `${pad2(H)}:${pad2(M)}`;
-}
-
-/* ===================== CATALOGO: servicios.json ===================== */
-let CATALOGO = [];
-const CATALOGO_PATH = path.join(process.cwd(), 'servicios.json');
-
-function claves(...arr) {
-  return arr
-    .flat()
-    .filter(Boolean)
-    .map((x) => normalizarTexto(x));
-}
+const claves = (...arr) =>
+  arr.flat().filter(Boolean).map((x) => normalizarTexto(x));
 
 function cargarCatalogo() {
   try {
@@ -72,7 +63,6 @@ function cargarCatalogo() {
     for (const it of data?.foto_estudio?.titulos_documentos || []) {
       items.push({
         tipo: 'servicio',
-        categoria: 'titulo',
         nombre: it.servicio,
         precio: it.precio,
         duracion_min: it.duracion_min,
@@ -84,19 +74,15 @@ function cargarCatalogo() {
         _nombres: claves(
           it.servicio,
           it.tamano ? `${it.servicio} ${it.tamano}` : null,
-          'titulo',
-          'foto titulo',
-          'fotografia titulo',
-          ...(it.alias || [])
+          'titulo', 'foto titulo', 'fotografia titulo', 'titulo universitario', 'titulo bachiller'
         ),
       });
     }
 
-    // FOTO ESTUDIO: migratorios
+    // FOTO ESTUDIO: migratorios (Visa)
     for (const it of data?.foto_estudio?.migratorios || []) {
       items.push({
         tipo: 'servicio',
-        categoria: 'visa',
         nombre: it.servicio,
         precio: it.precio,
         duracion_min: it.duracion_min,
@@ -112,14 +98,12 @@ function cargarCatalogo() {
           it.tamano,
           'foto visa',
           'foto para visa',
-          it.servicio && `foto ${it.servicio}`,
-          ...(it.alias || ['visa usa', 'visa americana', 'visa canada', 'visa canadiense', 'visa mexico', 'visa mexicana'])
+          it.servicio && `foto ${it.servicio}`
         ),
       });
     }
 
-    // IMPRESIÓN: línea aficionado
-    const notaTecAfic = data?.impresion_fotografica?.aficionado?.nota_tecnica;
+    // IMPRESIÓN FOTOGRÁFICA
     for (const it of data?.impresion_fotografica?.aficionado?.precios || []) {
       items.push({
         tipo: 'impresion',
@@ -127,19 +111,16 @@ function cargarCatalogo() {
         nombre: `Impresión ${it.tamano}`,
         tamano: it.tamano,
         precio: it.precio,
-        detalles: notaTecAfic,
-        acabado: it.acabado || null,
-        tiempo_entrega: it.tiempo_entrega || null,
-        min_copias: it.min_copias || 1,
+        detalles: data?.impresion_fotografica?.aficionado?.nota_tecnica,
         _nombres: claves(
           `impresion ${it.tamano}`,
+          `impresión ${it.tamano}`,
           `foto ${it.tamano}`,
           it.tamano,
           it.tamano?.replace('x', ' x ')
         ),
       });
     }
-    // IMPRESIÓN: línea profesional
     for (const it of data?.impresion_fotografica?.profesional?.precios || []) {
       items.push({
         tipo: 'impresion',
@@ -148,11 +129,9 @@ function cargarCatalogo() {
         tamano: it.tamano,
         precio: it.precio,
         detalles: 'Línea profesional',
-        acabado: it.acabado || null,
-        tiempo_entrega: it.tiempo_entrega || null,
-        min_copias: it.min_copias || 1,
         _nombres: claves(
           `impresion ${it.tamano}`,
+          `impresión ${it.tamano}`,
           `foto ${it.tamano}`,
           it.tamano,
           it.tamano?.replace('x', ' x ')
@@ -160,11 +139,10 @@ function cargarCatalogo() {
       });
     }
 
-    // Informativos: sesiones y retratos
+    // Sesiones/retratos informativos
     if (data?.foto_estudio?.sesiones_fotograficas?.tipos?.length) {
       items.push({
         tipo: 'informativo',
-        categoria: 'sesiones',
         nombre: 'Sesiones fotográficas',
         detalles: data.foto_estudio.sesiones_fotograficas.nota_atencion,
         _nombres: claves('sesion', 'sesiones', ...data.foto_estudio.sesiones_fotograficas.tipos),
@@ -173,10 +151,9 @@ function cargarCatalogo() {
     if (data?.foto_estudio?.retratos_especiales?.tipos?.length) {
       items.push({
         tipo: 'informativo',
-        categoria: 'retratos',
         nombre: 'Retratos especiales',
         detalles: data.foto_estudio.retratos_especiales.nota_atencion,
-        _nombres: claves('retrato', 'retratos', ...data.foto_estudio.retratos_especiales.tipos),
+        _nombres: claves('retratos', 'retrato', ...data.foto_estudio.retratos_especiales.tipos),
       });
     }
 
@@ -203,9 +180,9 @@ function buscarEnCatalogo(mensajeUsuario) {
   }
   return mejor;
 }
+const money = (n) => (typeof n === 'number' ? `$${n.toFixed(2)}` : n);
 function formatearRespuestaCatalogo(it) {
   if (!it) return null;
-
   if (it.tipo === 'servicio') {
     let out = `ℹ️ *${it.nombre}*\n\n`;
     if (it.precio != null) out += `💲 Precio: ${money(it.precio)}\n`;
@@ -216,72 +193,32 @@ function formatearRespuestaCatalogo(it) {
     if (it.vestimenta_senoritas) out += `👗 Señoritas: ${it.vestimenta_senoritas}\n`;
     if (it.vestimenta_caballeros) out += `🤵 Caballeros: ${it.vestimenta_caballeros}\n`;
     if (it.observaciones) out += `📝 Observaciones: ${it.observaciones}\n`;
-    out += `\n¿Deseas *agendar*? Escribe *quiero agendar* o envía *5*.\n[ Agendar ][ Dirección ][ Hablar con humano ]`;
+    out += `\n¿Deseas *agendar*? Envía *5* y te guío.`;
     return out.trim();
   }
-
   if (it.tipo === 'impresion') {
-    let out = `🖨️ *${it.nombre}* — ${it.linea}\n`;
-    out += `💲 Precio c/u: ${money(it.precio)}\n`;
-    if (it.acabado) out += `🎞️ Acabado: ${it.acabado}\n`;
+    let out = `🖨️ *${it.nombre}* (${it.linea})\n`;
+    if (it.precio != null) out += `💲 Precio: ${money(it.precio)}\n`;
     if (it.detalles) out += `📝 Detalles: ${it.detalles}\n`;
-    if (it.tiempo_entrega) out += `⏳ Entrega: ${it.tiempo_entrega}\n`;
-    if (it.min_copias) out += `🔸 Mínimo: ${it.min_copias} copia(s)\n`;
-    out += `\nPuedes escribir, por ejemplo: *4 copias 5x7 + 2 de 8x10* y calculo el total.\n[ Calcular total ][ Dirección ][ Hablar con humano ]`;
+    out += `\n¿Cantidad y tamaños que necesitas? Puedo ayudarte a calcular el total.`;
     return out.trim();
   }
-
   let out = `ℹ️ *${it.nombre}*\n`;
   if (it.detalles) out += `${it.detalles}\n`;
-  out += `\n¿Te conecto con un asesor o comparto la dirección?\n[ Hablar con humano ][ Dirección ]`;
+  out += `\nSi deseas, te conecto con un asesor o te comparto la dirección del local.`;
   return out.trim();
 }
 
-/* ============== Cálculo de totales de impresión (bloque 6) ============== */
-function parsearPedidoImpresion(texto) {
-  // ejemplos: "4 copias 5x7 + 2 de 8x10", "3 de 4x6 y 1 8x10"
-  const q = normalizarTexto(texto).replace(/de /g, '');
-  const partes = q.split(/[\+\&\,y]/g);
-  const items = [];
-  for (let p of partes) {
-    const m = p.match(/(\d+)\s*(copias?|x)?\s*(\d{1,2}\s*x\s*\d{1,2}|\d{1,2}x\d{1,2})/);
-    if (m) {
-      const cantidad = parseInt(m[1], 10);
-      const tam = m[3].replace(/\s*/g, '');
-      items.push({ cantidad, tamano: tam });
-    }
-  }
-  return items; // [{cantidad, tamano}]
-}
-function precioImpresionPorTamano(tam) {
-  const hit = CATALOGO.find(it => it.tipo === 'impresion' && normalizarTexto(it.tamano) === normalizarTexto(tam));
-  return hit ? { precio: hit.precio, linea: hit.linea, min: hit.min_copias || 1 } : null;
-}
-function calcularTotalImpresion(texto) {
-  const pedido = parsearPedidoImpresion(texto);
-  if (!pedido.length) return null;
-
-  let total = 0;
-  const desglose = [];
-  for (const it of pedido) {
-    const info = precioImpresionPorTamano(it.tamano);
-    if (!info) {
-      desglose.push(`❓ ${it.cantidad} x ${it.tamano} (tamaño no encontrado)`);
-      continue;
-    }
-    const cobradas = Math.max(it.cantidad, info.min);
-    const sub = cobradas * info.precio;
-    total += sub;
-    desglose.push(`• ${it.cantidad} x ${it.tamano} (${info.linea}) → ${money(info.precio)} c/u = ${money(sub)}${cobradas>it.cantidad?` (mín. ${info.min})`:''}`);
-  }
-  return { total, desglose };
-}
-
-/* ===================== GOOGLE CALENDAR ===================== */
+// =====================================================================================
+//                                  GOOGLE CALENDAR
+// =====================================================================================
 let serviceAccount = null;
 if (GOOGLE_SERVICE_ACCOUNT) {
-  try { serviceAccount = JSON.parse(GOOGLE_SERVICE_ACCOUNT); }
-  catch (e) { console.error('❌ GOOGLE_SERVICE_ACCOUNT inválido:', e.message); }
+  try {
+    serviceAccount = JSON.parse(GOOGLE_SERVICE_ACCOUNT);
+  } catch (e) {
+    console.error('❌ GOOGLE_SERVICE_ACCOUNT inválido:', e.message);
+  }
 }
 async function getCalendarClient() {
   try {
@@ -298,11 +235,27 @@ async function getCalendarClient() {
   }
 }
 function formatearFechaHoraLocal(dateObj) {
-  const opt = { timeZone: TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
+  const opt = {
+    timeZone: 'America/El_Salvador',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  };
   const parts = new Intl.DateTimeFormat('en-CA', opt).formatToParts(dateObj);
   const grab = t => parts.find(p => p.type === t)?.value;
   return `${grab('year')}-${grab('month')}-${grab('day')} ${grab('hour')}:${grab('minute')}`;
 }
+
+// 🆔 Genera ID corto de reserva
+function generarBookingId(fechaHoraTexto, telefono) {
+  const [f, h] = fechaHoraTexto.split(' ');
+  const ymd = f.replaceAll('-', '').slice(2); // YYMMDD
+  const hm  = h.replace(':','');              // HHmm
+  const t   = (telefono || '').replace(/[^0-9]/g,'');
+  const last4 = t.slice(-4) || '0000';
+  return `AF-${ymd}-${hm}-${last4}`;
+}
+
+// Crear cita → devuelve bookingId (o false)
 async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono, nombreCliente) {
   try {
     const calendar = await getCalendarClient();
@@ -311,29 +264,34 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono, nombreC
     const [fechaStr, horaStr] = fechaHoraTexto.split(' ');
     const [Y, M, D] = fechaStr.split('-').map(Number);
     const [h, m] = horaStr.split(':').map(Number);
+    const pad2 = (n) => String(n).padStart(2, '0');
 
     const ini = `${Y}-${pad2(M)}-${pad2(D)}T${pad2(h)}:${pad2(m)}:00`;
-    const minutos = h * 60 + m + 60;
-    const hf = Math.floor(minutos / 60);
-    const mf = minutos % 60;
+    const minutos = h*60 + m + 60;
+    const hf = Math.floor(minutos/60), mf = minutos % 60;
     const fin = `${Y}-${pad2(M)}-${pad2(D)}T${pad2(hf)}:${pad2(mf)}:00`;
 
+    const bookingId = generarBookingId(fechaHoraTexto, telefono);
+
     const evento = {
-      summary: `Sesión ${tipoSesion || 'fotográfica'} - ${nombreCliente || 'Cliente WhatsApp'}`,
+      summary: `(${bookingId}) Sesión ${tipoSesion || 'fotográfica'} - ${nombreCliente || 'Cliente WhatsApp'}`,
       description:
+        `ID: ${bookingId}\n` +
         `Sesión agendada desde el bot de Arte Fotográfico.\n` +
         (nombreCliente ? `Nombre: ${nombreCliente}\n` : '') +
         `Teléfono: ${telefono || ''}`,
-      start: { dateTime: ini, timeZone: TIMEZONE },
-      end:   { dateTime: fin, timeZone: TIMEZONE },
+      start: { dateTime: ini, timeZone: 'America/El_Salvador' },
+      end:   { dateTime: fin, timeZone: 'America/El_Salvador' },
     };
+
     await calendar.events.insert({ calendarId: GOOGLE_CALENDAR_ID, requestBody: evento });
-    return true;
+    return bookingId;
   } catch (e) {
     console.error('❌ crearCitaEnCalendar:', e.response?.data || e.message);
     return false;
   }
 }
+
 async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
   try {
     const calendar = await getCalendarClient();
@@ -341,6 +299,7 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
 
     const [fechaStr] = fechaHoraTexto.split(' ');
     const [Y, M, D] = fechaStr.split('-').map(Number);
+
     const timeMin = new Date(Y, M - 1, D, 0, 0, 0).toISOString();
     const timeMax = new Date(Y, M - 1, D, 23, 59, 59).toISOString();
 
@@ -369,6 +328,40 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
     return false;
   }
 }
+
+async function cancelarCitaPorId(bookingId) {
+  try {
+    const calendar = await getCalendarClient();
+    if (!calendar || !GOOGLE_CALENDAR_ID) return false;
+
+    const ahora = new Date();
+    const past  = new Date(ahora.getTime() - 365*24*60*60*1000).toISOString();
+    const future= new Date(ahora.getTime() + 365*24*60*60*1000).toISOString();
+
+    const resp = await calendar.events.list({
+      calendarId: GOOGLE_CALENDAR_ID,
+      timeMin: past,
+      timeMax: future,
+      q: bookingId,
+      singleEvents: true,
+      orderBy: 'startTime',
+      maxResults: 10,
+    });
+
+    const items = resp.data.items || [];
+    if (!items.length) return false;
+
+    await calendar.events.delete({
+      calendarId: GOOGLE_CALENDAR_ID,
+      eventId: items[0].id,
+    });
+    return true;
+  } catch (e) {
+    console.error('❌ cancelarCitaPorId:', e.response?.data || e.message);
+    return false;
+  }
+}
+
 async function listarCitasPorTelefono(telefono) {
   try {
     const calendar = await getCalendarClient();
@@ -402,9 +395,11 @@ async function listarCitasPorTelefono(telefono) {
   }
 }
 
-/* ===================== HORARIO ===================== */
+// =====================================================================================
+//                                      HORARIO
+// =====================================================================================
 function esHorarioLaboralActual() {
-  const loc = nowLocal();
+  const loc = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/El_Salvador' }));
   const d = loc.getDay(); // 0 dom, 6 sáb
   const h = loc.getHours();
   const m = loc.getMinutes();
@@ -413,7 +408,10 @@ function esHorarioLaboralActual() {
   if (d === 6) return hd >= 8 && hd <= 12.5;
   return false;
 }
-function esDomingo() { return nowLocal().getDay() === 0; }
+function esDomingo() {
+  const loc = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/El_Salvador' }));
+  return loc.getDay() === 0;
+}
 function esHorarioLaboralEnFecha(fechaHoraTexto) {
   const [f, hRaw] = (fechaHoraTexto || '').split(' ');
   if (!f || !hRaw) return false;
@@ -428,18 +426,16 @@ function esHorarioLaboralEnFecha(fechaHoraTexto) {
   if (dow === 6) return hd >= 8 && hd <= 12.5;
   return false;
 }
+function normalizarHora(h) {
+  const [H, M] = h.split(':').map(Number);
+  return `${String(H).padStart(2, '0')}:${String(M).padStart(2, '0')}`;
+}
 
-/* ===================== IA (OpenAI con cache) ===================== */
-const IA_CACHE = new Map(); // key -> {txt, ts}
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
-
+// =====================================================================================
+//                                         IA
+// =====================================================================================
 async function askOpenAI(prompt) {
   if (!OPENAI_API_KEY) return null;
-  const key = normalizarTexto(prompt).slice(0, 400);
-  const hit = IA_CACHE.get(key);
-  const now = Date.now();
-  if (hit && (now - hit.ts) < CACHE_TTL_MS) return hit.txt;
-
   try {
     const r = await axios.post(
       'https://api.openai.com/v1/chat/completions',
@@ -447,29 +443,26 @@ async function askOpenAI(prompt) {
         model: 'gpt-4o-mini',
         temperature: 0.2,
         messages: [
-          { role: 'system',
-            content: 'Eres el Asistente Arte Fotográfico. Responde en español, amable, profesional y conciso. Si no tienes un dato exacto, ofrece una alternativa útil o sugiere visitar el local.' },
-          { role: 'user', content: prompt }
+          {
+            role: 'system',
+            content:
+              'Eres el Asistente Arte Fotográfico. Responde en español, con tono amable, profesional y conciso. Negocio en Sonsonate, El Salvador. Usa datos exactos solo si el usuario los dio o están en el catálogo.',
+          },
+          { role: 'user', content: prompt },
         ],
-        max_tokens: 250
       },
       { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
     );
-    const txt = r.data?.choices?.[0]?.message?.content?.trim() || null;
-    if (txt) IA_CACHE.set(key, { txt, ts: now });
-    // evitar crecer sin límite
-    if (IA_CACHE.size > 200) {
-      const firstKey = IA_CACHE.keys().next().value;
-      IA_CACHE.delete(firstKey);
-    }
-    return txt;
+    return r.data?.choices?.[0]?.message?.content?.trim() || null;
   } catch (e) {
     console.error('❌ OpenAI:', e.response?.data || e.message);
     return null;
   }
 }
 
-/* ===================== WHATSAPP ===================== */
+// =====================================================================================
+//                                      WHATSAPP
+// =====================================================================================
 app.use(bodyParser.json());
 
 app.get('/', (_, res) => res.send('Servidor Arte Fotográfico activo 🚀'));
@@ -488,65 +481,63 @@ app.get('/webhook', (req, res) => {
 async function sendWhatsAppMessage(to, text) {
   const url = `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`;
   try {
-    const r = await axios.post(
+    await axios.post(
       url,
       { messaging_product: 'whatsapp', to, text: { body: text } },
       { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${WHATSAPP_TOKEN}` } }
     );
-    return r.data;
   } catch (e) {
     console.error('❌ WhatsApp send:', e.response?.data || e.message);
-    return null;
   }
+}
+
+function pideUbicacion(texto) {
+  const t = (texto || '').toLowerCase();
+  return [
+    'ubicacion','ubicación','direccion','dirección','como llegar','cómo llegar',
+    'donde estan','dónde están','donde estan ubicados','dónde están ubicados',
+    'mapa','maps','ubicados','donde están'
+  ].some(k => t.includes(k));
 }
 
 app.post('/webhook', async (req, res) => {
   try {
     const message = req.body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-    const msgId = message?.id;
     if (!message) return res.sendStatus(200);
 
     const from = message.from;
     const texto = (message.text?.body || '').trim();
     const low = texto.toLowerCase();
 
-    console.log(`📨 [${msgId}] ${from}: ${texto}`);
-
     // Fuera de horario actual
     if (!esHorarioLaboralActual()) {
       const out = esDomingo()
-        ? '📸 *Arte Fotográfico* — Hoy es *domingo* y estamos *cerrados*.\n🕓 Horario: L-V 8:00–12:30 / 14:00–18:00 · Sáb 8:00–12:30\nDéjanos tu mensaje y te respondemos al abrir. 😊'
-        : '📸 *Arte Fotográfico* — Ahora estamos *fuera de horario*.\n🕓 Horario: L-V 8:00–12:30 / 14:00–18:00 · Sáb 8:00–12:30\nDéjanos tu mensaje y te respondemos a la brevedad. 😊';
+        ? '📸 *Gracias por contactarnos con Arte Fotográfico.*\n\nHoy es *domingo* y estamos *cerrados* por descanso del personal.\n\n🕓 *Horario:*\nL-V: 8:00–12:30 y 14:00–18:00\nSáb: 8:00–12:30\n\nDéjanos tu mensaje y te respondemos al abrir. 😊'
+        : '📸 *Gracias por contactarnos con Arte Fotográfico.*\n\nAhora estamos *fuera de horario*, te responderemos en cuanto estemos de vuelta. 😊\n\n🕓 *Horario:*\nL-V: 8:00–12:30 y 14:00–18:00\nSáb: 8:00–12:30';
       await sendWhatsAppMessage(from, out);
       return res.sendStatus(200);
     }
 
-    /* ===== Derivar a humano (bloque 5) ===== */
-    if (/(humano|asesor|persona|atenderme)/i.test(low)) {
-      if (STAFF_PHONE) {
-        await sendWhatsAppMessage(STAFF_PHONE, `📲 Cliente solicita atención:\nDe: ${from}\nMensaje: "${texto}"`);
-      }
-      await sendWhatsAppMessage(from, '👤 Te conecto con un asesor. En breves momentos te escribirá. 🙌');
-      return res.sendStatus(200);
-    }
-
-    /* ===== Cancelar flujo guiado ===== */
+    // ================== Cancelar flujo guiado
     const estado = estadosUsuarios[from];
     if (estado && low === 'cancelar cita') {
       delete estadosUsuarios[from];
-      await sendWhatsAppMessage(from, '❌ Proceso cancelado. Envía *5* o escribe *agendar cita* para empezar de nuevo.');
+      await sendWhatsAppMessage(from, '❌ Proceso cancelado. Envía *5* o escribe "agendar cita" para empezar de nuevo.');
       return res.sendStatus(200);
     }
 
-    /* ===== Flujo guiado en progreso ===== */
+    // ================== Flujo guiado en progreso
     if (estado) {
       if (estado.paso === 'esperandoNombre') {
         estado.datos.nombre = texto;
         estado.paso = 'esperandoFecha';
-        await sendWhatsAppMessage(from,
-          `📅 Gracias, *${estado.datos.nombre}*.\nIndícame la *fecha y hora* en formato:\n⭐ 2025-11-15 15:00`);
+        await sendWhatsAppMessage(
+          from,
+          `📅 Gracias, *${estado.datos.nombre}*.\n\nAhora indícame la *fecha y hora* en formato:\n⭐ 2025-11-15 15:00`
+        );
         return res.sendStatus(200);
       }
+
       if (estado.paso === 'esperandoFecha') {
         const [f, hRaw] = texto.split(' ');
         const fOK = /^\d{4}-\d{2}-\d{2}$/.test(f || '');
@@ -557,8 +548,10 @@ app.post('/webhook', async (req, res) => {
         }
         const fechaHora = `${f} ${normalizarHora(hRaw)}`;
         if (!esHorarioLaboralEnFecha(fechaHora)) {
-          await sendWhatsAppMessage(from,
-            '⏰ Ese horario está *fuera de atención*.\nL-V: 8:00–12:30 y 14:00–18:00 · Sáb: 8:00–12:30.\nIndícame otra *fecha y hora* dentro del horario. 😊');
+          await sendWhatsAppMessage(
+            from,
+            '⏰ Ese horario está *fuera de atención*.\nL-V: 8:00–12:30 y 14:00–18:00 · Sáb: 8:00–12:30.\nIndícame otra *fecha y hora* dentro del horario. 😊'
+          );
           return res.sendStatus(200);
         }
         estado.datos.fechaHora = fechaHora;
@@ -566,20 +559,23 @@ app.post('/webhook', async (req, res) => {
         await sendWhatsAppMessage(from, '📸 Perfecto. ¿Qué *tipo de sesión* deseas? (ej.: sesión familiar, fotos para título, etc.)');
         return res.sendStatus(200);
       }
+
       if (estado.paso === 'esperandoTipo') {
         estado.datos.tipoSesion = texto;
         estado.paso = 'esperandoTelefono';
         await sendWhatsAppMessage(from, '📞 Genial. Por último, envíame tu *número de contacto* (ej.: 5037XXXXXX).');
         return res.sendStatus(200);
       }
+
       if (estado.paso === 'esperandoTelefono') {
         estado.datos.telefono = texto || from;
         const { nombre, fechaHora, tipoSesion, telefono } = estado.datos;
-        const ok = await crearCitaEnCalendar(fechaHora, tipoSesion, telefono, nombre);
+
+        const bookingId = await crearCitaEnCalendar(fechaHora, tipoSesion, telefono, nombre);
         await sendWhatsAppMessage(
           from,
-          ok
-            ? `✅ Cita creada.\n👤 *${nombre}*\n📅 *${fechaHora}*\n📸 *${tipoSesion}*\n📞 *${telefono}*`
+          bookingId
+            ? `✅ Cita creada.\n🆔 *Código*: ${bookingId}\n👤 *${nombre}*\n📅 *${fechaHora}*\n📸 *${tipoSesion}*\n📞 *${telefono}*\n\nPara cancelar: *cancelar id: ${bookingId}*`
             : '❌ No pude crear la cita. Revisa los datos o avisa a un colaborador.'
         );
         delete estadosUsuarios[from];
@@ -587,17 +583,10 @@ app.post('/webhook', async (req, res) => {
       }
     }
 
-    /* ===== Intención de agendar (bloque 1) ===== */
-    if (/(quiero agendar|puede reservar|agendame|reserva|hacer cita)/i.test(low)) {
-      estadosUsuarios[from] = { paso: 'esperandoNombre', datos: {}, confirmandoReserva: false };
-      await sendWhatsAppMessage(from,
-        '🗓️ *Agendar cita*\nPerfecto, te ayudo a reservar.\n1️⃣ Primero, dime tu *nombre completo*.\n[ Cancelar cita ]');
-      return res.sendStatus(200);
-    }
-
-    /* ===== Comandos / opciones ===== */
+    // ================== Comandos / opciones
     const esComandoCita = low.startsWith('cita:');       // cita: YYYY-MM-DD HH:mm; tipo; tel
     const esComandoCancelar = low.startsWith('cancelar:'); // cancelar: YYYY-MM-DD HH:mm; tel
+    const esCancelarPorId = low.startsWith('cancelar id:'); // cancelar id: AF-YYMMDD-HHMM-####
     const esMisCitas = low === 'mis citas' || low.includes('ver mis citas');
 
     const esSaludo =
@@ -611,7 +600,29 @@ app.post('/webhook', async (req, res) => {
     const esOpcion4 = low === '4' || low.includes('consultar orden') || low.includes('estado de mi pedido');
     const esOpcion5 = low === '5' || low.includes('agendar cita') || low.includes('reservar cita') || low.includes('reservar sesión') || low.includes('reservar sesion');
 
+    // 📍 Dirección fija (antes de IA)
+    if (pideUbicacion(texto)) {
+      await sendWhatsAppMessage(
+        from,
+        `🏠 *Dirección del local*\n${ADDRESS_TEXT}\n\n🗺️ *Cómo llegar:* ${MAPS_LINK}`
+      );
+      return res.sendStatus(200);
+    }
+
     let replyText = '';
+
+    if (esCancelarPorId) {
+      const bookingId = texto.substring('cancelar id:'.length).trim();
+      if (!bookingId) {
+        await sendWhatsAppMessage(from, 'Usa: *cancelar id: AF-YYMMDD-HHMM-####*');
+        return res.sendStatus(200);
+      }
+      const ok = await cancelarCitaPorId(bookingId);
+      await sendWhatsAppMessage(from, ok
+        ? `✅ Cita con código *${bookingId}* cancelada.`
+        : `❌ No encontré una cita con el código *${bookingId}*.`);
+      return res.sendStatus(200);
+    }
 
     if (esComandoCancelar) {
       const sin = texto.substring(9).trim();
@@ -638,14 +649,13 @@ app.post('/webhook', async (req, res) => {
 
     } else if (esSaludo) {
       replyText =
-        '👋 ¡Hola! Gracias por contactar con *Arte Fotográfico* 📸\n¿En qué puedo ayudarte hoy?\n\n' +
+        '👋 ¡Hola! Gracias por contactar con Arte Fotográfico 📸\nSoy un asistente virtual con IA.\n¿En qué puedo servirte hoy?\n\n' +
         'Elige una opción 👇\n' +
         '1️⃣ SERVICIO FOTO ESTUDIO\n' +
         '2️⃣ COTIZACIÓN DE PAQUETES DE EVENTOS SOCIALES\n' +
         '3️⃣ SERVICIO DE IMPRESIÓN FOTOGRÁFICA\n' +
         '4️⃣ CONSULTAR ORDEN\n' +
-        '5️⃣ AGENDA TU CITA\n\n' +
-        '[ Precios ][ Impresión ][ Agendar ][ Ubicación ]';
+        '5️⃣ AGENDA TU CITA';
 
     } else if (esComandoCita) {
       const sin = texto.substring(5).trim();
@@ -662,63 +672,55 @@ app.post('/webhook', async (req, res) => {
         if (!esHorarioLaboralEnFecha(fechaHora)) {
           replyText = '⏰ Ese horario está fuera de atención.\nL-V: 8:00–12:30 y 14:00–18:00 · Sáb: 8:00–12:30.\nElige otra fecha/hora dentro del horario. 😊';
         } else {
-          const ok = await crearCitaEnCalendar(fechaHora, tipo, tel, null);
-          replyText = ok
-            ? `✅ Cita creada.\n📅 *${fechaHora}*\n📸 *${tipo}*\n📞 *${tel}*`
+          const bookingId = await crearCitaEnCalendar(fechaHora, tipo, tel, null);
+          replyText = bookingId
+            ? `✅ Cita creada.\n🆔 *Código*: ${bookingId}\n📅 *${fechaHora}*\n📸 *${tipo}*\n📞 *${tel}*\n\nPara cancelar: *cancelar id: ${bookingId}*`
             : '❌ Hubo un problema al crear la cita. Intenta de nuevo.';
         }
       }
 
     } else if (esOpcion1) {
       replyText =
-        '📷 *SERVICIO FOTO ESTUDIO*\n' +
-        '— Títulos y documentos (Bachiller, 7x9 USO, 6x8 UMA, certificados, escalafón, carnets…)\n' +
-        '— Servicios migratorios (VISA USA 2x2, Canadá 3.5x4.5, México 3.2x2.6)\n' +
-        '— Sesiones (personales, pareja, familiares, bebés, portafolio, graduados, navideñas…)\n\n' +
-        '¿Sobre qué servicio te doy detalles?\n[ Bachiller ][ USO 7x9 ][ UMA 6x8 ][ VISA USA ]';
+        '📷 *SERVICIO FOTO ESTUDIO*\n\n' +
+        '🔸 *Títulos y documentos* (Bachiller, 7x9 USO, 6x8 UMA, certificados, escalafón, carnets…)\n' +
+        '🔸 *Servicios migratorios* (VISA USA 2x2, Canadá 3.5x4.5, México 3.2x2.6)\n' +
+        '🔸 *Sesiones fotográficas* (personales, pareja, familiares, bebés, portafolio, graduados, navideñas…)\n\n' +
+        '¿Sobre qué servicio te gustaría más información?';
 
     } else if (esOpcion2) {
       replyText =
-        '💍 *PAQUETES DE EVENTOS SOCIALES*\n' +
+        '💍 *PAQUETES DE EVENTOS SOCIALES*\n\n' +
         'Bodas, 15 años, bautizos, comuniones, baby showers, infantiles, pre-15 y exteriores.\n' +
-        'Cuéntame *tipo de evento, fecha y lugar* para cotizar (precios personalizados).\n[ Hablar con humano ][ Dirección ]';
+        'Cuéntame *tipo de evento, fecha y lugar* para cotizar (precios personalizados).';
 
     } else if (esOpcion3) {
       replyText =
-        '🖨️ *IMPRESIÓN FOTOGRÁFICA*\n' +
-        'Línea aficionado y profesional. Puedes decir: *4 copias 5x7 + 2 de 8x10* y calculo el total.\n[ Calcular total ][ Dirección ]';
+        '🖨️ *IMPRESIÓN FOTOGRÁFICA*\n\n' +
+        'Tenemos línea aficionado y profesional. ¿Qué tamaño deseas imprimir?';
 
     } else if (esOpcion4) {
       replyText =
-        '📦 *CONSULTAR ORDEN*\n' +
-        'Envíame tu *número de orden* o *nombre completo* y consultaré con el personal.\n[ Hablar con humano ]';
+        '📦 *CONSULTAR ORDEN*\n\n' +
+        'Envíame tu *número de orden* o *nombre completo* y consultaré con el personal.';
 
     } else if (esOpcion5) {
       estadosUsuarios[from] = { paso: 'esperandoNombre', datos: {} };
       replyText =
-        '🗓️ *Agendar cita*\n' +
-        'Perfecto, te ayudo a reservar.\n1️⃣ Primero, dime tu *nombre completo*.\n[ Cancelar cita ]';
-
-    } else if (/ubicaci[oó]n|direccion|donde estan|como llegar/i.test(low)) {
-      replyText = `📍 *Dirección:* Calle Masferrer, Av. Morazán, 2ª Av. Norte #1-2, entre Piedra Lisa y Casa de Cultura de Sonsonate, enfrente de Academia Patty.\n🗺️ Google Maps: ${MAPS_LINK}`;
-
-    } else if (/\d+\s*(copias?)?.*\d+x\d+/i.test(low)) {
-      // cálculo de impresión
-      const calc = calcularTotalImpresion(texto);
-      replyText = calc
-        ? `🧮 *Cálculo de impresión*\n${calc.desglose.join('\n')}\n\n*Total estimado:* ${money(calc.total)}`
-        : 'No pude entender bien los tamaños/cantidades. Ejemplo: *4 copias 5x7 + 2 de 8x10*.';
+        '🗓️ *Agendar cita*\n\n' +
+        'Perfecto, te ayudo a reservar.\n1️⃣ Primero, dime tu *nombre completo*.\n\n' +
+        'Puedes escribir *cancelar cita* para terminar el proceso.';
 
     } else {
-      // MOTOR HÍBRIDO: Catálogo → OpenAI → fallback
+      // ===== Motor híbrido: Catálogo → OpenAI (si hay clave)
       const hit = buscarEnCatalogo(texto);
       if (hit) {
         replyText = formatearRespuestaCatalogo(hit);
       } else {
         const ia = await askOpenAI(
-          `Cliente: "${texto}". Responde como asistente de Arte Fotográfico (Sonsonate). Incluye si corresponde: horarios, dirección corta, o sugiere hablar con humano.`
+          `Cliente pregunta: "${texto}". Responde como asistente del estudio Arte Fotográfico (Sonsonate).\n` +
+          `Si es sobre precios/vestimenta/impresión y no hay datos exactos, responde útilmente y sugiere visitarnos.`
         );
-        replyText = ia || '¿Podrías darme un poco más de detalle para ayudarte mejor? 😊';
+        replyText = ia || 'Gracias por tu mensaje. ¿Podrías darme un poco más de detalle para ayudarte mejor?';
       }
     }
 
