@@ -24,7 +24,7 @@ const PHONE_NUMBER_ID = '805856909285040';
 // ===== Dirección fija (bypassa IA) — CAMBIA EL LINK POR TU PIN EXACTO
 const ADDRESS_TEXT =
   'Calle Masferrer, Av. Morazán, 2ª Av. Norte #1-2, entre Piedra Lisa y Casa de Cultura de Sonsonate, enfrente de Academia Patty.';
-const MAPS_LINK = 'https://maps.app.goo.gl/RGm8K3yqk2Q7kRrj6';
+const MAPS_LINK = 'https://maps.app.goo.gl/7GWYy4GQ78jd9wGV9';
 
 // ===== Estado por usuario (flujo guiado de citas)
 const estadosUsuarios = {}; // { [tel]: { paso, datos: { nombre, fechaHora, tipoSesion, telefono } } }
