@@ -362,7 +362,7 @@ async function listarCitasPorTelefono(telefono) {
 
 // ================== HORARIOS ==================
 
-/*function esHorarioLaboral() {
+function esHorarioLaboral() {
   const ahora = new Date();
   const zonaLocal = ahora.toLocaleString('en-US', { timeZone: 'America/El_Salvador' });
   const fechaLocal = new Date(zonaLocal);
@@ -382,13 +382,49 @@ async function listarCitasPorTelefono(telefono) {
   // Domingo: cerrado
   return false;
 }
-*/
+
 function esDomingo() {
   const ahora = new Date();
   const zonaLocal = ahora.toLocaleString('en-US', { timeZone: 'America/El_Salvador' });
   const fechaLocal = new Date(zonaLocal);
   const dia = fechaLocal.getDay(); // 0 = domingo
   return dia === 0;
+}
+
+// 🕓 Verificar si una FECHA/HORA específica está dentro del horario laboral
+// Formato esperado: "YYYY-MM-DD HH:mm"
+function esHorarioLaboralEnFecha(fechaHoraTexto) {
+  const partes = fechaHoraTexto.split(' ');
+  if (partes.length !== 2) return false;
+
+  const [fechaStr, horaStr] = partes;
+  const [anio, mes, dia] = fechaStr.split('-').map(Number);
+  const [hora, minuto] = horaStr.split(':').map(Number);
+
+  if (
+    isNaN(anio) || isNaN(mes) || isNaN(dia) ||
+    isNaN(hora) || isNaN(minuto)
+  ) {
+    return false;
+  }
+
+  // Suponemos que lo que el cliente manda ya es hora local de El Salvador
+  const fecha = new Date(anio, mes - 1, dia, hora, minuto);
+  const diaSemana = fecha.getDay(); // 0=domingo, 6=sábado
+  const horaDecimal = hora + minuto / 60;
+
+  // Lunes a viernes: 8:00–12:30 y 14:00–18:00
+  if (diaSemana >= 1 && diaSemana <= 5) {
+    return (horaDecimal >= 8 && horaDecimal <= 12.5) || (horaDecimal >= 14 && horaDecimal <= 18);
+  }
+
+  // Sábado: 8:00–12:30
+  if (diaSemana === 6) {
+    return horaDecimal >= 8 && horaDecimal <= 12.5;
+  }
+
+  // Domingo: siempre fuera de horario
+  return false;
 }
 
 // ================== IA: GEMINI / CHATGPT ==================
@@ -573,8 +609,8 @@ app.post('/webhook', async (req, res) => {
     const texto = msgBody.trim();
     const textoLower = texto.toLowerCase();
 
-    // 🕓 Mensajes fuera de horario
-    /*if (!esHorarioLaboral()) {
+    // 🕓 Mensajes fuera de horario (según hora actual)
+    if (!esHorarioLaboral()) {
       let mensajeRespuesta = '';
 
       if (esDomingo()) {
@@ -599,7 +635,7 @@ app.post('/webhook', async (req, res) => {
       await sendWhatsAppMessage(from, mensajeRespuesta);
       return res.sendStatus(200);
     }
-*/
+
     // ================== FLUJO GUIADO DE CITA (OPCIÓN 5) ==================
     const estado = estadosUsuarios[from];
 
@@ -637,6 +673,19 @@ app.post('/webhook', async (req, res) => {
             from,
             '⚠️ El formato de fecha y hora no es válido.\n' +
               'Por favor usa este formato: *2025-11-15 15:00* (año-mes-día hora:minuto).'
+          );
+          return res.sendStatus(200);
+        }
+
+        // 🔍 Aquí verificamos si esa fecha/hora está dentro del horario laboral
+        if (!esHorarioLaboralEnFecha(texto)) {
+          await sendWhatsAppMessage(
+            from,
+            '⏰ El horario que indicas está *fuera de nuestro horario de atención*.\n\n' +
+              '🕓 *Nuestro horario es:*\n' +
+              '👉 *Lunes a viernes:* de 8:00 a.m. a 12:30 p.m. y de 2:00 p.m. a 6:00 p.m.\n' +
+              '👉 *Sábados:* de 8:00 a.m. a 12:30 p.m.\n\n' +
+              'Por favor indícame otra *fecha y hora* dentro de ese horario para agendar tu cita. 😊'
           );
           return res.sendStatus(200);
         }
@@ -833,6 +882,13 @@ app.post('/webhook', async (req, res) => {
           '⚠️ Formato de cita inválido.\n' +
           'Usa por ejemplo:\n' +
           'cita: 2025-11-15 15:00; sesión familiar; 50370000000';
+      } else if (!esHorarioLaboralEnFecha(fechaHoraTexto)) {
+        replyText =
+          '⏰ El horario que indicas está *fuera de nuestro horario de atención*.\n\n' +
+          '🕓 *Nuestro horario es:*\n' +
+          '👉 *Lunes a viernes:* de 8:00 a.m. a 12:30 p.m. y de 2:00 p.m. a 6:00 p.m.\n' +
+          '👉 *Sábados:* de 8:00 a.m. a 12:30 p.m.\n\n' +
+          'Por favor elige otra fecha y hora dentro de ese horario para poder crear la cita. 😊';
       } else {
         const ok = await crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefonoCliente, null);
         if (ok) {
