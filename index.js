@@ -8,21 +8,23 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 🔐 Tokens y claves desde Render
-const token = process.env.WHATSAPP_TOKEN;
+// 🔐 Variables de entorno (Render)
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT;
 const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
 
-// ⚠️ Datos fijos en código
-const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO'; // mismo que pusiste en Meta
+// ⚠️ Datos fijos de configuración
+const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO'; // mismo que en Meta
 const PHONE_NUMBER_ID = '805856909285040';
 
-// 🧠 Estado por usuario para flujo guiado de cita (opción 5)
+// Estado simple por usuario para flujo de citas guiadas
+// estadosUsuarios[telefono] = { paso: 'esperandoNombre' | 'esperandoFecha' | 'esperandoTipo' | 'esperandoTelefono', datos: {...} }
 const estadosUsuarios = {};
 
-// ---- Google Calendar: service account ----
+// ================== GOOGLE CALENDAR ==================
+
 let serviceAccount = null;
 
 if (GOOGLE_SERVICE_ACCOUNT) {
@@ -59,7 +61,6 @@ async function getCalendarClient() {
   return calendar;
 }
 
-// Evento de prueba
 async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
   try {
     const calendar = await getCalendarClient();
@@ -71,11 +72,11 @@ async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
 
     const ahora = new Date();
     const inicio = new Date(ahora.getTime() + 60 * 60 * 1000); // dentro de 1 hora
-    const fin = new Date(inicio.getTime() + 30 * 60 * 1000); // 30 minutos
+    const fin = new Date(inicio.getTime() + 30 * 60 * 1000); // 30 min
 
     const evento = {
       summary: `Cita de prueba con ${nombreCliente || 'cliente de WhatsApp'}`,
-      description: `Cita creada automáticamente desde el bot de Arte Fotográfico. Teléfono: ${telefono || ''}`,
+      description: `Cita creada automáticamente desde el bot de Arte Fotográfico.\nTeléfono: ${telefono || ''}`,
       start: {
         dateTime: inicio.toISOString(),
         timeZone: 'America/El_Salvador',
@@ -104,20 +105,10 @@ async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
   }
 }
 
-// Crear cita normal (usado por comando "cita:" y flujo guiado)
-async function crearCitaEnCalendar(
-  fechaHoraTexto,
-  tipoSesion,
-  telefono,
-  nombreCliente = 'Cliente de WhatsApp'
-) {
+// Crear cita (comando rápido o flujo guiado)
+async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono, nombreCliente) {
   try {
-    console.log('💠 crearCitaEnCalendar =>', {
-      fechaHoraTexto,
-      tipoSesion,
-      telefono,
-      nombreCliente,
-    });
+    console.log('💠 crearCitaEnCalendar =>', { fechaHoraTexto, tipoSesion, telefono, nombreCliente });
 
     const calendar = await getCalendarClient();
     if (!calendar) {
@@ -141,10 +132,9 @@ async function crearCitaEnCalendar(
 
     const pad2 = (n) => String(n).padStart(2, '0');
 
-    // Fecha/hora local como texto (sin "Z")
     const inicioLocal = `${anio}-${pad2(mes)}-${pad2(dia)}T${pad2(hora)}:${pad2(minuto)}:00`;
 
-    const totalMinutosInicio = hora * 60 + minuto + 60; // +1 hora
+    const totalMinutosInicio = hora * 60 + minuto + 60; // +1h
     const horaFin = Math.floor(totalMinutosInicio / 60);
     const minutoFin = totalMinutosInicio % 60;
     const finLocal = `${anio}-${pad2(mes)}-${pad2(dia)}T${pad2(horaFin)}:${pad2(minutoFin)}:00`;
@@ -152,10 +142,10 @@ async function crearCitaEnCalendar(
     console.log('💠 Horario cita - inicioLocal:', inicioLocal, 'finLocal:', finLocal);
 
     const evento = {
-      summary: `Sesión ${tipoSesion || 'fotográfica'} - ${nombreCliente}`,
+      summary: `Sesión ${tipoSesion || 'fotográfica'} - ${nombreCliente || 'Cliente WhatsApp'}`,
       description:
         `Sesión agendada desde el bot de Arte Fotográfico.\n` +
-        `Nombre: ${nombreCliente}\n` +
+        (nombreCliente ? `Nombre del cliente: ${nombreCliente}\n` : '') +
         `Teléfono: ${telefono || ''}`,
       start: {
         dateTime: inicioLocal,
@@ -185,7 +175,7 @@ async function crearCitaEnCalendar(
   }
 }
 
-// Convierte Date a "YYYY-MM-DD HH:mm" en zona El Salvador
+// Formatear Date a "YYYY-MM-DD HH:mm" en zona America/El_Salvador
 function formatearFechaHoraLocal(dateObj) {
   const opciones = {
     timeZone: 'America/El_Salvador',
@@ -211,7 +201,7 @@ function formatearFechaHoraLocal(dateObj) {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
-// Cancelar cita en Calendar
+// Cancelar cita por fecha/hora + teléfono
 async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
   try {
     console.log('💠 cancelarCitaEnCalendar =>', { fechaHoraTexto, telefono });
@@ -271,10 +261,9 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
 
       if (fechaEventoTexto !== fechaHoraTexto) continue;
 
-      const textoBuscado = telefonoLimpio;
       const coincideTelefono =
-        desc.includes(textoBuscado) ||
-        resumen.includes(textoBuscado) ||
+        desc.includes(telefonoLimpio) ||
+        resumen.includes(telefonoLimpio) ||
         (ultimos4 && desc.includes(ultimos4));
 
       if (coincideTelefono) {
@@ -307,12 +296,77 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
   }
 }
 
-// 🕓 Horarios
+// Listar citas próximas por teléfono (para "mis citas")
+async function listarCitasPorTelefono(telefono) {
+  try {
+    const calendar = await getCalendarClient();
+    if (!calendar) return [];
+
+    if (!GOOGLE_CALENDAR_ID) return [];
+
+    const ahora = new Date();
+    const dentroDe30Dias = new Date(ahora.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const timeMin = ahora.toISOString();
+    const timeMax = dentroDe30Dias.toISOString();
+
+    const listRes = await calendar.events.list({
+      calendarId: GOOGLE_CALENDAR_ID,
+      timeMin,
+      timeMax,
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+
+    const items = listRes.data.items || [];
+
+    const telefonoLimpio = telefono.replace(/[^0-9]/g, '');
+    const ultimos4 = telefonoLimpio.slice(-4);
+
+    const resultados = [];
+
+    for (const ev of items) {
+      const desc = (ev.description || '').toLowerCase();
+      const resumen = (ev.summary || '').toLowerCase();
+
+      const coincideTelefono =
+        desc.includes(telefonoLimpio) ||
+        resumen.includes(telefonoLimpio) ||
+        (ultimos4 && desc.includes(ultimos4));
+
+      if (!coincideTelefono) continue;
+
+      let fechaTexto = '';
+      if (ev.start && ev.start.dateTime) {
+        const fechaEv = new Date(ev.start.dateTime);
+        fechaTexto = formatearFechaHoraLocal(fechaEv);
+      }
+
+      resultados.push({
+        fecha: fechaTexto,
+        resumen: ev.summary || 'Cita sin título',
+      });
+    }
+
+    return resultados;
+  } catch (error) {
+    console.error('❌ Error al listar citas por teléfono:');
+    if (error.response && error.response.data) {
+      console.error(JSON.stringify(error.response.data, null, 2));
+    } else {
+      console.error(error.message);
+    }
+    return [];
+  }
+}
+
+// ================== HORARIOS ==================
+
 function esHorarioLaboral() {
   const ahora = new Date();
   const zonaLocal = ahora.toLocaleString('en-US', { timeZone: 'America/El_Salvador' });
   const fechaLocal = new Date(zonaLocal);
-  const dia = fechaLocal.getDay();
+  const dia = fechaLocal.getDay(); // 0 = domingo, 6 = sábado
   const hora = fechaLocal.getHours();
   const minuto = fechaLocal.getMinutes();
   const horaDecimal = hora + minuto / 60;
@@ -325,19 +379,20 @@ function esHorarioLaboral() {
   if (dia === 6) {
     return horaDecimal >= 8 && horaDecimal <= 12.5;
   }
-  // Domingo cerrado
-  return false;
+  // Domingo: cerrado
+  return true;
 }
 
 function esDomingo() {
   const ahora = new Date();
   const zonaLocal = ahora.toLocaleString('en-US', { timeZone: 'America/El_Salvador' });
   const fechaLocal = new Date(zonaLocal);
-  const dia = fechaLocal.getDay();
+  const dia = fechaLocal.getDay(); // 0 = domingo
   return dia === 0;
 }
 
-// ---- IA: Gemini ----
+// ================== IA: GEMINI / CHATGPT ==================
+
 async function preguntarAGemini(mensajeUsuario) {
   if (!GEMINI_API_KEY) {
     console.error('⚠️ No hay GEMINI_API_KEY configurada');
@@ -387,7 +442,7 @@ async function preguntarAGemini(mensajeUsuario) {
   }
 }
 
-// ---- IA: ChatGPT (opcional) ----
+// (Opcional) ChatGPT, por si en un futuro lo reactivas
 async function preguntarAChatGPT(mensajeUsuario) {
   if (!OPENAI_API_KEY) {
     console.error('⚠️ No hay OPENAI_API_KEY configurada');
@@ -439,14 +494,16 @@ async function preguntarAChatGPT(mensajeUsuario) {
   }
 }
 
+// ================== WHATSAPP ==================
+
 app.use(bodyParser.json());
 
-// Ruta simple de prueba
+// Ruta de prueba
 app.get('/', (req, res) => {
   res.send('Servidor Arte Fotográfico activo 🚀');
 });
 
-// ✅ WEBHOOK DE VERIFICACIÓN (GET)
+// Webhook GET (verificación)
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
   const tokenVerify = req.query['hub.verify_token'];
@@ -461,7 +518,7 @@ app.get('/webhook', (req, res) => {
   }
 });
 
-// ✅ ENVIAR MENSAJES DE WHATSAPP
+// Enviar mensaje WhatsApp
 async function sendWhatsAppMessage(to, text) {
   const url = `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`;
 
@@ -476,7 +533,7 @@ async function sendWhatsAppMessage(to, text) {
       {
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
         },
       }
     );
@@ -492,7 +549,7 @@ async function sendWhatsAppMessage(to, text) {
   }
 }
 
-// ✅ WEBHOOK PARA RECIBIR MENSAJES (POST)
+// Webhook POST (mensajes entrantes)
 app.post('/webhook', async (req, res) => {
   console.log('📩 Webhook recibido:');
   console.dir(req.body, { depth: null });
@@ -503,159 +560,100 @@ app.post('/webhook', async (req, res) => {
     const value = changes && changes.value;
     const messages = value && value.messages;
 
-    if (messages && messages[0]) {
-      const message = messages[0];
+    if (!messages || !messages[0]) {
+      return res.sendStatus(200);
+    }
 
-      const from = message.from;
-      const msgBody = message.text && message.text.body ? message.text.body : '';
+    const message = messages[0];
+    const from = message.from;
+    const msgBody = message.text && message.text.body ? message.text.body : '';
 
-      console.log(`📨 Mensaje de ${from}: ${msgBody}`);
+    console.log(`📨 Mensaje de ${from}: ${msgBody}`);
 
-      const texto = msgBody.trim();
-      const textoLower = texto.toLowerCase();
+    const texto = msgBody.trim();
+    const textoLower = texto.toLowerCase();
 
-      // 🕓 Mensaje fuera de horario
-      if (!esHorarioLaboral()) {
-        let mensajeRespuesta = '';
+    // 🕓 Mensajes fuera de horario
+    if (!esHorarioLaboral()) {
+      let mensajeRespuesta = '';
 
-        if (esDomingo()) {
-          mensajeRespuesta =
-            '📸 *¡Gracias por contactarnos con Arte Fotográfico!* 💬\n\n' +
-            'Hoy es *domingo* y nuestro estudio se encuentra *cerrado* por descanso del personal. 🛌\n\n' +
-            '🕓 *Nuestro horario de atención es:*\n' +
-            '👉 *Lunes a viernes:* de 8:00 a.m. a 12:30 p.m. y de 2:00 p.m. a 6:00 p.m.\n' +
-            '👉 *Sábados:* de 8:00 a.m. a 12:30 p.m.\n\n' +
-            'Puedes dejar tu mensaje con toda confianza y el lunes te responderemos en horario de atención. 😊';
-        } else {
-          mensajeRespuesta =
-            '📸 *¡Gracias por contactarnos con Arte Fotográfico!* 💬\n\n' +
-            'En este momento estamos *fuera de nuestro horario de atención*, pero con gusto te responderemos en cuanto estemos de vuelta. 😊\n\n' +
-            '🕓 *Nuestro horario de atención es:*\n' +
-            '👉 *Lunes a viernes:* de 8:00 a.m. a 12:30 p.m. y de 2:00 p.m. a 6:00 p.m.\n' +
-            '👉 *Sábados:* de 8:00 a.m. a 12:30 p.m.\n' +
-            '📍 *Sonsonate, El Salvador.*\n\n' +
-            '¡Gracias por tu mensaje y por elegirnos para capturar tus mejores momentos! 📷💖';
+      if (esDomingo()) {
+        mensajeRespuesta =
+          '📸 *¡Gracias por contactarnos con Arte Fotográfico!* 💬\n\n' +
+          'Hoy es *domingo* y nuestro estudio se encuentra *cerrado* por descanso del personal. 🛌\n\n' +
+          '🕓 *Nuestro horario de atención es:*\n' +
+          '👉 *Lunes a viernes:* de 8:00 a.m. a 12:30 p.m. y de 2:00 p.m. a 6:00 p.m.\n' +
+          '👉 *Sábados:* de 8:00 a.m. a 12:30 p.m.\n\n' +
+          'Puedes dejar tu mensaje con toda confianza y el lunes te responderemos en horario de atención. 😊';
+      } else {
+        mensajeRespuesta =
+          '📸 *¡Gracias por contactarnos con Arte Fotográfico!* 💬\n\n' +
+          'En este momento estamos *fuera de nuestro horario de atención*, pero con gusto te responderemos en cuanto estemos de vuelta. 😊\n\n' +
+          '🕓 *Nuestro horario de atención es:*\n' +
+          '👉 *Lunes a viernes:* de 8:00 a.m. a 12:30 p.m. y de 2:00 p.m. a 6:00 p.m.\n' +
+          '👉 *Sábados:* de 8:00 a.m. a 12:30 p.m.\n' +
+          '📍 *Sonsonate, El Salvador.*\n\n' +
+          '¡Gracias por tu mensaje y por elegirnos para capturar tus mejores momentos! 📷💖';
+      }
+
+      await sendWhatsAppMessage(from, mensajeRespuesta);
+      return res.sendStatus(200);
+    }
+
+    // ================== FLUJO GUIADO DE CITA (OPCIÓN 5) ==================
+    const estado = estadosUsuarios[from];
+
+    // Permitir cancelar el flujo guiado con "cancelar cita"
+    if (estado && textoLower === 'cancelar cita') {
+      delete estadosUsuarios[from];
+      await sendWhatsAppMessage(
+        from,
+        '❌ He cancelado el proceso de agendar cita.\nSi deseas, puedes empezar de nuevo enviando *5* o escribiendo "agendar cita".'
+      );
+      return res.sendStatus(200);
+    }
+
+    if (estado) {
+      // Estamos en medio del flujo guiado
+      if (estado.paso === 'esperandoNombre') {
+        estado.datos.nombre = texto;
+        estado.paso = 'esperandoFecha';
+        await sendWhatsAppMessage(
+          from,
+          '📅 Perfecto, *' +
+            estado.datos.nombre +
+            '*.\n\nAhora indícame la *fecha y hora* en el siguiente formato:\n' +
+            '⭐ 2025-11-15 15:00\n\n' +
+            'Ejemplo: 2025-11-15 15:00 (15 de noviembre de 2025 a las 3:00 p.m.).\n\n' +
+            'Si deseas cancelar este proceso escribe "cancelar cita".'
+        );
+        return res.sendStatus(200);
+      }
+
+      if (estado.paso === 'esperandoFecha') {
+        const partes = texto.split(' ');
+        if (partes.length !== 2 || !/^\d{4}-\d{2}-\d{2}$/.test(partes[0]) || !/^\d{2}:\d{2}$/.test(partes[1])) {
+          await sendWhatsAppMessage(
+            from,
+            '⚠️ El formato de fecha y hora no es válido.\n' +
+              'Por favor usa este formato: *2025-11-15 15:00* (año-mes-día hora:minuto).'
+          );
+          return res.sendStatus(200);
         }
 
-        await sendWhatsAppMessage(from, mensajeRespuesta);
-        return res.sendStatus(200);
-      }
+        estado.datos.fechaHora = texto;
+        estado.paso = 'esperandoTipo';
 
-      const esTestCalendar = textoLower === 'test calendar';
-      const esComandoCita = textoLower.startsWith('cita:');
-      const esComandoCancelar = textoLower.startsWith('cancelar:');
-
-      const esSaludo =
-        textoLower.includes('hola') ||
-        textoLower.includes('hola mario') ||
-        textoLower.includes('hola marito') ||
-        textoLower.includes('buenos dias') ||
-        textoLower.includes('buenos días') ||
-        textoLower.includes('buenas tardes') ||
-        textoLower.includes('buenas noches') ||
-        textoLower.includes('hey') ||
-        textoLower.includes('qué tal') ||
-        textoLower.includes('que tal');
-
-      const usaIAForzado = textoLower.startsWith('ia:');
-
-      const esOpcion1 =
-        textoLower === '1' ||
-        textoLower.includes('foto estudio') ||
-        textoLower.includes('fotoestudio') ||
-        textoLower.includes('estudio de fotos');
-
-      const esOpcion2 =
-        textoLower === '2' ||
-        textoLower.includes('eventos sociales') ||
-        textoLower.includes('evento social') ||
-        textoLower.includes('paquetes de eventos') ||
-        textoLower.includes('bodas') ||
-        textoLower.includes('15 años') ||
-        textoLower.includes('quince años') ||
-        textoLower.includes('bautizos') ||
-        textoLower.includes('bautizo');
-
-      const esOpcion3 =
-        textoLower === '3' ||
-        textoLower.includes('impresión fotográfica') ||
-        textoLower.includes('impresion fotografica') ||
-        textoLower.includes('imprimir fotos') ||
-        textoLower.includes('impresiones de fotos');
-
-      const esOpcion4 =
-        textoLower === '4' ||
-        textoLower.includes('consultar orden') ||
-        textoLower.includes('consulta de orden') ||
-        textoLower.includes('estado de mi orden') ||
-        textoLower.includes('estado de mi pedido') ||
-        textoLower.includes('ver mi pedido') ||
-        textoLower.includes('rastrear pedido');
-
-      const esOpcion5 =
-        textoLower === '5' ||
-        textoLower.includes('agenda tu cita') ||
-        textoLower.includes('agendar cita') ||
-        textoLower.includes('sacar cita') ||
-        textoLower.includes('hacer una cita') ||
-        textoLower.includes('reservar cita') ||
-        textoLower.includes('reservar sesión') ||
-        textoLower.includes('reservar sesion');
-
-      let replyText = '';
-
-      // 🧠 Flujo guiado de cita (opción 5)
-      const estado = estadosUsuarios[from];
-
-      // cancelar cita (proceso guiado)
-      if (textoLower === 'cancelar cita' && estado) {
-        delete estadosUsuarios[from];
         await sendWhatsAppMessage(
           from,
-          '❌ He cancelado el proceso de agendar cita.\nSi deseas empezar de nuevo, escribe *5* o *agenda tu cita*.'
+          '📸 Perfecto. Ahora dime el *tipo de sesión* que deseas (ejemplo: sesión familiar, fotos para título, sesión de pareja, etc.).'
         );
         return res.sendStatus(200);
       }
 
-      // PASO 1: esperando nombre
-      if (estado && estado.paso === 'esperando_nombre') {
-        estadosUsuarios[from].datos = estadosUsuarios[from].datos || {};
-        estadosUsuarios[from].datos.nombre = texto;
-
-        estadosUsuarios[from].paso = 'esperando_fecha_hora';
-
-        await sendWhatsAppMessage(
-          from,
-          '📅 Perfecto *' +
-            texto +
-            '*, ahora indícame la *fecha y hora* en el siguiente formato:\n' +
-            '⭐ `2025-11-15 15:00`\n\n' +
-            'Ejemplo: 2025-11-15 15:00 (15 de noviembre de 2025 a las 3:00 p.m.)\n\n' +
-            'Si deseas cancelar este proceso escribe *"cancelar cita"*.'
-        );
-        return res.sendStatus(200);
-      }
-
-      // PASO 2: esperando fecha/hora
-      if (estado && estado.paso === 'esperando_fecha_hora') {
-        estadosUsuarios[from].datos = estadosUsuarios[from].datos || {};
-        estadosUsuarios[from].datos.fechaHora = texto;
-
-        estadosUsuarios[from].paso = 'esperando_tipo';
-
-        await sendWhatsAppMessage(
-          from,
-          '✅ Perfecto. Ahora dime el *tipo de sesión* que deseas (ejemplo: sesión familiar, fotos para título, sesión de pareja, etc.).'
-        );
-        return res.sendStatus(200);
-      }
-
-      // PASO 3: esperando tipo de sesión
-      if (estado && estado.paso === 'esperando_tipo') {
-        estadosUsuarios[from].datos = estadosUsuarios[from].datos || {};
-        estadosUsuarios[from].datos.tipo = texto;
-
-        estadosUsuarios[from].paso = 'esperando_telefono';
+      if (estado.paso === 'esperandoTipo') {
+        estado.datos.tipoSesion = texto;
+        estado.paso = 'esperandoTelefono';
 
         await sendWhatsAppMessage(
           from,
@@ -664,203 +662,291 @@ app.post('/webhook', async (req, res) => {
         return res.sendStatus(200);
       }
 
-      // PASO 4: esperando teléfono -> crear cita
-      if (estado && estado.paso === 'esperando_telefono') {
-        const datos = estadosUsuarios[from].datos || {};
-        const nombreCliente = datos.nombre || 'Cliente';
-        const fechaHoraTexto = datos.fechaHora;
-        const tipoSesion = datos.tipo || 'fotográfica';
-        const telefonoCliente = texto || from;
+      if (estado.paso === 'esperandoTelefono') {
+        estado.datos.telefono = texto || from;
 
-        const ok = await crearCitaEnCalendar(
-          fechaHoraTexto,
-          tipoSesion,
-          telefonoCliente,
-          nombreCliente
-        );
+        const { nombre, fechaHora, tipoSesion, telefono } = estado.datos;
 
+        const ok = await crearCitaEnCalendar(fechaHora, tipoSesion, telefono, nombre);
         if (ok) {
           await sendWhatsAppMessage(
             from,
             '✅ He creado tu cita en el calendario de Arte Fotográfico.\n' +
-              `👤 Nombre: *${nombreCliente}*\n` +
-              `📅 Fecha y hora: *${fechaHoraTexto}*\n` +
+              `👤 Nombre: *${nombre}*\n` +
+              `📅 Fecha y hora: *${fechaHora}*\n` +
               `📸 Tipo de sesión: *${tipoSesion}*\n` +
-              `📞 Contacto: *${telefonoCliente}*`
+              `📞 Contacto: *${telefono}*`
           );
         } else {
           await sendWhatsAppMessage(
             from,
             '❌ Ocurrió un problema al crear la cita en el calendario.\n' +
-              'Por favor revisa el formato de la fecha/hora o avisa a un colaborador.'
+              'Por favor revisa los datos y vuelve a intentarlo, o avisa a un colaborador.'
           );
         }
 
         delete estadosUsuarios[from];
         return res.sendStatus(200);
       }
+    }
 
-      // Lógica general
+    // ================== DETECCIÓN DE COMANDOS / OPCIONES ==================
 
-      if (usaIAForzado) {
-        const pregunta = texto.substring(3).trim() || 'Responde como asistente de Arte Fotográfico.';
-        console.log('🤖 Enviando a Gemini (modo ia:):', pregunta);
-        replyText = await preguntarAGemini(pregunta);
-      } else if (esComandoCancelar) {
-        // cancelar: YYYY-MM-DD HH:mm; telefono
-        const sinPrefijo = texto.substring(9).trim();
-        const partes = sinPrefijo.split(';').map((p) => p.trim());
+    const esTestCalendar = textoLower === 'test calendar';
+    const esComandoCita = textoLower.startsWith('cita:');
+    const esComandoCancelar = textoLower.startsWith('cancelar:');
+    const esMisCitas =
+      textoLower === 'mis citas' ||
+      textoLower.includes('ver mis citas') ||
+      textoLower.includes('mis próximas citas');
 
-        const fechaHoraTexto = partes[0];
-        const telefonoCliente = partes[1] || from;
+    const esSaludo =
+      textoLower.includes('hola') ||
+      textoLower.includes('hola mario') ||
+      textoLower.includes('hola marito') ||
+      textoLower.includes('buenos dias') ||
+      textoLower.includes('buenos días') ||
+      textoLower.includes('buenas tardes') ||
+      textoLower.includes('buenas noches') ||
+      textoLower.includes('hey') ||
+      textoLower.includes('qué tal') ||
+      textoLower.includes('que tal');
 
-        if (!fechaHoraTexto) {
-          replyText =
-            '⚠️ Formato de cancelación inválido.\n' +
-            'Usa por ejemplo:\n' +
-            'cancelar: 2025-11-15 15:00; 50370000000';
-        } else {
-          const ok = await cancelarCitaEnCalendar(fechaHoraTexto, telefonoCliente);
-          if (ok) {
-            replyText =
-              '✅ He cancelado la cita en el calendario de Arte Fotográfico.\n' +
-              `📅 Fecha y hora: *${fechaHoraTexto}*\n` +
-              `📞 Contacto: *${telefonoCliente}*`;
-          } else {
-            replyText =
-              '❌ No encontré una cita que coincida con esa fecha/hora y teléfono.\n' +
-              'Por favor verifica los datos o consulta con un colaborador.';
-          }
-        }
-      } else if (esSaludo) {
+    const usaIAForzado = textoLower.startsWith('ia:');
+
+    const esOpcion1 =
+      textoLower === '1' ||
+      textoLower.includes('foto estudio') ||
+      textoLower.includes('fotoestudio') ||
+      textoLower.includes('estudio de fotos');
+
+    const esOpcion2 =
+      textoLower === '2' ||
+      textoLower.includes('eventos sociales') ||
+      textoLower.includes('evento social') ||
+      textoLower.includes('paquetes de eventos') ||
+      textoLower.includes('bodas') ||
+      textoLower.includes('15 años') ||
+      textoLower.includes('quince años') ||
+      textoLower.includes('bautizos') ||
+      textoLower.includes('bautizo');
+
+    const esOpcion3 =
+      textoLower === '3' ||
+      textoLower.includes('impresión fotográfica') ||
+      textoLower.includes('impresion fotografica') ||
+      textoLower.includes('imprimir fotos') ||
+      textoLower.includes('impresiones de fotos');
+
+    const esOpcion4 =
+      textoLower === '4' ||
+      textoLower.includes('consultar orden') ||
+      textoLower.includes('consulta de orden') ||
+      textoLower.includes('estado de mi orden') ||
+      textoLower.includes('estado de mi pedido') ||
+      textoLower.includes('ver mi pedido') ||
+      textoLower.includes('rastrear pedido');
+
+    const esOpcion5 =
+      textoLower === '5' ||
+      textoLower.includes('agenda tu cita') ||
+      textoLower.includes('agendar cita') ||
+      textoLower.includes('sacar cita') ||
+      textoLower.includes('hacer una cita') ||
+      textoLower.includes('reservar cita') ||
+      textoLower.includes('reservar sesión') ||
+      textoLower.includes('reservar sesion');
+
+    let replyText = '';
+
+    // ================== RESPUESTAS ==================
+
+    if (usaIAForzado) {
+      const pregunta = texto.substring(3).trim() || 'Responde como asistente de Arte Fotográfico.';
+      console.log('🤖 Enviando a Gemini (modo ia:):', pregunta);
+      replyText = await preguntarAGemini(pregunta);
+
+    } else if (esComandoCancelar) {
+      // cancelar: YYYY-MM-DD HH:mm; telefono
+      const sinPrefijo = texto.substring(9).trim();
+      const partes = sinPrefijo.split(';').map((p) => p.trim());
+
+      const fechaHoraTexto = partes[0];
+      const telefonoCliente = partes[1] || from;
+
+      if (!fechaHoraTexto) {
         replyText =
-          '👋 ¡Hola! Gracias por contactar con Arte Fotográfico 📸\n' +
-          'Soy un asistente virtual con inteligencia artificial.\n' +
-          '¿En qué puedo servirte hoy?\n\n' +
-          'Por favor selecciona una opción escribiendo el número o el nombre del servicio que necesitas 👇\n' +
-          '1️⃣ SERVICIO FOTO ESTUDIO\n' +
-          '2️⃣ COTIZACIÓN DE PAQUETES DE EVENTOS SOCIALES\n' +
-          '3️⃣ SERVICIO DE IMPRESIÓN FOTOGRÁFICA\n' +
-          '4️⃣ CONSULTAR ORDEN\n' +
-          '5️⃣ AGENDA TU CITA';
-      } else if (esComandoCita) {
-        // cita: YYYY-MM-DD HH:mm; tipo de sesión; telefono
-        const sinPrefijo = texto.substring(5).trim();
-        const partes = sinPrefijo.split(';').map((p) => p.trim());
-
-        const fechaHoraTexto = partes[0];
-        const tipoSesion = partes[1] || 'fotográfica';
-        const telefonoCliente = partes[2] || from;
-
-        if (!fechaHoraTexto) {
-          replyText =
-            '⚠️ Formato de cita inválido.\n' +
-            'Usa por ejemplo:\n' +
-            'cita: 2025-11-15 15:00; sesión familiar; 50370000000';
-        } else {
-          const ok = await crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefonoCliente);
-          if (ok) {
-            replyText =
-              '✅ He creado tu cita en el calendario de Arte Fotográfico.\n' +
-              `📅 Fecha y hora: *${fechaHoraTexto}*\n` +
-              `📸 Tipo de sesión: *${tipoSesion}*\n` +
-              `📞 Contacto: *${telefonoCliente}*`;
-          } else {
-            replyText =
-              '❌ Ocurrió un problema al crear la cita en el calendario.\n' +
-              'Por favor revisa el formato y vuelve a intentarlo, o avisa a un colaborador.';
-          }
-        }
-      } else if (esTestCalendar) {
-        const ok = await crearEventoDePruebaCalendar('Cliente de prueba', from);
+          '⚠️ Formato de cancelación inválido.\n' +
+          'Usa por ejemplo:\n' +
+          'cancelar: 2025-11-15 15:00; 50370000000';
+      } else {
+        const ok = await cancelarCitaEnCalendar(fechaHoraTexto, telefonoCliente);
         if (ok) {
           replyText =
-            '✅ He creado un *evento de prueba* en el calendario de Arte Fotográfico para dentro de 1 hora.\n' +
-            'Por favor revisa tu Google Calendar para verificarlo. 🗓️';
+            '✅ He cancelado la cita en el calendario de Arte Fotográfico.\n' +
+            `📅 Fecha y hora: *${fechaHoraTexto}*\n` +
+            `📞 Contacto: *${telefonoCliente}*`;
         } else {
           replyText =
-            '❌ No pude crear el evento de prueba en el calendario.\n' +
-            'Revisa las credenciales de Google y vuelve a intentarlo.';
+            '❌ No encontré una cita que coincida con esa fecha/hora y teléfono.\n' +
+            'Por favor verifica los datos o consulta con un colaborador.';
         }
-      } else if (esOpcion1) {
-        replyText =
-          '📷 *SERVICIO FOTO ESTUDIO*\n\n' +
-          'En Foto Estudio ofrecemos:\n\n' +
-          '🔸 *Fotografías para títulos y documentos:*\n' +
-          '- Título de Bachiller\n' +
-          '- Título Universitario 7x9 (Uso Universidad de Sonsonate)\n' +
-          '- Título Universitario 6x8 (UMA Universidad Modular Abierta)\n' +
-          '- Certificados, Escalafón, Carnets y más.\n\n' +
-          '🔸 *Fotografías para servicios migratorios:*\n' +
-          '- VISA Americana (2x2 / 50x50 mm) — 💲10.00\n' +
-          '- VISA Canadiense (3.5x4.5 cm) — 💲10.00\n' +
-          '- VISA Mexicana (3.2x2.6 cm) — 💲10.00\n' +
-          '(Todas incluyen 4 fotografías impresas)\n\n' +
-          '🔸 *Sesiones fotográficas:*\n' +
-          '- Personales, de pareja, familiares, bebés, portafolio profesional, graduados, navideñas y más 🎉\n' +
-          '(Precios disponibles directamente en el local)\n\n' +
-          '🔸 *Retratos especiales:*\n' +
-          '- Blanco y negro, contemporáneos y artísticos.\n\n' +
-          'Si deseas más información o agendar tu sesión, dime y con gusto te ayudo 😊';
-      } else if (esOpcion2) {
-        replyText =
-          '💍 *COTIZACIÓN DE PAQUETES DE EVENTOS SOCIALES*\n\n' +
-          'En Arte Fotográfico tenemos paquetes personalizados para:\n' +
-          '- Bodas\n' +
-          '- 15 años\n' +
-          '- Bautizos\n' +
-          '- Comuniones\n' +
-          '- Baby showers\n' +
-          '- Fiestas infantiles\n' +
-          '- Sesiones pre 15 años\n' +
-          '- Sesiones en exteriores (outdoors)\n\n' +
-          '👉 Para brindarte una cotización personalizada, por favor dime:\n' +
-          '- Tipo de evento\n' +
-          '- Fecha del evento\n' +
-          '- Lugar (salón, iglesia, casa, ciudad, etc.)\n\n' +
-          'Si prefieres hablar con una persona, también puedo comunicarte con nuestro personal 📞';
-      } else if (esOpcion3) {
-        replyText =
-          '🖨️ *SERVICIO DE IMPRESIÓN FOTOGRÁFICA*\n\n' +
-          'Ofrecemos impresiones fotográficas de alta calidad en diferentes tamaños y acabados.\n\n' +
-          'Puedes enviarnos tus fotos de estas formas:\n' +
-          '- 📁 Desde USB\n' +
-          '- 📱 Enviándolas por WhatsApp\n' +
-          '- ✉️ Desde tu correo electrónico\n\n' +
-          'Si deseas cotizar o hacer un pedido, puedo comunicarte con nuestro personal para ayudarte con tamaños, precios y tiempos de entrega. 😊\n\n' +
-          '¿Te gustaría que te atienda un colaborador para tu impresión fotográfica?';
-      } else if (esOpcion4) {
-        replyText =
-          '📦 *CONSULTAR ORDEN*\n\n' +
-          'Para ayudarte a consultar el estado de tu orden, por favor envíame uno de estos datos:\n' +
-          '- Número de orden (si lo tienes)\n' +
-          'o\n' +
-          '- Nombre completo con el que hiciste el pedido\n\n' +
-          'Con esa información, comunicaré tu consulta a nuestro personal para que te brinden el estado actualizado de tu pedido. 😊';
-      } else if (esOpcion5) {
-        estadosUsuarios[from] = { paso: 'esperando_nombre', datos: {} };
+      }
 
+    } else if (esMisCitas) {
+      const citas = await listarCitasPorTelefono(from);
+      if (!citas.length) {
         replyText =
-          '🗓️ *Agendar cita en Arte Fotográfico*\n\n' +
-          'Perfecto, te ayudo a reservar tu sesión.\n\n' +
-          '✍️ Primero, por favor dime tu *nombre completo*.\n\n' +
-          'Si en cualquier momento deseas cancelar este proceso, escribe *"cancelar cita"*.';
+          '📅 No encontré citas próximas asociadas a tu número en los próximos 30 días.\n' +
+          'Si crees que es un error, por favor consulta con un colaborador o envía de nuevo los datos de tu cita.';
       } else {
-        const pregunta =
-          'Cliente de Arte Fotográfico dice: "' +
-          texto +
-          '". Responde como asistente del estudio fotográfico en Sonsonate. ' +
-          'Sé amable, profesional, breve (máximo 3 líneas) y en español. ' +
-          'Si la pregunta tiene que ver con horarios, dirección, servicios o paquetes, respóndelo claramente. ' +
-          'Si no entiendes, pide al cliente que aclare su duda.';
-
-        console.log('🤖 Enviando a Gemini (modo automático):', pregunta);
-        replyText = await preguntarAGemini(pregunta);
+        let textoCitas = '📅 *Estas son tus próximas citas registradas:*\n\n';
+        citas.forEach((c, i) => {
+          textoCitas += `${i + 1}. ${c.fecha} — ${c.resumen}\n`;
+        });
+        replyText = textoCitas;
       }
 
-      if (replyText) {
-        await sendWhatsAppMessage(from, replyText);
+    } else if (esSaludo) {
+      replyText =
+        '👋 ¡Hola! Gracias por contactar con Arte Fotográfico 📸\n' +
+        'Soy un asistente virtual con inteligencia artificial.\n' +
+        '¿En qué puedo servirte hoy?\n\n' +
+        'Por favor selecciona una opción escribiendo el número o el nombre del servicio que necesitas 👇\n' +
+        '1️⃣ SERVICIO FOTO ESTUDIO\n' +
+        '2️⃣ COTIZACIÓN DE PAQUETES DE EVENTOS SOCIALES\n' +
+        '3️⃣ SERVICIO DE IMPRESIÓN FOTOGRÁFICA\n' +
+        '4️⃣ CONSULTAR ORDEN\n' +
+        '5️⃣ AGENDA TU CITA';
+
+    } else if (esComandoCita) {
+      // cita: YYYY-MM-DD HH:mm; tipo; telefono
+      const sinPrefijo = texto.substring(5).trim();
+      const partes = sinPrefijo.split(';').map((p) => p.trim());
+
+      const fechaHoraTexto = partes[0];
+      const tipoSesion = partes[1] || 'fotográfica';
+      const telefonoCliente = partes[2] || from;
+
+      if (!fechaHoraTexto) {
+        replyText =
+          '⚠️ Formato de cita inválido.\n' +
+          'Usa por ejemplo:\n' +
+          'cita: 2025-11-15 15:00; sesión familiar; 50370000000';
+      } else {
+        const ok = await crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefonoCliente, null);
+        if (ok) {
+          replyText =
+            '✅ He creado tu cita en el calendario de Arte Fotográfico.\n' +
+            `📅 Fecha y hora: *${fechaHoraTexto}*\n` +
+            `📸 Tipo de sesión: *${tipoSesion}*\n` +
+            `📞 Contacto: *${telefonoCliente}*`;
+        } else {
+          replyText =
+            '❌ Ocurrió un problema al crear la cita en el calendario.\n' +
+            'Por favor revisa el formato y vuelve a intentarlo, o avisa a un colaborador.';
+        }
       }
+
+    } else if (esTestCalendar) {
+      const ok = await crearEventoDePruebaCalendar('Cliente de prueba', from);
+      if (ok) {
+        replyText =
+          '✅ He creado un *evento de prueba* en el calendario de Arte Fotográfico para dentro de 1 hora.\n' +
+          'Por favor revisa tu Google Calendar para verificarlo. 🗓️';
+      } else {
+        replyText =
+          '❌ No pude crear el evento de prueba en el calendario.\n' +
+          'Revisa las credenciales de Google y vuelve a intentarlo.';
+      }
+
+    } else if (esOpcion1) {
+      replyText =
+        '📷 *SERVICIO FOTO ESTUDIO*\n\n' +
+        'En Foto Estudio ofrecemos:\n\n' +
+        '🔸 *Fotografías para títulos y documentos:*\n' +
+        '- Título de Bachiller\n' +
+        '- Título Universitario 7x9 (Uso Universidad de Sonsonate)\n' +
+        '- Título Universitario 6x8 (UMA Universidad Modular Abierta)\n' +
+        '- Certificados, Escalafón, Carnets y más.\n\n' +
+        '🔸 *Fotografías para servicios migratorios:*\n' +
+        '- VISA Americana (2x2 / 50x50 mm) — 💲10.00\n' +
+        '- VISA Canadiense (3.5x4.5 cm) — 💲10.00\n' +
+        '- VISA Mexicana (3.2x2.6 cm) — 💲10.00\n' +
+        '(Todas incluyen 4 fotografías impresas)\n\n' +
+        '🔸 *Sesiones fotográficas:*\n' +
+        '- Personales, de pareja, familiares, bebés, portafolio profesional, graduados, navideñas y más 🎉\n' +
+        '(Precios disponibles directamente en el local)\n\n' +
+        '🔸 *Retratos especiales:*\n' +
+        '- Blanco y negro, contemporáneos y artísticos.\n\n' +
+        'Si deseas más información o agendar tu sesión, dime y con gusto te ayudo 😊';
+
+    } else if (esOpcion2) {
+      replyText =
+        '💍 *COTIZACIÓN DE PAQUETES DE EVENTOS SOCIALES*\n\n' +
+        'En Arte Fotográfico tenemos paquetes personalizados para:\n' +
+        '- Bodas\n' +
+        '- 15 años\n' +
+        '- Bautizos\n' +
+        '- Comuniones\n' +
+        '- Baby showers\n' +
+        '- Fiestas infantiles\n' +
+        '- Sesiones pre 15 años\n' +
+        '- Sesiones en exteriores (outdoors)\n\n' +
+        '👉 Para brindarte una cotización personalizada, por favor dime:\n' +
+        '- Tipo de evento\n' +
+        '- Fecha del evento\n' +
+        '- Lugar (salón, iglesia, casa, ciudad, etc.)\n\n' +
+        'Si prefieres hablar con una persona, también puedo comunicarte con nuestro personal 📞';
+
+    } else if (esOpcion3) {
+      replyText =
+        '🖨️ *SERVICIO DE IMPRESIÓN FOTOGRÁFICA*\n\n' +
+        'Ofrecemos impresiones fotográficas de alta calidad en diferentes tamaños y acabados.\n\n' +
+        'Puedes enviarnos tus fotos de estas formas:\n' +
+        '- 📁 Desde USB\n' +
+        '- 📱 Enviándolas por WhatsApp\n' +
+        '- ✉️ Desde tu correo electrónico\n\n' +
+        'Si deseas cotizar o hacer un pedido, puedo comunicarte con nuestro personal para ayudarte con tamaños, precios y tiempos de entrega. 😊\n\n' +
+        '¿Te gustaría que te atienda un colaborador para tu impresión fotográfica?';
+
+    } else if (esOpcion4) {
+      replyText =
+        '📦 *CONSULTAR ORDEN*\n\n' +
+        'Para ayudarte a consultar el estado de tu orden, por favor envíame uno de estos datos:\n' +
+        '- Número de orden (si lo tienes)\n' +
+        'o\n' +
+        '- Nombre completo con el que hiciste el pedido\n\n' +
+        'Con esa información, comunicaré tu consulta a nuestro personal para que te brinden el estado actualizado de tu pedido. 😊';
+
+    } else if (esOpcion5) {
+      // INICIO del flujo guiado: pedimos NOMBRE primero
+      estadosUsuarios[from] = {
+        paso: 'esperandoNombre',
+        datos: {}, // aquí vamos guardando nombre, fechaHora, tipoSesion, telefono
+      };
+
+      replyText =
+        '🗓️ *Agendar cita en Arte Fotográfico*\n\n' +
+        'Perfecto, te ayudo a reservar tu sesión.\n\n' +
+        '1️⃣ Para empezar, dime por favor tu *nombre completo*.\n\n' +
+        'Si deseas cancelar este proceso escribe "cancelar cita".';
+
+    } else {
+      const pregunta =
+        'Cliente de Arte Fotográfico dice: "' +
+        texto +
+        '". Responde como asistente del estudio fotográfico en Sonsonate. ' +
+        'Sé amable, profesional, breve (máximo 3 líneas) y en español. ' +
+        'Si la pregunta tiene que ver con horarios, dirección, servicios o paquetes, respóndelo claramente. ' +
+        'Si no entiendes, pide al cliente que aclare su duda.';
+
+      console.log('🤖 Enviando a Gemini (modo automático):', pregunta);
+      replyText = await preguntarAGemini(pregunta);
+    }
+
+    if (replyText) {
+      await sendWhatsAppMessage(from, replyText);
     }
   } catch (err) {
     console.error('⚠️ Error procesando el webhook:', err);
