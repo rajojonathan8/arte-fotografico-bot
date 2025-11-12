@@ -168,10 +168,15 @@
       ]
     },
     "profesional": {
+      "nota_tecnica": "LA IMPRESIÓN PAPEL FOTOGRÁFICO LINEA PROFESIONAL SE HACE CON EPSON 260 GRAMOS PROFESIONAL TINTAS ULTRA DS 11 COLORES",
       "precios": [
         { "tamano": "4x6", "precio": 1.25 },
         { "tamano": "5x7", "precio": 2.00 },
-        { "tamano": "6x8", "precio": 3.50 }
+        { "tamano": "6x8", "precio": 3.50 },
+        { "tamano": "8x10", "precio": 12.00 },
+        { "tamano": "11x14", "precio": 21.00 },
+        { "tamano": "20x24", "precio": 95.00 },
+        { "tamano": "30x40", "precio": 145.00 }
       ]
     }
   }
