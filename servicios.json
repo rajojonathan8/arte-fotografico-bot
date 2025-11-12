@@ -1,0 +1,178 @@
+{
+  "meta": {
+    "version": "1.0",
+    "moneda": "USD",
+    "ubicacion_pais": "El Salvador",
+    "ultima_actualizacion": "2025-11-12"
+  },
+  "horario": {
+    "lunes_viernes": [{ "inicio": "08:00", "fin": "12:30" }, { "inicio": "14:00", "fin": "18:00" }],
+    "sabado": [{ "inicio": "08:00", "fin": "12:30" }],
+    "domingo": []
+  },
+  "direccion": "Calle Masferrer, Av. Morazán, 2ª Av. Norte #1-2, entre Piedra Lisa y Casa de Cultura de Sonsonate, enfrente de Academia Patty.",
+  "menu_principal": [
+    { "id": 1, "nombre": "SERVICIO FOTO ESTUDIO" },
+    { "id": 2, "nombre": "COTIZACIÓN DE PAQUETES DE EVENTOS SOCIALES" },
+    { "id": 3, "nombre": "SERVICIO DE IMPRESIÓN FOTOGRÁFICA" },
+    { "id": 4, "nombre": "CONSULTAR ORDEN" },
+    { "id": 5, "nombre": "AGENDA TU CITA" }
+  ],
+  "foto_estudio": {
+    "titulos_documentos": [
+      {
+        "servicio": "Título de Bachiller",
+        "precio": 10.00,
+        "duracion_min": 30,
+        "tamano": null,
+        "tipo_foto": null,
+        "vestimenta_senoritas": "Chaqueta formal negra, blusa/top negro.",
+        "vestimenta_caballeros": "Saco formal negro, camisa blanca o colores pasteles suaves (beige/celeste), corbata negra o sólida.",
+        "observaciones": "Maquillaje suave, evitar sombras/iluminador; cabello semi recogido; aretes medianos/pequeños. Caballeros: corte formal y barba recortada."
+      },
+      {
+        "servicio": "Título Universitario USO (Universidad de Sonsonate)",
+        "precio": 20.00,
+        "duracion_min": 30,
+        "tamano": "7x9",
+        "tipo_foto": null,
+        "vestimenta_senoritas": "Chaqueta formal negra, blusa/top negro.",
+        "vestimenta_caballeros": "Saco formal negro, camisa blanca o pasteles suaves (beige/celeste), corbata negra o sólida.",
+        "observaciones": "Mismas recomendaciones de maquillaje y presentación."
+      },
+      {
+        "servicio": "Título Universitario UMA (Universidad Modular Abierta)",
+        "precio": 20.00,
+        "duracion_min": 30,
+        "tamano": "6x8",
+        "tipo_foto": null,
+        "vestimenta_senoritas": "Chaqueta formal negra, blusa/top negro.",
+        "vestimenta_caballeros": "Saco formal negro, camisa blanca o pasteles suaves (beige/celeste), corbata negra o sólida.",
+        "observaciones": "Mismas recomendaciones de maquillaje y presentación."
+      },
+      {
+        "servicio": "Certificado (Primer Año de Bachillerato)",
+        "precio": 10.00,
+        "duracion_min": 30,
+        "tamano": "2.5x3.5 papel granulado",
+        "tipo_foto": "Frente; blanco y negro",
+        "vestimenta_senoritas": "Camisa blanca",
+        "vestimenta_caballeros": "Camisa blanca",
+        "observaciones": "Maquillaje suave; cabello semi recogido; aretes pequeños/medianos; caballeros con corte formal y barba recortada."
+      },
+      {
+        "servicio": "Escalafón",
+        "precio": 10.00,
+        "duracion_min": 30,
+        "tamano": "2.5x3.0",
+        "tipo_foto": null,
+        "vestimenta_senoritas": "Chaqueta negra",
+        "vestimenta_caballeros": "Saco negro, corbata negra, camisa blanca",
+        "observaciones": "Presentación formal recomendada."
+      },
+      {
+        "servicio": "Carnets de minoridad",
+        "precio": 10.00,
+        "duracion_min": 30,
+        "tamano": "2.6x3.2",
+        "tipo_foto": "Color; fondo sólido o gris; frente",
+        "vestimenta_senoritas": "Vestuario casual",
+        "vestimenta_caballeros": "Vestuario casual",
+        "observaciones": "Presentación limpia y sencilla."
+      }
+    ],
+    "migratorios": [
+      {
+        "servicio": "VISA Americana",
+        "precio": 10.00,
+        "duracion_min": 30,
+        "tamano": "2x2 (50x50 mm)",
+        "tipo_foto": "Frente; fondo blanco",
+        "cantidad_fotos": 4,
+        "vestimenta_senoritas": "Formal o semi casual; evitar prendas blancas.",
+        "vestimenta_caballeros": "Formal o semi casual; evitar prendas blancas.",
+        "observaciones": "No lentes, aretes, collares o cadenas. Evitar color blanco por fondo blanco."
+      },
+      {
+        "servicio": "VISA Canadiense",
+        "precio": 10.00,
+        "duracion_min": 30,
+        "tamano": "3.5x4.5 cm",
+        "tipo_foto": "Frente; fondo blanco",
+        "cantidad_fotos": 4,
+        "vestimenta_senoritas": "Formal o semi casual; evitar prendas blancas.",
+        "vestimenta_caballeros": "Formal o semi casual; evitar prendas blancas.",
+        "observaciones": "No lentes, aretes, collares o cadenas."
+      },
+      {
+        "servicio": "VISA Mexicana",
+        "precio": 10.00,
+        "duracion_min": 30,
+        "tamano": "3.2x2.6 cm",
+        "tipo_foto": "Frente; fondo blanco",
+        "cantidad_fotos": 4,
+        "vestimenta_senoritas": "Formal o semi casual; evitar prendas blancas.",
+        "vestimenta_caballeros": "Formal o semi casual; evitar prendas blancas.",
+        "observaciones": "No lentes, aretes, collares o cadenas."
+      }
+    ],
+    "sesiones_fotograficas": {
+      "tipos": [
+        "Personales",
+        "De pareja",
+        "Familiares",
+        "Bebés",
+        "Portafolio profesional",
+        "Graduados",
+        "Navideñas",
+        "Otros"
+      ],
+      "nota_atencion": "Servicio personalizado con precios personalizados. Se recomienda que el cliente visite el local o que un asesor lo contacte.",
+      "sugerir_direccion": true
+    },
+    "retratos_especiales": {
+      "tipos": ["Blanco y negro", "Contemporáneos", "Artísticos"],
+      "nota_atencion": "Servicio personalizado con precios personalizados. Se recomienda visita al local o contacto con asesor.",
+      "sugerir_direccion": true
+    }
+  },
+  "eventos_sociales": {
+    "tipos": [
+      "Bodas",
+      "15 años",
+      "Bautizos",
+      "Comuniones",
+      "Baby showers",
+      "Fiestas infantiles",
+      "Sesiones pre 15 años",
+      "Sesiones outdoors (exteriores)"
+    ],
+    "cotizacion": {
+      "requisitos": ["tipo_evento", "fecha", "lugar"],
+      "nota_atencion": "Paquetes y precios personalizados; se recomienda visita al local o contacto con asesor.",
+      "sugerir_direccion": true
+    }
+  },
+  "impresion_fotografica": {
+    "nota_general": "Impresiones de alta calidad. Puedes traer fotos en USB, enviarlas por WhatsApp o correo.",
+    "aficionado": {
+      "nota_tecnica": "Impresión papel fotográfico 260 g con tintas Epson DS (6 colores).",
+      "precios": [
+        { "tamano": "4x6", "precio": 0.55 },
+        { "tamano": "5x7", "precio": 0.95 },
+        { "tamano": "6x8", "precio": 1.50 },
+        { "tamano": "8x10", "precio": 7.00 },
+        { "tamano": "11x14", "precio": 15.00 },
+        { "tamano": "20x24", "precio": 75.00 },
+        { "tamano": "30x40", "precio": 125.00 }
+      ]
+    },
+    "profesional": {
+      "precios": [
+        { "tamano": "4x6", "precio": 1.25 },
+        { "tamano": "5x7", "precio": 2.00 },
+        { "tamano": "6x8", "precio": 3.50 }
+      ]
+    }
+  }
+}
