@@ -1,3 +1,4 @@
+// index.js
 require('dotenv').config();
 
 const { google } = require('googleapis');
@@ -8,11 +9,13 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== Vars de entorno
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// ===== Entorno
+const WHATSAPP_TOKEN       = process.env.WHATSAPP_TOKEN;
+const OPENAI_API_KEY       = process.env.OPENAI_API_KEY;   // Principal
+const GEMINI_API_KEY       = process.env.GEMINI_API_KEY;   // Fallback
 const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT;
-const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
+const GOOGLE_CALENDAR_ID   = process.env.GOOGLE_CALENDAR_ID;
+const SKIP_CURRENT_HOURS   = (process.env.SKIP_CURRENT_HOURS || '0') === '1'; // para pruebas
 
 // ===== Config fijos
 const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO';
@@ -54,7 +57,7 @@ async function crearEventoDePruebaCalendar(nombreCliente, telefono) {
       summary: `Cita de prueba con ${nombreCliente || 'cliente de WhatsApp'}`,
       description: `Creado por el bot.\nTeléfono: ${telefono || ''}`,
       start: { dateTime: inicio.toISOString(), timeZone: 'America/El_Salvador' },
-      end: { dateTime: fin.toISOString(), timeZone: 'America/El_Salvador' },
+      end:   { dateTime: fin.toISOString(),    timeZone: 'America/El_Salvador' },
     };
 
     await calendar.events.insert({ calendarId: GOOGLE_CALENDAR_ID, requestBody: evento });
@@ -88,7 +91,7 @@ async function crearCitaEnCalendar(fechaHoraTexto, tipoSesion, telefono, nombreC
         (nombreCliente ? `Nombre: ${nombreCliente}\n` : '') +
         `Teléfono: ${telefono || ''}`,
       start: { dateTime: inicioLocal, timeZone: 'America/El_Salvador' },
-      end: { dateTime: finLocal, timeZone: 'America/El_Salvador' },
+      end:   { dateTime: finLocal,   timeZone: 'America/El_Salvador' },
     };
 
     await calendar.events.insert({ calendarId: GOOGLE_CALENDAR_ID, requestBody: evento });
@@ -111,17 +114,14 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
     const calendar = await getCalendarClient();
     if (!calendar || !GOOGLE_CALENDAR_ID) return false;
 
-    const [fechaStr, horaStr] = fechaHoraTexto.split(' ');
+    const [fechaStr] = fechaHoraTexto.split(' ');
     const [y, m, d] = fechaStr.split('-').map(Number);
-    const inicioDia = new Date(y, m - 1, d, 0, 0, 0).toISOString();
-    const finDia = new Date(y, m - 1, d, 23, 59, 59).toISOString();
+    const timeMin = new Date(y, m - 1, d, 0, 0, 0).toISOString();
+    const timeMax = new Date(y, m - 1, d, 23, 59, 59).toISOString();
 
     const resp = await calendar.events.list({
       calendarId: GOOGLE_CALENDAR_ID,
-      timeMin: inicioDia,
-      timeMax: finDia,
-      singleEvents: true,
-      orderBy: 'startTime',
+      timeMin, timeMax, singleEvents: true, orderBy: 'startTime',
     });
 
     const tel = telefono.replace(/[^0-9]/g, '');
@@ -129,11 +129,11 @@ async function cancelarCitaEnCalendar(fechaHoraTexto, telefono) {
 
     for (const ev of resp.data.items || []) {
       const desc = (ev.description || '').toLowerCase();
-      const sum = (ev.summary || '').toLowerCase();
+      const sum  = (ev.summary || '').toLowerCase();
       const fechaTxt = ev.start?.dateTime ? formatearFechaHoraLocal(new Date(ev.start.dateTime)) : '';
 
       const coincideFecha = fechaTxt === fechaHoraTexto;
-      const coincideTel = desc.includes(tel) || sum.includes(tel) || (ult4 && desc.includes(ult4));
+      const coincideTel   = desc.includes(tel) || sum.includes(tel) || (ult4 && desc.includes(ult4));
 
       if (coincideFecha && coincideTel) {
         await calendar.events.delete({ calendarId: GOOGLE_CALENDAR_ID, eventId: ev.id });
@@ -169,7 +169,7 @@ async function listarCitasPorTelefono(telefono) {
     const out = [];
     for (const ev of resp.data.items || []) {
       const desc = (ev.description || '').toLowerCase();
-      const sum = (ev.summary || '').toLowerCase();
+      const sum  = (ev.summary || '').toLowerCase();
       const coincideTel = desc.includes(tel) || sum.includes(tel) || (ult4 && desc.includes(ult4));
       if (!coincideTel) continue;
       const fecha = ev.start?.dateTime ? formatearFechaHoraLocal(new Date(ev.start.dateTime)) : '';
@@ -184,6 +184,7 @@ async function listarCitasPorTelefono(telefono) {
 
 // ================= HORARIO =================
 function esHorarioLaboralActual() {
+  if (SKIP_CURRENT_HOURS) return true; // para pruebas
   const ahora = new Date();
   const loc = new Date(ahora.toLocaleString('en-US', { timeZone: 'America/El_Salvador' }));
   const d = loc.getDay(); // 0 dom, 6 sáb
@@ -202,7 +203,7 @@ function esHorarioLaboralEnFecha(fechaHoraTexto) {
   const [fechaStr, horaStrRaw] = (fechaHoraTexto || '').split(' ');
   if (!fechaStr || !horaStrRaw) return false;
 
-  // aceptar H:mm o HH:mm
+  // Acepta H:mm o HH:mm
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) return false;
   if (!/^([01]?\d|2[0-3]):([0-5]\d)$/.test(horaStrRaw)) return false;
 
@@ -222,26 +223,59 @@ function normalizarHora(horaStrRaw) {
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 }
 
-// ================= IA (Gemini) =================
-async function preguntarAGemini(mensaje) {
-  if (!GEMINI_API_KEY) {
-    console.error('⚠️ Falta GEMINI_API_KEY');
-    return 'Por ahora no puedo usar IA gratuita, pero con gusto te ayudo como asistente básico 😊';
-  }
+// ================= IA (OpenAI principal, Gemini fallback) =================
+async function askOpenAI(prompt) {
+  if (!OPENAI_API_KEY) throw new Error('NO_OPENAI_KEY');
+  const url = 'https://api.openai.com/v1/chat/completions';
+  const body = {
+    model: 'gpt-4o-mini',
+    temperature: 0.2,
+    messages: [
+      {
+        role: 'system',
+        content:
+          'Eres el Asistente Arte Fotográfico. Responde SIEMPRE en español, con tono amable, profesional y breve (máx. 3 líneas). ' +
+          'Estudio fotográfico en Sonsonate, El Salvador. Si preguntan por horarios, dirección, servicios o precios que existan, respóndelos claro. ' +
+          'Si la pregunta requiere precio personalizado (sesiones especiales o eventos), invita a visitar el local o a que un asesor contacte.'
+      },
+      { role: 'user', content: prompt }
+    ]
+  };
+  const res = await axios.post(url, body, {
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
+    timeout: 12000
+  });
+  const txt = res.data?.choices?.[0]?.message?.content?.trim();
+  if (!txt) throw new Error('OPENAI_EMPTY');
+  return txt;
+}
+
+async function askGemini(prompt) {
+  if (!GEMINI_API_KEY) throw new Error('NO_GEMINI_KEY');
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const r = await axios.post(url, {
+    contents: [{ parts: [{ text:
+      'Eres el Asistente Arte Fotográfico. Responde en español, amable, claro y breve (máx. 3 líneas). ' +
+      'Negocio en Sonsonate, El Salvador.\n\n' +
+      `Mensaje del cliente: ${prompt}`
+    }]}],
+  }, { timeout: 12000 });
+  const txt = r.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  if (!txt) throw new Error('GEMINI_EMPTY');
+  return txt;
+}
+
+async function preguntarIA(textoUsuario) {
   try {
-    const r = await axios.post(url, {
-      contents: [{ parts: [{ text:
-        'Eres el Asistente Arte Fotográfico. Responde en español, amable, claro y breve.\n' +
-        'Negocio en Sonsonate, El Salvador.\n\n' +
-        `Mensaje del cliente: ${mensaje}`
-      }]}],
-    });
-    const txt = r.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    return txt?.trim() || 'No pude generar una respuesta en este momento.';
+    return await askOpenAI(textoUsuario);
   } catch (e) {
-    console.error('❌ Gemini:', e.response?.data || e.message);
-    return 'Ocurrió un problema al usar la IA gratuita (Gemini). Intenta de nuevo más tarde.';
+    console.warn('⚠️ OpenAI falló, intento con Gemini:', e.message);
+    try {
+      return await askGemini(textoUsuario);
+    } catch (e2) {
+      console.error('❌ Gemini también falló:', e2.message);
+      return 'Ocurrió un problema con la IA en este momento. Intentemos de nuevo más tarde.';
+    }
   }
 }
 
@@ -283,11 +317,11 @@ app.post('/webhook', async (req, res) => {
     const texto = (message.text?.body || '').trim();
     const low = texto.toLowerCase();
 
-    // Fuera de horario (según hora ACTUAL)
+    // Fuera de horario (según hora ACTUAL) — se puede saltar con SKIP_CURRENT_HOURS=1
     if (!esHorarioLaboralActual()) {
       const out = esDomingo()
-        ? '📸 *Gracias por contactarnos con Arte Fotográfico.*\n\nHoy es *domingo* y estamos *cerrados* por descanso del personal.\n\n🕓 *Horario:*\nL-V: 8:00–12:30 y 14:00–18:00\nSáb: 8:00–12:30\n\nDéjanos tu mensaje y te respondemos al abrir. 😊'
-        : '📸 *Gracias por contactarnos con Arte Fotográfico.*\n\nAhora estamos *fuera de horario*, te responderemos en cuanto estemos de vuelta. 😊\n\n🕓 *Horario:*\nL-V: 8:00–12:30 y 14:00–18:00\nSáb: 8:00–12:30';
+        ? '📸 *Gracias por escribir a Arte Fotográfico.* Hoy es *domingo* y estamos *cerrados*.\n\n🕓 *Horario:*\nL-V: 8:00–12:30 y 14:00–18:00\nSáb: 8:00–12:30\n\nDéjanos tu mensaje y te respondemos al abrir. 😊'
+        : '📸 *Gracias por escribir a Arte Fotográfico.* Ahora estamos *fuera de horario*.\n\n🕓 *Horario:*\nL-V: 8:00–12:30 y 14:00–18:00\nSáb: 8:00–12:30\n\nDéjanos tu mensaje y te respondemos al volver. 😊';
       await sendWhatsAppMessage(from, out);
       return res.sendStatus(200);
     }
@@ -307,7 +341,7 @@ app.post('/webhook', async (req, res) => {
         estado.paso = 'esperandoFecha';
         await sendWhatsAppMessage(
           from,
-          `📅 Gracias, *${estado.datos.nombre}*.\n\nAhora indícame la *fecha y hora* en formato:\n⭐ 2025-11-15 15:00\n(Ej.: 2025-11-15 15:00).`
+          `📅 Gracias, *${estado.datos.nombre}*.\n\nAhora indícame la *fecha y hora* en formato:\n⭐ 2025-11-15 15:00\n(Ej.: 2025-11-15 15:00).\nPuedes escribir *cancelar cita* para salir.`
         );
         return res.sendStatus(200);
       }
@@ -315,7 +349,7 @@ app.post('/webhook', async (req, res) => {
       if (estado.paso === 'esperandoFecha') {
         const [fechaStr, horaStrRaw] = texto.split(' ');
         const fechaOK = /^\d{4}-\d{2}-\d{2}$/.test(fechaStr || '');
-        const horaOK = /^([01]?\d|2[0-3]):([0-5]\d)$/.test(horaStrRaw || '');
+        const horaOK  = /^([01]?\d|2[0-3]):([0-5]\d)$/.test(horaStrRaw || '');
 
         if (!fechaOK || !horaOK) {
           await sendWhatsAppMessage(from, '⚠️ Formato inválido. Usa *YYYY-MM-DD HH:mm* (ej.: 2025-11-15 15:00).');
@@ -361,10 +395,10 @@ app.post('/webhook', async (req, res) => {
     }
 
     // ===== Comandos / opciones
-    const esTestCalendar = low === 'test calendar';
-    const esComandoCita = low.startsWith('cita:');       // cita: YYYY-MM-DD HH:mm; tipo; telefono
-    const esComandoCancelar = low.startsWith('cancelar:'); // cancelar: YYYY-MM-DD HH:mm; telefono
-    const esMisCitas = low === 'mis citas' || low.includes('ver mis citas');
+    const esTestCalendar    = low === 'test calendar';
+    const esComandoCita     = low.startsWith('cita:');       // cita: YYYY-MM-DD HH:mm; tipo; telefono
+    const esComandoCancelar = low.startsWith('cancelar:');   // cancelar: YYYY-MM-DD HH:mm; telefono
+    const esMisCitas        = low === 'mis citas' || low.includes('ver mis citas');
 
     const esSaludo =
       low.includes('hola') || low.includes('buenos días') || low.includes('buenos dias') ||
@@ -382,7 +416,7 @@ app.post('/webhook', async (req, res) => {
     let replyText = '';
 
     if (usaIA) {
-      replyText = await preguntarAGemini(texto.substring(3).trim() || 'Responde como asistente de Arte Fotográfico.');
+      replyText = await preguntarIA(texto.substring(3).trim() || 'Responde como asistente de Arte Fotográfico.');
     } else if (esComandoCancelar) {
       const sin = texto.substring(9).trim();
       const [fechaStr, horaStrRaw] = (sin.split(';')[0] || '').trim().split(' ');
@@ -466,7 +500,8 @@ app.post('/webhook', async (req, res) => {
         'Perfecto, te ayudo a reservar.\n1️⃣ Primero, dime tu *nombre completo*.\n\n' +
         'Puedes escribir *cancelar cita* para terminar el proceso.';
     } else {
-      replyText = await preguntarAGemini(texto);
+      // Chat libre con IA (natural)
+      replyText = await preguntarIA(texto);
     }
 
     if (replyText) await sendWhatsAppMessage(from, replyText);
