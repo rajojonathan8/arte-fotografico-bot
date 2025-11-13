@@ -1,0 +1,233 @@
+<%- include('_head', { title }) %>
+
+<header class="p-4 bg-white shadow">
+  <div class="max-w-6xl mx-auto flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold">Chat con clientes</h1>
+      <p class="text-sm text-slate-500">
+        Vista de mensajes de WhatsApp (por ahora con datos de prueba).
+      </p>
+    </div>
+    <a href="/admin" class="text-sm text-slate-600 hover:text-slate-900">← Volver al panel</a>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto p-4">
+  <div class="bg-white rounded-2xl shadow border border-slate-200 flex flex-col h-[540px] md:h-[600px] overflow-hidden">
+
+    <!-- Contenedor principal: lista de chats + conversación -->
+    <div class="flex flex-1 min-h-0">
+      <!-- Lista de chats -->
+      <aside class="w-64 border-r border-slate-200 bg-slate-50 flex flex-col">
+        <div class="p-3 border-b border-slate-200">
+          <input
+            id="search"
+            type="text"
+            placeholder="Buscar cliente..."
+            class="w-full rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
+          />
+        </div>
+
+        <ul id="chat-list" class="flex-1 overflow-y-auto text-sm">
+          <!-- Aquí se llena por JS -->
+        </ul>
+      </aside>
+
+      <!-- Conversación -->
+      <section class="flex-1 flex flex-col bg-slate-100">
+        <!-- Cabecera del chat actual -->
+        <div id="chat-header" class="px-4 py-3 border-b border-slate-200 bg-white flex items-center justify-between">
+          <div>
+            <p id="chat-name" class="font-semibold text-slate-900">Selecciona un cliente</p>
+            <p id="chat-phone" class="text-xs text-slate-500"></p>
+          </div>
+          <span id="chat-last" class="text-xs text-slate-400"></span>
+        </div>
+
+        <!-- Mensajes -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-2 text-sm">
+          <p class="text-slate-400 text-center mt-10">Elige un chat en la lista de la izquierda.</p>
+        </div>
+
+        <!-- Caja para escribir (por ahora solo estética) -->
+        <form id="chat-form" class="border-t border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
+          <input
+            id="message-input"
+            type="text"
+            placeholder="Escribe una respuesta (por ahora solo visual)..."
+            class="flex-1 rounded-full border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
+            autocomplete="off"
+          />
+          <button
+            type="submit"
+            class="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-emerald-600"
+          >
+            Enviar
+          </button>
+        </form>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script>
+  // Datos enviados desde admin-panel.js
+  const conversations = <%- JSON.stringify(conversations || []) %>;
+
+  let activeId = null;
+
+  const chatListEl = document.getElementById('chat-list');
+  const chatMessagesEl = document.getElementById('chat-messages');
+  const chatNameEl = document.getElementById('chat-name');
+  const chatPhoneEl = document.getElementById('chat-phone');
+  const chatLastEl = document.getElementById('chat-last');
+  const searchEl = document.getElementById('search');
+  const formEl = document.getElementById('chat-form');
+  const inputEl = document.getElementById('message-input');
+
+  function renderChatList(filterText = '') {
+    const q = filterText.toLowerCase().trim();
+    chatListEl.innerHTML = '';
+
+    conversations.forEach((c) => {
+      if (
+        q &&
+        !c.name.toLowerCase().includes(q) &&
+        !c.phone.toLowerCase().includes(q)
+      ) {
+        return;
+      }
+
+      const li = document.createElement('li');
+      li.className =
+        'border-b border-slate-200 cursor-pointer hover:bg-emerald-50 ' +
+        (c.id === activeId ? 'bg-emerald-50' : 'bg-slate-50');
+
+      li.innerHTML = `
+        <button class="w-full text-left px-3 py-2 flex flex-col">
+          <span class="text-sm font-semibold text-slate-900 truncate">${c.name}</span>
+          <span class="text-xs text-slate-500 truncate">${c.phone}</span>
+          <span class="text-[11px] text-slate-400 mt-1">${c.lastMessageAt}</span>
+        </button>
+      `;
+
+      li.addEventListener('click', () => {
+        activeId = c.id;
+        renderChatHeader();
+        renderMessages();
+        renderChatList(q); // para refrescar selección
+      });
+
+      chatListEl.appendChild(li);
+    });
+
+    if (!chatListEl.children.length) {
+      const li = document.createElement('li');
+      li.className = 'p-3 text-xs text-slate-400';
+      li.textContent = 'No se encontraron clientes.';
+      chatListEl.appendChild(li);
+    }
+  }
+
+  function getActiveConversation() {
+    return conversations.find((c) => c.id === activeId) || null;
+  }
+
+  function renderChatHeader() {
+    const conv = getActiveConversation();
+    if (!conv) {
+      chatNameEl.textContent = 'Selecciona un cliente';
+      chatPhoneEl.textContent = '';
+      chatLastEl.textContent = '';
+      return;
+    }
+    chatNameEl.textContent = conv.name;
+    chatPhoneEl.textContent = conv.phone;
+    chatLastEl.textContent = conv.lastMessageAt || '';
+  }
+
+  function renderMessages() {
+    const conv = getActiveConversation();
+    chatMessagesEl.innerHTML = '';
+
+    if (!conv) {
+      const p = document.createElement('p');
+      p.className = 'text-slate-400 text-center mt-10';
+      p.textContent = 'Elige un chat en la lista de la izquierda.';
+      chatMessagesEl.appendChild(p);
+      return;
+    }
+
+    conv.messages.forEach((m) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'w-full flex mb-1';
+
+      const isClient = m.from === 'client';
+      if (isClient) {
+        wrap.classList.add('justify-start');
+      } else {
+        wrap.classList.add('justify-end');
+      }
+
+      const bubble = document.createElement('div');
+      bubble.className =
+        'max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow ' +
+        (isClient
+          ? 'bg-white text-slate-900 border border-slate-200'
+          : 'bg-emerald-500 text-white');
+
+      bubble.innerHTML = `
+        <div>${m.text}</div>
+        <div class="text-[10px] mt-1 opacity-70 text-right">${m.time || ''}</div>
+      `;
+
+      wrap.appendChild(bubble);
+      chatMessagesEl.appendChild(wrap);
+    });
+
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+  }
+
+  // 🔍 Búsqueda
+  if (searchEl) {
+    searchEl.addEventListener('input', (e) => {
+      renderChatList(e.target.value || '');
+    });
+  }
+
+  // Formulario (por ahora solo agrega el mensaje visualmente al chat activo)
+  if (formEl && inputEl) {
+    formEl.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = (inputEl.value || '').trim();
+      if (!text || !activeId) return;
+
+      const conv = getActiveConversation();
+      if (!conv) return;
+
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const time = `${hh}:${mm}`;
+
+      conv.messages.push({ from: 'bot', text, time });
+      conv.lastMessageAt = `Hoy · ${time}`;
+
+      inputEl.value = '';
+      renderMessages();
+      renderChatList(searchEl ? searchEl.value : '');
+    });
+  }
+
+  // Al cargar, seleccionamos el primer chat si existe
+  window.addEventListener('DOMContentLoaded', () => {
+    if (conversations.length > 0) {
+      activeId = conversations[0].id;
+    }
+    renderChatHeader();
+    renderChatList('');
+    renderMessages();
+  });
+</script>
+
+<%- include('_foot') %>

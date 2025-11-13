@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Panel Arte Fotográfico - Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      min-height: 100vh;
+
+      /* 🔹 Fondo: imagen de la empresa */
+      background-image: url("/admin/static/bg-arte.jpg");
+      background-size: cover;        /* que cubra toda la pantalla */
+      background-position: center;   /* centrada */
+      background-repeat: no-repeat;
+      background-attachment: fixed;  /* en escritorio se ve elegante */
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      position: relative;
+      color: #e5e7eb;
+    }
+
+    /* 🔹 Capa oscura encima de la foto para que el texto se lea bien */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(
+        135deg,
+        rgba(15, 23, 42, 0.90),
+        rgba(15, 23, 42, 0.70)
+      );
+      z-index: 0;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1; /* por encima del filtro oscuro */
+
+      background: rgba(2, 6, 23, 0.94);
+      border-radius: 16px;
+      padding: 24px 20px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      border: 1px solid rgba(31, 41, 55, 0.9);
+
+      backdrop-filter: blur(10px); /* efecto glass en navegadores modernos */
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+    p.sub {
+      font-size: 0.85rem;
+      text-align: center;
+      color: #9ca3af;
+      margin-top: 0;
+      margin-bottom: 16px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      display: block;
+      margin-bottom: 4px;
+      color: #d1d5db;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #374151;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 0.95rem;
+      margin-bottom: 12px;
+    }
+    input:focus {
+      outline: none;
+      border-color: #22c55e;
+      box-shadow: 0 0 0 1px #22c55e40;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg,#22c55e,#16a34a);
+      color: #020617;
+      margin-top: 4px;
+    }
+    button:hover {
+      opacity: 0.95;
+    }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: #9ca3af;
+      text-align: center;
+    }
+
+    /* 🔹 Ajustes para pantallas pequeñas (celular) */
+    @media (max-width: 480px) {
+      .card {
+        padding: 20px 16px;
+        border-radius: 12px;
+      }
+      h1 {
+        font-size: 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Panel Arte Fotográfico</h1>
+    <p class="sub">Acceso para empleados</p>
+
+    <form method="POST" action="/admin/login">
+      <label for="pin">PIN de acceso</label>
+      <input
+        type="password"
+        id="pin"
+        name="pin"
+        placeholder="Ingresa el PIN de administrador"
+        required
+      />
+      <button type="submit">Entrar al panel</button>
+      <p class="hint">Por ahora todos usan el mismo PIN.</p>
+    </form>
+  </div>
+</body>
+</html>

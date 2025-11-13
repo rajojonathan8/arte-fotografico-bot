@@ -1,0 +1,43 @@
+<section class="topbar">
+  <div class="topbar-title">Panel Arte Fotográfico</div>
+  <div class="topbar-subtitle">Chat con clientes</div>
+</section>
+
+<main class="chat-layout">
+  <!-- Columna izquierda: contactos -->
+  <section class="chat-sidebar">
+    <div class="chat-sidebar-header">
+      <h2>Conversaciones</h2>
+      <p class="chat-sidebar-sub">Clientes que han escrito por WhatsApp</p>
+    </div>
+    <ul id="contactList" class="contact-list">
+      <!-- Se llena por JS -->
+    </ul>
+  </section>
+
+  <!-- Columna derecha: mensajes -->
+  <section class="chat-main">
+    <div class="chat-main-header">
+      <div>
+        <div id="chatContactName" class="chat-contact-name">Selecciona un contacto</div>
+        <div id="chatContactPhone" class="chat-contact-phone"></div>
+      </div>
+    </div>
+
+    <div id="chatMessages" class="chat-messages">
+      <div class="chat-placeholder">
+        Selecciona una conversación en la izquierda para ver los mensajes.
+      </div>
+    </div>
+
+    <form id="chatForm" class="chat-input" autocomplete="off">
+      <input
+        id="chatInput"
+        type="text"
+        placeholder="Escribe un mensaje para el cliente..."
+        autocomplete="off"
+      />
+      <button type="submit">Enviar</button>
+    </form>
+  </section>
+</main>
