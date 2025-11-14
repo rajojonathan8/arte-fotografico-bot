@@ -1,1 +1,31 @@
-[]
+[
+  {
+    "phone": "50371234567",
+    "name": "María López",
+    "lastUpdate": 1731520005000,
+    "messages": [
+      {
+        "from": "cliente",
+        "text": "Hola, cuánto valen las fotos de visa americana?",
+        "timestamp": 1731520000000
+      },
+      {
+        "from": "bot",
+        "text": "Las fotos para visa americana tienen un costo de $10.",
+        "timestamp": 1731520005000
+      }
+    ]
+  },
+  {
+    "phone": "50378901234",
+    "name": "Carlos Herrera",
+    "lastUpdate": 1731521000000,
+    "messages": [
+      {
+        "from": "cliente",
+        "text": "¿Y la vestimenta cómo sería?",
+        "timestamp": 1731520900000
+      }
+    ]
+  }
+]

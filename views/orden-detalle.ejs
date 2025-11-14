@@ -1,0 +1,212 @@
+<%- include('_head', { title }) %>
+
+<header class="p-4 bg-white shadow">
+  <div class="max-w-5xl mx-auto flex items-center justify-between">
+    <div>
+      <p class="text-xs uppercase tracking-wide text-slate-400">
+        <%= tipo === 'institucion' ? 'Orden de institución' : 'Orden de persona' %>
+      </p>
+      <h1 class="text-2xl font-semibold text-slate-900"><%= title %></h1>
+    </div>
+
+    <div class="flex gap-2">
+      <% if (tipo === 'institucion') { %>
+        <a
+          href="/admin/ordenes/institucion/<%= idx %>/editar"
+          class="px-3 py-1.5 text-sm rounded-full border border-emerald-600 text-emerald-700 hover:bg-emerald-50">
+          Editar
+        </a>
+        <form
+          action="/admin/ordenes/institucion/<%= idx %>/eliminar"
+          method="POST"
+          onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de institución?');">
+          <button
+            type="submit"
+            class="px-3 py-1.5 text-sm rounded-full border border-red-600 text-red-700 hover:bg-red-50">
+            Eliminar
+          </button>
+        </form>
+      <% } else { %>
+        <a
+          href="/admin/ordenes/persona/<%= idx %>/editar"
+          class="px-3 py-1.5 text-sm rounded-full border border-emerald-600 text-emerald-700 hover:bg-emerald-50">
+          Editar
+        </a>
+        <form
+          action="/admin/ordenes/persona/<%= idx %>/eliminar"
+          method="POST"
+          onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de persona?');">
+          <button
+            type="submit"
+            class="px-3 py-1.5 text-sm rounded-full border border-red-600 text-red-700 hover:bg-red-50">
+            Eliminar
+          </button>
+        </form>
+      <% } %>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto p-4 space-y-6">
+  <a
+    href="/admin/ordenes?<%= tipo === 'institucion' ? 'tab=instituciones' : 'tab=personas' %>"
+    class="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
+    ← Volver a órdenes
+  </a>
+
+  <!-- Tarjeta principal -->
+  <section class="bg-white rounded-2xl shadow p-6 space-y-4">
+    <% if (tipo === 'institucion') { %>
+      <div class="flex flex-wrap gap-6">
+        <div class="space-y-1">
+          <p class="text-xs uppercase text-slate-400">Institución</p>
+          <p class="text-lg font-semibold"><%= orden.institucion %></p>
+        </div>
+
+        <div class="space-y-1">
+          <p class="text-xs uppercase text-slate-400">Sección</p>
+          <p class="font-medium"><%= orden.seccion %></p>
+        </div>
+
+        <div class="space-y-1">
+          <p class="text-xs uppercase text-slate-400">Paquete</p>
+          <p class="font-medium"><%= orden.paquete %></p>
+        </div>
+      </div>
+
+      <hr class="border-slate-100">
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+          <p class="text-xs uppercase text-slate-400">Toma principal</p>
+          <p class="font-semibold"><%= orden.toma_principal || 0 %></p>
+        </div>
+        <div>
+          <p class="text-xs uppercase text-slate-400">Collage 1</p>
+          <p class="font-semibold"><%= orden.collage1 || 0 %></p>
+        </div>
+        <div>
+          <p class="text-xs uppercase text-slate-400">Collage 2</p>
+          <p class="font-semibold"><%= orden.collage2 || 0 %></p>
+        </div>
+        <div>
+          <p class="text-xs uppercase text-slate-400">Fecha toma</p>
+          <p class="font-semibold"><%= orden.fecha_toma || '—' %></p>
+        </div>
+      </div>
+
+      <hr class="border-slate-100">
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+        <div>
+          <p class="text-xs uppercase text-slate-400">Teléfono</p>
+          <p class="font-semibold"><%= orden.telefono || '—' %></p>
+        </div>
+
+        <div>
+          <p class="text-xs uppercase text-slate-400">Entrega</p>
+          <% const estadoInst = orden.entrega || orden.estado_entrega || 'Pendiente'; %>
+          <% if (estadoInst === 'Entregado') { %>
+            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
+              Entregado
+            </span>
+          <% } else { %>
+            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">
+              Pendiente
+            </span>
+          <% } %>
+        </div>
+
+        <div>
+          <p class="text-xs uppercase text-slate-400">Urgencia</p>
+          <% const urgInst = orden.urgencia || 'Normal'; %>
+          <% if (urgInst === 'Urgente' || urgInst === 'Muy urgente') { %>
+            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
+              <%= urgInst %>
+            </span>
+          <% } else { %>
+            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700">
+              <%= urgInst %>
+            </span>
+          <% } %>
+        </div>
+      </div>
+
+    <% } else { %>
+      <!-- DETALLE PERSONA -->
+      <div class="flex flex-wrap gap-6">
+        <div class="space-y-1">
+          <p class="text-xs uppercase text-slate-400">Nombre</p>
+          <p class="text-lg font-semibold"><%= orden.nombre %></p>
+        </div>
+
+        <div class="space-y-1">
+          <p class="text-xs uppercase text-slate-400">N° orden</p>
+          <p class="font-medium"><%= orden.numero_orden || orden.n_orden || '—' %></p>
+        </div>
+
+        <div class="space-y-1">
+          <p class="text-xs uppercase text-slate-400">N° toma</p>
+          <p class="font-medium"><%= orden.numero_toma || orden.n_toma || '—' %></p>
+        </div>
+      </div>
+
+      <hr class="border-slate-100">
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+          <p class="text-xs uppercase text-slate-400">Fecha toma</p>
+          <p class="font-semibold"><%= orden.fecha_toma || '—' %></p>
+        </div>
+        <div>
+          <p class="text-xs uppercase text-slate-400">Fecha entrega</p>
+          <p class="font-semibold"><%= orden.fecha_entrega || '—' %></p>
+        </div>
+        <div>
+          <p class="text-xs uppercase text-slate-400">Urgencia</p>
+          <% const urgPers = orden.urgencia || 'Normal'; %>
+          <% if (urgPers === 'Urgente' || urgPers === 'Muy urgente') { %>
+            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
+              <%= urgPers %>
+            </span>
+          <% } else { %>
+            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700">
+              <%= urgPers %>
+            </span>
+          <% } %>
+        </div>
+        <div>
+          <p class="text-xs uppercase text-slate-400">Precio</p>
+          <p class="font-semibold">
+            $<%= Number(orden.precio || 0).toFixed(2) %>
+          </p>
+        </div>
+      </div>
+
+      <hr class="border-slate-100">
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <p class="text-xs uppercase text-slate-400">Teléfono</p>
+          <p class="font-semibold"><%= orden.telefono || '—' %></p>
+        </div>
+
+        <div>
+          <p class="text-xs uppercase text-slate-400">Entrega</p>
+          <% const estadoPers = orden.entrega || orden.estado_entrega || 'Pendiente'; %>
+          <% if (estadoPers === 'Entregado') { %>
+            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
+              Entregado
+            </span>
+          <% } else { %>
+            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">
+              Pendiente
+            </span>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
+  </section>
+</main>
+
+<%- include('_foot') %>

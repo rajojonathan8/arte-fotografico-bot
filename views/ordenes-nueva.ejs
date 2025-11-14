@@ -1,0 +1,138 @@
+<%- include('_head', { title }) %>
+
+<header class="p-4 bg-white shadow">
+  <div class="max-w-3xl mx-auto flex items-center justify-between">
+    <h1 class="text-xl font-semibold"><%= title %></h1>
+    <a href="/admin/ordenes" class="text-sm text-slate-600 hover:text-slate-900">← Volver a órdenes</a>
+  </div>
+</header>
+
+<main class="max-w-3xl mx-auto p-4">
+  <form
+    action="/admin/ordenes/nueva-institucion"
+    method="post"
+    class="bg-white rounded-2xl shadow p-6 space-y-4"
+  >
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Institución</label>
+        <input
+          name="institucion"
+          required
+          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          placeholder="Nombre de la institución"
+        />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Sección</label>
+        <input
+          name="seccion"
+          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          placeholder="9° A, 2° Bachillerato..."
+        />
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-slate-700">Paquete</label>
+      <input
+        name="paquete"
+        class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        placeholder="Paquete A, solo foto título..."
+      />
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Toma principal</label>
+        <input
+          type="number"
+          min="0"
+          name="toma_principal"
+          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          value="0"
+        />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Collage 1</label>
+        <input
+          type="number"
+          min="0"
+          name="collage1"
+          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          value="0"
+        />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Collage 2</label>
+        <input
+          type="number"
+          min="0"
+          name="collage2"
+          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          value="0"
+        />
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Fecha de toma</label>
+        <input
+          type="date"
+          name="fecha_toma"
+          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Teléfono</label>
+        <input
+          name="telefono"
+          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          placeholder="5037XXXXXXX"
+        />
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Estado de entrega</label>
+        <select
+          name="estado_entrega"
+          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+          <option value="Pendiente">Pendiente</option>
+          <option value="Entregado">Entregado</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700">Urgencia</label>
+        <select
+          name="urgencia"
+          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+          <option value="Normal">Normal</option>
+          <option value="Urgente">Urgente</option>
+          <option value="Muy urgente">Muy urgente</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="flex justify-end space-x-2 pt-2">
+      <a
+        href="/admin/ordenes"
+        class="px-4 py-2 rounded-lg text-sm font-medium border border-slate-300 text-slate-700 hover:bg-slate-50"
+      >
+        Cancelar
+      </a>
+      <button
+        type="submit"
+        class="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700"
+      >
+        Guardar orden
+      </button>
+    </div>
+  </form>
+</main>
+
+<%- include('_foot') %>

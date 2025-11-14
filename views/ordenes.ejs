@@ -1,0 +1,351 @@
+<%- include('_head', { title }) %>
+
+<header class="p-4 bg-white shadow">
+  <div class="max-w-6xl mx-auto flex items-center justify-between">
+    <h1 class="text-xl font-semibold">Órdenes y libros</h1>
+    <a href="/admin" class="text-sm text-slate-600 hover:text-slate-900">← Volver al panel</a>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto p-4">
+
+  <!-- Tabs -->
+  <div class="flex flex-wrap gap-2 mb-4">
+    <a
+      href="/admin/ordenes?tab=instituciones"
+      class="px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2
+             <%= tab === 'instituciones' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700' %>">
+      <span>📒</span> Instituciones
+    </a>
+
+    <a
+      href="/admin/ordenes?tab=personas"
+      class="px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2
+             <%= tab === 'personas' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700' %>">
+      <span>👤</span> Personas
+    </a>
+  </div>
+
+  <!-- 🔍 Filtros (fecha, estado, urgencia, búsqueda) -->
+<section class="bg-white rounded-2xl shadow p-4 mb-4">
+  <form action="/admin/ordenes" method="GET" class="flex flex-wrap items-end gap-4">
+    <!-- mantener la pestaña actual -->
+    <input type="hidden" name="tab" value="<%= tab %>">
+
+    <!-- Fecha desde -->
+    <div>
+      <label for="fecha_desde" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
+        Desde (fecha toma)
+      </label>
+      <input
+        type="date"
+        id="fecha_desde"
+        name="fecha_desde"
+        value="<%= fechaDesde || '' %>"
+        class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+    </div>
+
+    <!-- Fecha hasta -->
+    <div>
+      <label for="fecha_hasta" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
+        Hasta (fecha toma)
+      </label>
+      <input
+        type="date"
+        id="fecha_hasta"
+        name="fecha_hasta"
+        value="<%= fechaHasta || '' %>"
+        class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+    </div>
+
+    <!-- Estado de entrega -->
+    <div>
+      <label for="estado" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
+        Entrega
+      </label>
+      <select
+        id="estado"
+        name="estado"
+        class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        <option value="" <%= !estadoFiltro ? 'selected' : '' %>>Todas</option>
+        <option value="Pendiente" <%= estadoFiltro === 'Pendiente' ? 'selected' : '' %>>Pendiente</option>
+        <option value="Entregado" <%= estadoFiltro === 'Entregado' ? 'selected' : '' %>>Entregado</option>
+      </select>
+    </div>
+
+    <!-- Urgencia -->
+    <div>
+      <label for="urgencia" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
+        Urgencia
+      </label>
+      <select
+        id="urgencia"
+        name="urgencia"
+        class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        <option value="" <%= !urgenciaFiltro ? 'selected' : '' %>>Todas</option>
+        <option value="Normal" <%= urgenciaFiltro === 'Normal' ? 'selected' : '' %>>Normal</option>
+        <option value="Urgente" <%= urgenciaFiltro === 'Urgente' ? 'selected' : '' %>>Urgente</option>
+        <option value="Muy urgente" <%= urgenciaFiltro === 'Muy urgente' ? 'selected' : '' %>>Muy urgente</option>
+      </select>
+    </div>
+
+    <!-- Búsqueda de texto -->
+    <div class="flex-1 min-w-[200px]">
+      <label for="q" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
+        Buscar
+      </label>
+      <input
+        type="text"
+        id="q"
+        name="q"
+        placeholder="Nombre, institución, teléfono, N° orden..."
+        value="<%= textoFiltro || '' %>"
+        class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+    </div>
+
+    <!-- Botones -->
+    <div class="flex gap-2">
+      <button
+        type="submit"
+        class="px-4 py-2 text-sm rounded-full bg-emerald-600 text-white hover:bg-emerald-700">
+        Aplicar filtros
+      </button>
+
+      <a
+        href="/admin/ordenes?tab=<%= tab %>"
+        class="px-4 py-2 text-sm rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200">
+        Limpiar
+      </a>
+    </div>
+  </form>
+
+  <% if (fechaDesde || fechaHasta || estadoFiltro || urgenciaFiltro || textoFiltro) { %>
+    <p class="mt-2 text-xs text-slate-500">
+      Filtros activos:
+      <% if (fechaDesde || fechaHasta) { %>
+        <span>Fecha toma</span>
+        <% if (fechaDesde) { %> desde <span class="font-semibold"><%= fechaDesde %></span><% } %>
+        <% if (fechaDesde && fechaHasta) { %> y <% } %>
+        <% if (fechaHasta) { %> hasta <span class="font-semibold"><%= fechaHasta %></span><% } %>;
+      <% } %>
+      <% if (estadoFiltro) { %>
+        <span>Entrega: <span class="font-semibold"><%= estadoFiltro %></span>;</span>
+      <% } %>
+      <% if (urgenciaFiltro) { %>
+        <span>Urgencia: <span class="font-semibold"><%= urgenciaFiltro %></span>;</span>
+      <% } %>
+      <% if (textoFiltro) { %>
+        <span>Búsqueda: "<span class="font-semibold"><%= textoFiltro %></span>"</span>
+      <% } %>
+    </p>
+  <% } %>
+</section>
+
+
+  <!-- Tabla de INSTITUCIONES -->
+  <% if (tab === 'instituciones') { %>
+    <section class="bg-white rounded-2xl shadow p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Libro de instituciones</h2>
+        <a
+          href="/admin/ordenes/nueva-institucion"
+          class="px-4 py-2 text-sm rounded-full bg-emerald-600 text-white hover:bg-emerald-700">
+          + Nueva orden (institución)
+        </a>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-50 text-slate-600">
+            <tr>
+              <th class="px-3 py-2 text-left">Institución</th>
+              <th class="px-3 py-2 text-left">Sección</th>
+              <th class="px-3 py-2 text-left">Paquete</th>
+              <th class="px-3 py-2 text-center">Toma principal</th>
+              <th class="px-3 py-2 text-center">Collage 1</th>
+              <th class="px-3 py-2 text-center">Collage 2</th>
+              <th class="px-3 py-2 text-left">Fecha toma</th>
+              <th class="px-3 py-2 text-left">Teléfono</th>
+              <th class="px-3 py-2 text-center">Entrega</th>
+              <th class="px-3 py-2 text-center">Urgencia</th>
+              <th class="px-3 py-2 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <% if (!ordenesInstituciones || ordenesInstituciones.length === 0) { %>
+              <tr>
+                <td colspan="11" class="px-3 py-4 text-center text-slate-500">
+                  No hay órdenes de instituciones registradas para este filtro.
+                </td>
+              </tr>
+            <% } else { %>
+              <% ordenesInstituciones.forEach((o, idx) => { %>
+                <tr class="hover:bg-slate-50">
+                  <td class="px-3 py-2"><%= o.institucion %></td>
+                  <td class="px-3 py-2"><%= o.seccion %></td>
+                  <td class="px-3 py-2"><%= o.paquete %></td>
+                  <td class="px-3 py-2 text-center"><%= o.toma_principal %></td>
+                  <td class="px-3 py-2 text-center"><%= o.collage1 %></td>
+                  <td class="px-3 py-2 text-center"><%= o.collage2 %></td>
+                  <td class="px-3 py-2"><%= o.fecha_toma %></td>
+                  <td class="px-3 py-2"><%= o.telefono %></td>
+                  <td class="px-3 py-2 text-center">
+                    <% const estadoInst = o.entrega || o.estado_entrega || 'Pendiente'; %>
+                    <% if (estadoInst === 'Entregado') { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
+                        Entregado
+                      </span>
+                    <% } else { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">
+                        Pendiente
+                      </span>
+                    <% } %>
+                  </td>
+                  <td class="px-3 py-2 text-center">
+                    <% const urgInst = o.urgencia || 'Normal'; %>
+                    <% if (urgInst === 'Urgente' || urgInst === 'Muy urgente') { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
+                        <%= urgInst %>
+                      </span>
+                    <% } else { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700">
+                        <%= urgInst %>
+                      </span>
+                    <% } %>
+                  </td>
+                  <td class="px-3 py-2 text-center">
+                    <div class="inline-flex gap-2">
+                      <a href="/admin/ordenes/institucion/<%= idx %>"
+                         class="text-xs text-slate-600 hover:underline">
+                        Ver
+                      </a>
+                      <a href="/admin/ordenes/institucion/<%= idx %>/editar"
+                         class="text-xs text-emerald-700 hover:underline">
+                        Editar
+                      </a>
+                      <form
+                        action="/admin/ordenes/institucion/<%= idx %>/eliminar"
+                        method="POST"
+                        onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de institución?');"
+                        class="inline">
+                        <button type="submit"
+                                class="text-xs text-red-600 hover:underline">
+                          Eliminar
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% } %>
+
+  <!-- Tabla de PERSONAS -->
+  <% if (tab === 'personas') { %>
+    <section class="bg-white rounded-2xl shadow p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Libro de personas</h2>
+        <a
+          href="/admin/ordenes/nueva-persona"
+          class="px-4 py-2 text-sm rounded-full bg-emerald-600 text-white hover:bg-emerald-700">
+          + Nueva orden (persona)
+        </a>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-50 text-slate-600">
+            <tr>
+              <th class="px-3 py-2 text-left">Nombre</th>
+              <th class="px-3 py-2 text-left">N° orden</th>
+              <th class="px-3 py-2 text-center">N° toma</th>
+              <th class="px-3 py-2 text-left">Fecha toma</th>
+              <th class="px-3 py-2 text-left">Fecha entrega</th>
+              <th class="px-3 py-2 text-center">Urgente</th>
+              <th class="px-3 py-2 text-right">Precio</th>
+              <th class="px-3 py-2 text-left">Teléfono</th>
+              <th class="px-3 py-2 text-center">Entrega</th>
+              <th class="px-3 py-2 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <% if (!ordenesPersonas || ordenesPersonas.length === 0) { %>
+              <tr>
+                <td colspan="10" class="px-3 py-4 text-center text-slate-500">
+                  No hay órdenes de personas registradas para este filtro.
+                </td>
+              </tr>
+            <% } else { %>
+              <% ordenesPersonas.forEach((o, idx) => { %>
+                <tr class="hover:bg-slate-50">
+                  <td class="px-3 py-2"><%= o.nombre %></td>
+                  <td class="px-3 py-2"><%= o.numero_orden || o.n_orden %></td>
+                  <td class="px-3 py-2 text-center"><%= o.numero_toma || o.n_toma %></td>
+                  <td class="px-3 py-2"><%= o.fecha_toma %></td>
+                  <td class="px-3 py-2"><%= o.fecha_entrega %></td>
+                  <td class="px-3 py-2 text-center">
+                    <% const urgPers = o.urgencia || 'Normal'; %>
+                    <% if (urgPers === 'Urgente' || urgPers === 'Muy urgente') { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
+                        <%= urgPers %>
+                      </span>
+                    <% } else { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700">
+                        <%= urgPers %>
+                      </span>
+                    <% } %>
+                  </td>
+                  <td class="px-3 py-2 text-right">
+                    $<%= Number(o.precio || 0).toFixed(2) %>
+                  </td>
+                  <td class="px-3 py-2"><%= o.telefono %></td>
+                  <td class="px-3 py-2 text-center">
+                    <% const estadoPers = o.entrega || o.estado_entrega || 'Pendiente'; %>
+                    <% if (estadoPers === 'Entregado') { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
+                        Entregado
+                      </span>
+                    <% } else { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">
+                        Pendiente
+                      </span>
+                    <% } %>
+                  </td>
+                  <td class="px-3 py-2 text-center">
+                    <div class="inline-flex gap-2">
+                      <a href="/admin/ordenes/persona/<%= idx %>"
+                         class="text-xs text-slate-600 hover:underline">
+                        Ver
+                      </a>
+                      <a href="/admin/ordenes/persona/<%= idx %>/editar"
+                         class="text-xs text-emerald-700 hover:underline">
+                        Editar
+                      </a>
+                      <form
+                        action="/admin/ordenes/persona/<%= idx %>/eliminar"
+                        method="POST"
+                        onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de persona?');"
+                        class="inline">
+                        <button type="submit"
+                                class="text-xs text-red-600 hover:underline">
+                          Eliminar
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% } %>
+
+</main>
+
+<%- include('_foot') %>

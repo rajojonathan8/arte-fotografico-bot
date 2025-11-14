@@ -78,7 +78,7 @@ function registrarMensaje(phone, name, lado, text, ts) {
   if (!phone || !text) return;
   const timestamp = ts || Date.now();
   const tel = phone.toString();
-
+  
   const convs = loadConversaciones();
   let conv = convs.find((c) => c.phone === tel);
 
@@ -555,6 +555,24 @@ async function sendWhatsAppMessage(to, text, opts = {}) {
     console.error('❌ WhatsApp send:', e.response?.data || e.message);
   }
 }
+
+// ======================================================================
+//     API para el panel de chat (lo consume admin-public/admin-chat.js)
+// ======================================================================
+app.get('/admin/api/chat', (req, res) => {
+  try {
+    const convs = loadConversaciones();
+
+    // Ordenar por última actualización (más reciente primero)
+    convs.sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0));
+
+    res.json(convs);
+  } catch (e) {
+    console.error('❌ Error en /admin/api/chat:', e.message);
+    res.json([]); // Para que el panel no truene
+  }
+});
+
 
 app.post('/webhook', async (req, res) => {
   try {

@@ -1,0 +1,88 @@
+<%- include('_head', { title }) %>
+
+<header class="p-4 bg-white shadow">
+  <div class="max-w-4xl mx-auto flex items-center justify-between">
+    <h1 class="text-xl font-semibold">Editar orden — persona</h1>
+    <a href="/admin/ordenes?tab=personas" class="text-sm text-slate-600 hover:text-slate-900">← Volver</a>
+  </div>
+</header>
+
+<main class="max-w-4xl mx-auto p-4">
+  <form action="/admin/ordenes/persona/<%= idx %>/editar" method="POST"
+        class="bg-white rounded-2xl shadow p-4 space-y-4">
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm mb-1">Nombre</label>
+        <input name="nombre" class="w-full border rounded-lg px-3 py-2"
+               value="<%= orden.nombre %>" required>
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1">N° orden</label>
+        <input name="numero_orden" class="w-full border rounded-lg px-3 py-2"
+               value="<%= orden.numero_orden %>">
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1">N° toma</label>
+        <input name="numero_toma" class="w-full border rounded-lg px-3 py-2"
+               value="<%= orden.numero_toma %>">
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1">Fecha toma</label>
+        <input type="date" name="fecha_toma" class="w-full border rounded-lg px-3 py-2"
+               value="<%= orden.fecha_toma %>">
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1">Fecha entrega</label>
+        <input type="date" name="fecha_entrega" class="w-full border rounded-lg px-3 py-2"
+               value="<%= orden.fecha_entrega %>">
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1">Urgencia</label>
+        <select name="urgencia" class="w-full border rounded-lg px-3 py-2">
+          <option value="Normal" <%= orden.urgencia === 'Normal' ? 'selected' : '' %>>Normal</option>
+          <option value="Urgente" <%= orden.urgencia === 'Urgente' ? 'selected' : '' %>>Urgente</option>
+          <option value="Muy urgente" <%= orden.urgencia === 'Muy urgente' ? 'selected' : '' %>>Muy urgente</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1">Precio</label>
+        <input type="number" step="0.01" min="0" name="precio" class="w-full border rounded-lg px-3 py-2"
+               value="<%= orden.precio || 0 %>">
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1">Teléfono</label>
+        <input name="telefono" class="w-full border rounded-lg px-3 py-2"
+               value="<%= orden.telefono %>">
+      </div>
+
+      <div>
+        <label class="block text-sm mb-1">Entrega</label>
+        <select name="estado_entrega" class="w-full border rounded-lg px-3 py-2">
+          <option value="Pendiente" <%= orden.entrega !== 'Entregado' ? 'selected' : '' %>>Pendiente</option>
+          <option value="Entregado" <%= orden.entrega === 'Entregado' ? 'selected' : '' %>>Entregado</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-2">
+      <a href="/admin/ordenes?tab=personas"
+         class="px-4 py-2 rounded-lg border text-sm text-slate-600 hover:bg-slate-50">
+        Cancelar
+      </a>
+      <button type="submit"
+              class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">
+        Guardar cambios
+      </button>
+    </div>
+  </form>
+</main>
+
+<%- include('_foot') %>
