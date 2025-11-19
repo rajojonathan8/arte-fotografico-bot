@@ -3,6 +3,9 @@ const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const fs = require('fs');
+const multer = require('multer');
+const Tesseract = require('tesseract.js');
+const sharp = require('sharp');
 
 // ============================================================================
 // RUTAS Y HELPERS COMPARTIDOS (data/…)
@@ -13,6 +16,24 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const CONV_PATH = path.join(DATA_DIR, 'conversaciones.json');
 const ORD_INST_PATH = path.join(DATA_DIR, 'ordenes-instituciones.json');
 const ORD_PER_PATH = path.join(DATA_DIR, 'ordenes-personas.json');
+const CITAS_PATH = path.join(DATA_DIR, 'citas.json');
+
+
+// Carpeta de uploads para OCR
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Configuración de multer (subida de una sola imagen)
+const upload = multer({
+  dest: UPLOADS_DIR,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10 MB
+  },
+});
+
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -50,6 +71,74 @@ function writeJson(filePath, data) {
 // Conversaciones para el panel de chat
 function loadConversacionesPanel() {
   return readJson(CONV_PATH, []);
+}
+
+// ===== Helpers de pago ======================================================
+
+function computePagoEstado(precio, abono) {
+  const p = Number(precio) || 0;
+  const a = Number(abono) || 0;
+
+  if (p <= 0 && a <= 0) return 'Pendiente';
+  if (a >= p && p > 0) return 'Pagado';
+  if (a > 0 && a < p) return 'Abono';
+  return 'Pendiente';
+}
+
+function derivePagoEstado(record) {
+  const stored = (record.pago_estado || '').toLowerCase();
+  if (stored === 'pagado') return 'Pagado';
+  if (stored === 'abono') return 'Abono';
+  if (stored === 'pendiente') return 'Pendiente';
+
+  // Si no hay texto guardado, calculamos por números como respaldo
+  return computePagoEstado(record.precio, record.abono);
+}
+// Intenta obtener el abono desde cualquier campo que tenga la palabra "abono"
+function getAbonoFromBody(datos) {
+  if (!datos) return 0;
+
+  let abonoNum = 0;
+
+  for (const [key, value] of Object.entries(datos)) {
+    const k = key.toLowerCase();
+    // ignoramos cosas como "estado_pago" pero aceptamos abono, abonado, abono_inicial, etc.
+    if (k.includes('abono') && !k.includes('estado')) {
+      const n = Number(value);
+      if (!isNaN(n)) {
+        abonoNum = n;
+        break;
+      }
+    }
+  }
+
+  return abonoNum;
+}
+
+// Resumen de pagos (para la cajita de totales)
+function calcularResumen(lista) {
+  const datos = Array.isArray(lista) ? lista : [];
+
+  let totalPrecio = 0;
+  let totalAbono = 0;
+  let totalSaldo = 0;
+
+  datos.forEach((o) => {
+    const precio = Number(o.precio || 0);
+    const abono = Number(o.abono || 0);
+    const saldo = Math.max(precio - abono, 0);
+
+    totalPrecio += precio;
+    totalAbono += abono;
+    totalSaldo += saldo;
+  });
+
+  return {
+    totalPrecio,
+    totalAbono,
+    totalSaldo,
+    cantidad: datos.length,
+  };
 }
 
 // ============================================================================
@@ -124,6 +213,12 @@ function mountAdmin(app) {
       title: 'Herramientas IA',
       desc: 'Subir listas de estudiantes y convertirlas a texto limpio automáticamente.',
     },
+        {
+      href: '/admin/citas',
+      icon: '📅',
+      title: 'Citas',
+      desc: 'Ver, filtrar y actualizar el estado de las citas.',
+    },
   ];
 
   router.get('/', requireAuth, (req, res) => {
@@ -143,105 +238,98 @@ function mountAdmin(app) {
   });
 
   // ---------------------------------------------------------------------------
-// ÓRDENES Y LIBROS (con filtros avanzados)
-// ---------------------------------------------------------------------------
-router.get('/ordenes', requireAuth, (req, res) => {
-  const tab = req.query.tab === 'personas' ? 'personas' : 'instituciones';
+  // ÓRDENES Y LIBROS (con filtros avanzados)
+  // ---------------------------------------------------------------------------
+  router.get('/ordenes', requireAuth, (req, res) => {
+    const tab = req.query.tab === 'personas' ? 'personas' : 'instituciones';
 
-  // Fechas recibidas del formulario (YYYY-MM-DD)
-  const fechaDesde = (req.query.fecha_desde || '').trim();
-  const fechaHasta = (req.query.fecha_hasta || '').trim();
+    // Filtros recibidos del formulario
+    const fechaDesde = (req.query.fecha_desde || '').trim();
+    const fechaHasta = (req.query.fecha_hasta || '').trim();
+    const busqueda = (req.query.q || '').trim().toLowerCase();
+    const filtroUrg = (req.query.urgencia || '').trim();
+    const filtroEnt = (req.query.entrega || '').trim();
+    const filtroPago = (req.query.pago || '').trim();
 
-  // Filtros adicionales
-  const estado = (req.query.estado || '').trim();      // '' | Pendiente | Entregado
-  const urgencia = (req.query.urgencia || '').trim();  // '' | Normal | Urgente | Muy urgente
-  const texto = (req.query.q || '').trim().toLowerCase(); // búsqueda libre
+    const ordenesInstitucionesAll = readJson(ORD_INST_PATH, []);
+    const ordenesPersonasAll = readJson(ORD_PER_PATH, []);
 
-  const ordenesInstitucionesAll = readJson(ORD_INST_PATH, []);
-  const ordenesPersonasAll = readJson(ORD_PER_PATH, []);
+    function pasaFiltrosGenerales(o) {
+      // Fecha de toma
+      if (fechaDesde || fechaHasta) {
+        const f = (o.fecha_toma || '').slice(0, 10);
+        if (!f) return false;
+        if (fechaDesde && f < fechaDesde) return false;
+        if (fechaHasta && f > fechaHasta) return false;
+      }
 
-  // Filtra por fecha_toma si se mandó rango
-  function filtrarPorFecha(lista) {
-    if (!fechaDesde && !fechaHasta) return lista;
+      // Texto libre
+      if (busqueda) {
+        const texto = [
+          o.institucion,
+          o.seccion,
+          o.paquete,
+          o.nombre,
+          o.telefono,
+          o.numero_orden,
+          o.n_orden,
+          o.numero_toma,
+          o.n_toma,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
 
-    return (lista || []).filter((o) => {
-      const f = (o.fecha_toma || '').slice(0, 10); // asumimos YYYY-MM-DD
-      if (!f) return false;
+        if (!texto.includes(busqueda)) return false;
+      }
 
-      if (fechaDesde && f < fechaDesde) return false;
-      if (fechaHasta && f > fechaHasta) return false;
+      // Urgencia
+      if (filtroUrg) {
+        const u = (o.urgencia || 'Normal').toLowerCase();
+        if (u !== filtroUrg.toLowerCase()) return false;
+      }
+
+      // Entrega
+      if (filtroEnt) {
+        const e = (o.entrega || o.estado_entrega || 'Pendiente').toLowerCase();
+        if (e !== filtroEnt.toLowerCase()) return false;
+      }
+
+      // Pago (solo aplica si el registro tiene precio/abono)
+      if (filtroPago) {
+        const p = derivePagoEstado(o).toLowerCase();
+        if (p !== filtroPago.toLowerCase()) return false;
+      }
 
       return true;
+    }
+
+    const ordenesInstituciones = (ordenesInstitucionesAll || []).filter(
+      pasaFiltrosGenerales
+    );
+    const ordenesPersonas = (ordenesPersonasAll || []).filter(
+      pasaFiltrosGenerales
+    );
+
+    // Resúmenes de pago
+    const resumenInstituciones = calcularResumen(ordenesInstituciones);
+    const resumenPersonas = calcularResumen(ordenesPersonas);
+
+    res.render('ordenes', {
+      title: 'Órdenes y libros',
+      tab,
+      ordenesInstituciones,
+      ordenesPersonas,
+      fechaDesde,
+      fechaHasta,
+      busqueda,
+      filtroUrg,
+      filtroEnt,
+      filtroPago,
+      resumenInstituciones,
+      resumenPersonas,
     });
-  }
-
-  // Filtra por estado / urgencia / texto
-  function filtrarAvanzado(lista, tipo) {
-    let out = filtrarPorFecha(lista);
-
-    // Estado de entrega
-    if (estado) {
-      out = out.filter((o) => {
-        const e = o.entrega || o.estado_entrega || 'Pendiente';
-        return e === estado;
-      });
-    }
-
-    // Urgencia
-    if (urgencia) {
-      out = out.filter((o) => {
-        const u = o.urgencia || 'Normal';
-        return u === urgencia;
-      });
-    }
-
-    // Búsqueda de texto
-    if (texto) {
-      out = out.filter((o) => {
-        let campos = [];
-        if (tipo === 'inst') {
-          campos = [
-            o.institucion,
-            o.seccion,
-            o.paquete,
-            o.telefono,
-          ];
-        } else {
-          campos = [
-            o.nombre,
-            o.numero_orden,
-            o.n_orden,
-            o.numero_toma,
-            o.n_toma,
-            o.telefono,
-          ];
-        }
-
-        return campos.some((c) =>
-          typeof c === 'string' && c.toLowerCase().includes(texto)
-        );
-      });
-    }
-
-    return out;
-  }
-
-  const ordenesInstituciones = filtrarAvanzado(ordenesInstitucionesAll, 'inst');
-  const ordenesPersonas = filtrarAvanzado(ordenesPersonasAll, 'per');
-
-  res.render('ordenes', {
-    title: 'Órdenes y libros',
-    tab,
-    ordenesInstituciones,
-    ordenesPersonas,
-    fechaDesde,
-    fechaHasta,
-    estadoFiltro: estado,
-    urgenciaFiltro: urgencia,
-    textoFiltro: texto,
   });
-});
-
 
   // ---------------------------------------------------------------------------
   // NUEVA ORDEN — INSTITUCIÓN
@@ -252,34 +340,60 @@ router.get('/ordenes', requireAuth, (req, res) => {
     });
   });
 
-  router.post(
-    '/ordenes/nueva-institucion',
-    requireAuth,
-    express.urlencoded({ extended: true }),
-    (req, res) => {
-      const datos = req.body || {};
-      const lista = readJson(ORD_INST_PATH, []);
+ router.post(
+  '/ordenes/nueva-institucion',
+  requireAuth,
+  express.urlencoded({ extended: true }),
+  (req, res) => {
+    const datos = req.body || {};
+    const lista = readJson(ORD_INST_PATH, []);
 
-      const nuevaOrden = {
-        id: Date.now(),
-        institucion: datos.institucion || '',
-        seccion: datos.seccion || '',
-        paquete: datos.paquete || '',
-        toma_principal: Number(datos.toma_principal || 0),
-        collage1: Number(datos.collage1 || 0),
-        collage2: Number(datos.collage2 || 0),
-        fecha_toma: datos.fecha_toma || '',
-        telefono: datos.telefono || '',
-        entrega: datos.entrega || 'Pendiente', // Pendiente / Entregado
-        urgencia: datos.urgencia || 'Normal',  // Normal / Urgente / Muy urgente
-      };
+    const precioNum   = Number(datos.precio) || 0;
+    let   abonoNum    = Number(datos.abono_inicial || 0);
+    let   pagoEstado  = datos.pago_estado || 'Pendiente';
 
-      lista.push(nuevaOrden);
-      writeJson(ORD_INST_PATH, lista);
-
-      res.redirect('/admin/ordenes?tab=instituciones');
+    // Ajustamos coherencia entre precio / abono / estado
+    if (pagoEstado === 'Pagado' && precioNum > 0) {
+      abonoNum = precioNum;
+    } else {
+      // Si no está en Pagado, calculamos según números
+      pagoEstado = computePagoEstado(precioNum, abonoNum);
     }
-  );
+
+    const nuevaOrden = {
+      id: Date.now(),
+
+      // 🔹 NUEVO: nombre del alumno/contacto
+      nombre: datos.nombre || '',
+
+      institucion: datos.institucion || '',
+      seccion: datos.seccion || '',
+      paquete: datos.paquete || '',
+      toma_principal: Number(datos.toma_principal || 0),
+      collage1: Number(datos.collage1 || 0),
+      collage2: Number(datos.collage2 || 0),
+
+      // 🔹 NUEVO: Collage 3
+      collage3: Number(datos.collage3 || 0),
+
+      fecha_toma: datos.fecha_toma || '',
+      telefono: datos.telefono || '',
+      entrega: datos.entrega || 'Pendiente',
+      urgencia: datos.urgencia || 'Normal',
+
+      // Pago
+      precio: precioNum,
+      abono: abonoNum,
+      pago_estado: pagoEstado,
+    };
+
+    lista.push(nuevaOrden);
+    writeJson(ORD_INST_PATH, lista);
+
+    res.redirect('/admin/ordenes?tab=instituciones');
+  }
+);
+
 
   // ---------------------------------------------------------------------------
   // NUEVA ORDEN — PERSONA
@@ -290,11 +404,12 @@ router.get('/ordenes', requireAuth, (req, res) => {
     });
   });
 
-  router.post(
+    router.post(
     '/ordenes/nueva-persona',
     requireAuth,
     express.urlencoded({ extended: true }),
     (req, res) => {
+      const datos = req.body || {};
       const {
         nombre,
         numero_orden,
@@ -305,9 +420,29 @@ router.get('/ordenes', requireAuth, (req, res) => {
         precio,
         telefono,
         estado_entrega,
-      } = req.body || {};
+        pago_estado,
+      } = datos;
 
       const lista = readJson(ORD_PER_PATH, []);
+
+      const precioNum = Number(precio) || 0;
+      let abonoNum = getAbonoFromBody(datos);   // 👈 AQUÍ usamos el helper
+      let pagoEstado = pago_estado || 'Pendiente';
+
+      // Si marca "Pagado", el abono pasa a ser igual al precio
+      if (pagoEstado === 'Pagado' && precioNum > 0) {
+        abonoNum = precioNum;
+      }
+
+      // Si hay abono pero menor al precio → "Abono"
+      if (abonoNum > 0 && abonoNum < precioNum && pagoEstado !== 'Pagado') {
+        pagoEstado = 'Abono';
+      }
+
+      // Si abono 0 y estado "Abono" → lo regresamos a "Pendiente"
+      if (abonoNum === 0 && pagoEstado === 'Abono') {
+        pagoEstado = 'Pendiente';
+      }
 
       lista.push({
         nombre: nombre || '',
@@ -316,16 +451,20 @@ router.get('/ordenes', requireAuth, (req, res) => {
         fecha_toma: fecha_toma || '',
         fecha_entrega: fecha_entrega || '',
         urgencia: urgencia || 'Normal',
-        precio: Number(precio) || 0,
+        precio: precioNum,
         telefono: telefono || '',
-        entrega: estado_entrega || 'Pendiente', // 👈 campo que usa ordenes.ejs
+        entrega: estado_entrega || 'Pendiente',
+
+        abono: abonoNum,
+        pago_estado: pagoEstado,
       });
 
       writeJson(ORD_PER_PATH, lista);
-
       res.redirect('/admin/ordenes?tab=personas');
     }
   );
+
+
 
   // ---------------------------------------------------------------------------
   // EDITAR ORDEN — INSTITUCIÓN
@@ -347,37 +486,50 @@ router.get('/ordenes', requireAuth, (req, res) => {
     });
   });
 
-  router.post(
-    '/ordenes/institucion/:idx/editar',
-    requireAuth,
-    express.urlencoded({ extended: true }),
-    (req, res) => {
-      const idx = parseInt(req.params.idx, 10);
-      const lista = readJson(ORD_INST_PATH, []);
+router.post(
+  '/ordenes/institucion/:idx/editar',
+  requireAuth,
+  express.urlencoded({ extended: true }),
+  (req, res) => {
+    const idx = parseInt(req.params.idx, 10);
+    const lista = readJson(ORD_INST_PATH, []);
 
-      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
-        return res.redirect('/admin/ordenes?tab=instituciones');
-      }
-
-      const datos = req.body || {};
-      lista[idx] = {
-        ...lista[idx],
-        institucion: datos.institucion || '',
-        seccion: datos.seccion || '',
-        paquete: datos.paquete || '',
-        toma_principal: Number(datos.toma_principal || 0),
-        collage1: Number(datos.collage1 || 0),
-        collage2: Number(datos.collage2 || 0),
-        fecha_toma: datos.fecha_toma || '',
-        telefono: datos.telefono || '',
-        entrega: datos.entrega || 'Pendiente',
-        urgencia: datos.urgencia || 'Normal',
-      };
-
-      writeJson(ORD_INST_PATH, lista);
-      res.redirect('/admin/ordenes?tab=instituciones');
+    if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+      return res.redirect('/admin/ordenes?tab=instituciones');
     }
-  );
+
+    const datos = req.body || {};
+    const precioNum = Number(datos.precio) || 0;
+    const abonoNum  = Number(datos.abono) || 0;
+
+    const pagoEstado = computePagoEstado(precioNum, abonoNum);
+
+    lista[idx] = {
+      ...lista[idx],
+
+      nombre: datos.nombre || '',       // 🔹 nuevo
+      institucion: datos.institucion || '',
+      seccion: datos.seccion || '',
+      paquete: datos.paquete || '',
+      toma_principal: Number(datos.toma_principal || 0),
+      collage1: Number(datos.collage1 || 0),
+      collage2: Number(datos.collage2 || 0),
+      collage3: Number(datos.collage3 || 0), // 🔹 nuevo
+      fecha_toma: datos.fecha_toma || '',
+      telefono: datos.telefono || '',
+      entrega: datos.entrega || 'Pendiente',
+      urgencia: datos.urgencia || 'Normal',
+
+      precio: precioNum,
+      abono: abonoNum,
+      pago_estado: pagoEstado,
+    };
+
+    writeJson(ORD_INST_PATH, lista);
+    res.redirect('/admin/ordenes?tab=instituciones');
+  }
+);
+
 
   // ---------------------------------------------------------------------------
   // EDITAR ORDEN — PERSONA
@@ -399,7 +551,7 @@ router.get('/ordenes', requireAuth, (req, res) => {
     });
   });
 
-  router.post(
+    router.post(
     '/ordenes/persona/:idx/editar',
     requireAuth,
     express.urlencoded({ extended: true }),
@@ -411,6 +563,7 @@ router.get('/ordenes', requireAuth, (req, res) => {
         return res.redirect('/admin/ordenes?tab=personas');
       }
 
+      const datos = req.body || {};
       const {
         nombre,
         numero_orden,
@@ -421,7 +574,13 @@ router.get('/ordenes', requireAuth, (req, res) => {
         precio,
         telefono,
         estado_entrega,
-      } = req.body || {};
+      } = datos;
+
+      const precioNum = Number(precio) || 0;
+      const abonoNum  = getAbonoFromBody(datos);   // 👈 AQUÍ
+
+      // Estado de pago SOLO por números
+      const pagoEstado = computePagoEstado(precioNum, abonoNum);
 
       lista[idx] = {
         ...lista[idx],
@@ -431,15 +590,19 @@ router.get('/ordenes', requireAuth, (req, res) => {
         fecha_toma: fecha_toma || '',
         fecha_entrega: fecha_entrega || '',
         urgencia: urgencia || 'Normal',
-        precio: Number(precio) || 0,
+        precio: precioNum,
         telefono: telefono || '',
         entrega: estado_entrega || 'Pendiente',
+
+        abono: abonoNum,
+        pago_estado: pagoEstado,
       };
 
       writeJson(ORD_PER_PATH, lista);
       res.redirect('/admin/ordenes?tab=personas');
     }
   );
+
 
   // ---------------------------------------------------------------------------
   // ELIMINAR ORDEN — INSTITUCIÓN
@@ -574,15 +737,438 @@ router.get('/ordenes', requireAuth, (req, res) => {
   );
 
   // ---------------------------------------------------------------------------
-  // HERRAMIENTAS IA (placeholder)
+  // ABONAR / MARCAR PAGADO — PERSONAS
   // ---------------------------------------------------------------------------
-  router.get('/herramientas', requireAuth, (req, res) => {
-    res.render('placeholder', {
-      title: 'Herramientas IA',
-      subtitle:
-        'Aquí podrás subir fotos/listas de estudiantes y convertirlas a texto limpio automáticamente.',
+  router.post(
+    '/ordenes/persona/:idx/abonar',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    (req, res) => {
+      const idx = parseInt(req.params.idx, 10);
+      const monto = Number(req.body.monto) || 0;
+      const lista = readJson(ORD_PER_PATH, []);
+
+      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length || monto <= 0) {
+        return res.redirect('/admin/ordenes?tab=personas');
+      }
+
+      const item = lista[idx];
+      const precio = Number(item.precio) || 0;
+      const abonoActual = Number(item.abono) || 0;
+      let nuevoAbono = abonoActual + monto;
+
+      if (nuevoAbono > precio) nuevoAbono = precio;
+
+      item.abono = nuevoAbono;
+      item.pago_estado = computePagoEstado(precio, nuevoAbono);
+
+      writeJson(ORD_PER_PATH, lista);
+      res.redirect('/admin/ordenes?tab=personas');
+    }
+  );
+
+  router.post(
+    '/ordenes/persona/:idx/marcar-pagado',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    (req, res) => {
+      const idx = parseInt(req.params.idx, 10);
+      const lista = readJson(ORD_PER_PATH, []);
+
+      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+        return res.redirect('/admin/ordenes?tab=personas');
+      }
+
+      const item = lista[idx];
+      const precio = Number(item.precio) || 0;
+
+      item.abono = precio;
+      item.pago_estado = 'Pagado';
+
+      writeJson(ORD_PER_PATH, lista);
+      res.redirect('/admin/ordenes?tab=personas');
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // ABONAR / MARCAR PAGADO — INSTITUCIONES
+  // ---------------------------------------------------------------------------
+  router.post(
+    '/ordenes/institucion/:idx/abonar',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    (req, res) => {
+      const idx = parseInt(req.params.idx, 10);
+      const monto = Number(req.body.monto) || 0;
+      const lista = readJson(ORD_INST_PATH, []);
+
+      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length || monto <= 0) {
+        return res.redirect('/admin/ordenes?tab=instituciones');
+      }
+
+      const item = lista[idx];
+      const precio = Number(item.precio) || 0;
+      const abonoActual = Number(item.abono) || 0;
+      let nuevoAbono = abonoActual + monto;
+
+      if (nuevoAbono > precio) nuevoAbono = precio;
+
+      item.abono = nuevoAbono;
+      item.pago_estado = computePagoEstado(precio, nuevoAbono);
+
+      writeJson(ORD_INST_PATH, lista);
+      res.redirect('/admin/ordenes?tab=instituciones');
+    }
+  );
+
+  router.post(
+    '/ordenes/institucion/:idx/marcar-pagado',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    (req, res) => {
+      const idx = parseInt(req.params.idx, 10);
+      const lista = readJson(ORD_INST_PATH, []);
+
+      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+        return res.redirect('/admin/ordenes?tab=instituciones');
+      }
+
+      const item = lista[idx];
+      const precio = Number(item.precio) || 0;
+
+      item.abono = precio;
+      item.pago_estado = 'Pagado';
+
+      writeJson(ORD_INST_PATH, lista);
+      res.redirect('/admin/ordenes?tab=instituciones');
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // RECIBO — PERSONA (HTML imprimible media carta)
+  // ---------------------------------------------------------------------------
+  router.get(
+    '/ordenes/persona/:idx/recibo',
+    requireAuth,
+    (req, res) => {
+      const idx = parseInt(req.params.idx, 10);
+      const lista = readJson(ORD_PER_PATH, []);
+
+      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+        return res.redirect('/admin/ordenes?tab=personas');
+      }
+
+      const orden = lista[idx];
+      const precio = Number(orden.precio || 0);
+      const abono = Number(orden.abono || 0);
+      const saldo = Math.max(precio - abono, 0);
+      const pagoEstado = derivePagoEstado(orden);
+
+      res.render('orden-recibo.ejs', {
+        title: 'Recibo — persona',
+        tipo: 'persona',
+        idx,
+        orden,
+        precio,
+        abono,
+        saldo,
+        pagoEstado,
+      });
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // RECIBO — INSTITUCIÓN (HTML imprimible media carta)
+  // ---------------------------------------------------------------------------
+  router.get(
+    '/ordenes/institucion/:idx/recibo',
+    requireAuth,
+    (req, res) => {
+      const idx = parseInt(req.params.idx, 10);
+      const lista = readJson(ORD_INST_PATH, []);
+
+      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+        return res.redirect('/admin/ordenes?tab=instituciones');
+      }
+
+      const orden = lista[idx];
+      const precio = Number(orden.precio || 0);
+      const abono = Number(orden.abono || 0);
+      const saldo = Math.max(precio - abono, 0);
+      const pagoEstado = derivePagoEstado(orden);
+
+      res.render('orden-recibo.ejs', {
+        title: 'Recibo — institución',
+        tipo: 'institucion',
+        idx,
+        orden,
+        precio,
+        abono,
+        saldo,
+        pagoEstado,
+      });
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // PANEL DE CITAS
+  // ---------------------------------------------------------------------------
+  router.get('/citas', requireAuth, (req, res) => {
+    const fechaDesde = (req.query.fecha_desde || '').trim();
+    const fechaHasta = (req.query.fecha_hasta || '').trim();
+    const busqueda   = (req.query.q || '').trim().toLowerCase();
+    const estadoFil  = (req.query.estado || '').trim().toLowerCase();
+
+    const lista = readJson(CITAS_PATH, []);
+
+    // Filtrado
+    let citas = (lista || []).filter((c) => {
+      // Fecha
+      if (fechaDesde || fechaHasta) {
+        const f = (c.fecha || '').slice(0, 16); // ISO 2025-11-17T15:30
+        if (!f) return false;
+        if (fechaDesde && f < fechaDesde) return false;
+        if (fechaHasta && f > fechaHasta) return false;
+      }
+
+      // Búsqueda por cliente / sesión / teléfono
+      if (busqueda) {
+        const texto = [
+          c.cliente,
+          c.sesion,
+          c.telefono,
+          c.notas,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        if (!texto.includes(busqueda)) return false;
+      }
+
+      // Estado
+      if (estadoFil) {
+        const e = (c.estado || 'Pendiente').toLowerCase();
+        if (e !== estadoFil) return false;
+      }
+
+      return true;
+    });
+
+    // Ordenar por fecha ascendente
+    citas.sort((a, b) => {
+      const fa = a.fecha || '';
+      const fb = b.fecha || '';
+      if (fa < fb) return -1;
+      if (fa > fb) return 1;
+      return 0;
+    });
+
+    res.render('citas.ejs', {
+      title: 'Citas',
+      citas,
+      fechaDesde,
+      fechaHasta,
+      busqueda,
+      estadoFil,
     });
   });
+
+  // Crear nueva cita
+  router.post(
+    '/citas/nueva',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    (req, res) => {
+      const { cliente, telefono, sesion, fecha, notas } = req.body || {};
+      const lista = readJson(CITAS_PATH, []);
+
+      const nuevaCita = {
+        id: Date.now(),
+        cliente: cliente || '',
+        telefono: telefono || '',
+        sesion: sesion || '',
+        fecha: fecha || '', // formato datetime-local (YYYY-MM-DDTHH:mm)
+        notas: notas || '',
+        estado: 'Pendiente',
+        origen: 'manual',   // luego podemos poner google-calendar
+      };
+
+      lista.push(nuevaCita);
+      writeJson(CITAS_PATH, lista);
+
+      res.redirect('/admin/citas');
+    }
+  );
+
+  // Cambiar estado de una cita
+  router.post(
+    '/citas/:idx/estado',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    (req, res) => {
+      const idx = parseInt(req.params.idx, 10);
+      const { estado } = req.body || {};
+
+      let lista = readJson(CITAS_PATH, []);
+
+      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+        return res.redirect('/admin/citas');
+      }
+
+      const nuevoEstado = ['Pendiente', 'Atendida', 'Cancelada'].includes(estado)
+        ? estado
+        : 'Pendiente';
+
+      lista[idx].estado = nuevoEstado;
+      writeJson(CITAS_PATH, lista);
+
+      res.redirect('/admin/citas');
+    }
+  );
+
+
+
+  // ---------------------------------------------------------------------------
+// TICKET 80 mm — PERSONA
+// ---------------------------------------------------------------------------
+router.get(
+  '/ordenes/persona/:idx/ticket',
+  requireAuth,
+  (req, res) => {
+    const idx = parseInt(req.params.idx, 10);
+    const lista = readJson(ORD_PER_PATH, []);
+
+    if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+      return res.redirect('/admin/ordenes?tab=personas');
+    }
+
+    const orden = lista[idx];
+    const precio = Number(orden.precio || 0);
+    const abono  = Number(orden.abono  || 0);
+    const saldo  = Math.max(precio - abono, 0);
+    const pagoEstado = derivePagoEstado(orden);
+
+    res.render('orden-ticket.ejs', {
+      title: 'Ticket — persona',
+      tipo: 'persona',
+      idx,
+      orden,
+      precio,
+      abono,
+      saldo,
+      pagoEstado,
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// TICKET 80 mm — INSTITUCIÓN
+// ---------------------------------------------------------------------------
+router.get(
+  '/ordenes/institucion/:idx/ticket',
+  requireAuth,
+  (req, res) => {
+    const idx = parseInt(req.params.idx, 10);
+    const lista = readJson(ORD_INST_PATH, []);
+
+    if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+      return res.redirect('/admin/ordenes?tab=instituciones');
+    }
+
+    const orden = lista[idx];
+    const precio = Number(orden.precio || 0);
+    const abono  = Number(orden.abono  || 0);
+    const saldo  = Math.max(precio - abono, 0);
+    const pagoEstado = derivePagoEstado(orden);
+
+    res.render('orden-ticket.ejs', {
+      title: 'Ticket — institución',
+      tipo: 'institucion',
+      idx,
+      orden,
+      precio,
+      abono,
+      saldo,
+      pagoEstado,
+    });
+  }
+);
+
+
+ // ---------------------------------------------------------------------------
+// HERRAMIENTAS OCR
+// ---------------------------------------------------------------------------
+router.get('/herramientas', requireAuth, (req, res) => {
+  // Si ya tienes texto del OCR desde un POST, aquí podrías pasarlo en "ocrText"
+  res.render('herramientas-ocr', {
+    title: 'Herramientas OCR',
+    ocrText: '', // por ahora vacío; luego lo llenamos desde tu backend de OCR
+  });
+});
+
+// Procesar la imagen con OCR (Tesseract + preprocesado con sharp)
+router.post(
+  '/herramientas/ocr',
+  requireAuth,
+  upload.single('imagen_lista'),
+  async (req, res) => {
+    if (!req.file) {
+      return res.render('herramientas-ocr', {
+        title: 'Herramientas OCR',
+        ocrText: 'Error: no se recibió ninguna imagen.',
+      });
+    }
+
+    const imagenPath = req.file.path;
+    const preprocesadaPath = imagenPath + '-pre.png';
+    let textoDelOcr = '';
+
+    try {
+      // 1️⃣ Preprocesar la imagen: agrandar, blanco y negro, más contraste
+      await sharp(imagenPath)
+        .resize({ width: 1800, withoutEnlargement: false }) // la agrandamos a ~1800 px de ancho
+        .grayscale()
+        .normalize()               // mejora contraste
+        .toFile(preprocesadaPath); // guardamos imagen procesada
+
+      // 2️⃣ Pasar la imagen procesada a Tesseract
+      const result = await Tesseract.recognize(
+        preprocesadaPath,
+        'spa+eng', // español + algo de inglés/números
+        {
+          logger: m => console.log('[OCR]', m), // opcional, progreso en consola
+        }
+      );
+
+      textoDelOcr = (result.data && result.data.text) ? result.data.text : '';
+
+      // Limpieza básica de saltos de línea
+      textoDelOcr = textoDelOcr
+        .replace(/\r\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+
+    } catch (err) {
+      console.error('❌ Error en OCR:', err);
+      textoDelOcr = 'Ocurrió un error al procesar la imagen con OCR.\n' +
+                    'Revisa la consola del servidor para más detalles.';
+    } finally {
+      // Borramos archivos temporales
+      try { fs.unlinkSync(imagenPath); } catch (e) {}
+      try { fs.unlinkSync(preprocesadaPath); } catch (e) {}
+    }
+
+    res.render('herramientas-ocr', {
+      title: 'Herramientas OCR',
+      ocrText: textoDelOcr || '(El OCR no devolvió texto)',
+    });
+  }
+);
+
+
+
+
 
   // ---------------------------------------------------------------------------
   // LOGOUT

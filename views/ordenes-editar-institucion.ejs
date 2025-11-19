@@ -3,7 +3,8 @@
 <header class="p-4 bg-white shadow">
   <div class="max-w-4xl mx-auto flex items-center justify-between">
     <h1 class="text-xl font-semibold">Editar orden — institución</h1>
-    <a href="/admin/ordenes?tab=instituciones" class="text-sm text-slate-600 hover:text-slate-900">← Volver</a>
+    <a href="/admin/ordenes?tab=instituciones"
+       class="text-sm text-slate-600 hover:text-slate-900">← Volver</a>
   </div>
 </header>
 
@@ -17,9 +18,13 @@
         <input name="institucion" class="w-full border rounded-lg px-3 py-2"
                value="<%= orden.institucion %>" required>
       </div>
-
       <div>
-        <label class="block text-sm mb-1">Sección / grado</label>
+    <label class="label">Nombre</label>
+    <input type="text" name="nombre" class="input"
+           value="<%= orden.nombre || '' %>">
+  </div>
+      <div>
+        <label class="block text-sm mb-1">Sección / Grupo</label>
         <input name="seccion" class="w-full border rounded-lg px-3 py-2"
                value="<%= orden.seccion %>">
       </div>
@@ -31,33 +36,46 @@
       </div>
 
       <div>
-        <label class="block text-sm mb-1">Fecha de toma</label>
-        <input type="date" name="fecha_toma" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.fecha_toma %>">
+        <label class="block text-sm mb-1">Teléfono</label>
+        <input name="telefono" class="w-full border rounded-lg px-3 py-2"
+               value="<%= orden.telefono %>">
       </div>
+    </div>
 
+    <div class="grid md:grid-cols-3 gap-4">
       <div>
         <label class="block text-sm mb-1">Toma principal</label>
-        <input type="number" min="0" name="toma_principal" class="w-full border rounded-lg px-3 py-2"
+        <input type="number" name="toma_principal"
+               class="w-full border rounded-lg px-3 py-2"
                value="<%= orden.toma_principal || 0 %>">
       </div>
 
       <div>
         <label class="block text-sm mb-1">Collage 1</label>
-        <input type="number" min="0" name="collage1" class="w-full border rounded-lg px-3 py-2"
+        <input type="number" name="collage1"
+               class="w-full border rounded-lg px-3 py-2"
                value="<%= orden.collage1 || 0 %>">
       </div>
 
       <div>
         <label class="block text-sm mb-1">Collage 2</label>
-        <input type="number" min="0" name="collage2" class="w-full border rounded-lg px-3 py-2"
+        <input type="number" name="collage2"
+               class="w-full border rounded-lg px-3 py-2"
                value="<%= orden.collage2 || 0 %>">
       </div>
+       <div>
+    <label class="label">Collage 3</label>
+    <input type="number" name="collage3" class="input"
+           value="<%= orden.collage3 || 0 %>">
+  </div>
+    </div>
 
+    <div class="grid md:grid-cols-2 gap-4">
       <div>
-        <label class="block text-sm mb-1">Teléfono</label>
-        <input name="telefono" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.telefono %>">
+        <label class="block text-sm mb-1">Fecha toma</label>
+        <input type="date" name="fecha_toma"
+               class="w-full border rounded-lg px-3 py-2"
+               value="<%= orden.fecha_toma %>">
       </div>
 
       <div>
@@ -68,14 +86,49 @@
           <option value="Muy urgente" <%= orden.urgencia === 'Muy urgente' ? 'selected' : '' %>>Muy urgente</option>
         </select>
       </div>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-4">
+        <div>
+    <label class="label">Precio</label>
+    <input type="number" step="0.01" name="precio" class="input"
+           value="<%= orden.precio || 0 %>">
+  </div>
+
+       <div>
+    <label class="label">Abonado (total)</label>
+    <input type="number" step="0.01" name="abono" class="input"
+           value="<%= orden.abono || 0 %>">
+    <p class="help-text">
+      Este es el total abonado (suma de pagos). Puedes corregirlo manualmente si lo necesitas.
+    </p>
+  </div>
 
       <div>
-        <label class="block text-sm mb-1">Entrega</label>
-        <select name="entrega" class="w-full border rounded-lg px-3 py-2">
-          <option value="Pendiente" <%= orden.entrega !== 'Entregado' ? 'selected' : '' %>>Pendiente</option>
-          <option value="Entregado" <%= orden.entrega === 'Entregado' ? 'selected' : '' %>>Entregado</option>
+        <label class="block text-sm mb-1">Estado de pago</label>
+        <select name="pago_estado" class="w-full border rounded-lg px-3 py-2">
+          <option value="Pendiente"
+            <%= (orden.pago_estado || 'Pendiente') === 'Pendiente' ? 'selected' : '' %>>
+            Pendiente
+          </option>
+          <option value="Abono"
+            <%= orden.pago_estado === 'Abono' ? 'selected' : '' %>>
+            Abono
+          </option>
+          <option value="Pagado"
+            <%= orden.pago_estado === 'Pagado' ? 'selected' : '' %>>
+            Pagado
+          </option>
         </select>
       </div>
+    </div>
+
+    <div>
+      <label class="block text-sm mb-1">Entrega</label>
+      <select name="entrega" class="w-full border rounded-lg px-3 py-2">
+        <option value="Pendiente" <%= orden.entrega !== 'Entregado' ? 'selected' : '' %>>Pendiente</option>
+        <option value="Entregado" <%= orden.entrega === 'Entregado' ? 'selected' : '' %>>Entregado</option>
+      </select>
     </div>
 
     <div class="flex justify-end gap-2 pt-2">

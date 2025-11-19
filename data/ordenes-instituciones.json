@@ -1,41 +1,18 @@
 [
   {
-    "id": 1763142699345,
-    "institucion": "cca",
-    "seccion": "1bachillerato",
-    "paquete": "1",
-    "toma_principal": 34,
+    "id": 1763414571370,
+    "institucion": "sss",
+    "seccion": "ssd",
+    "paquete": "3",
+    "toma_principal": 34340,
     "collage1": 3434,
     "collage2": 3434,
-    "fecha_toma": "2025-11-12",
+    "fecha_toma": "2025-11-18",
     "telefono": "3434",
     "entrega": "Pendiente",
-    "urgencia": "Urgente"
-  },
-  {
-    "id": 1763142735846,
-    "institucion": "salarrue",
-    "seccion": "32",
-    "paquete": "paquete2",
-    "toma_principal": 22,
-    "collage1": 22,
-    "collage2": 22,
-    "fecha_toma": "2025-11-18",
-    "telefono": "2323",
-    "entrega": "Pendiente",
-    "urgencia": "Urgente"
-  },
-  {
-    "id": 1763142752896,
-    "institucion": "2323",
-    "seccion": "322",
-    "paquete": "2323",
-    "toma_principal": 2323,
-    "collage1": 232,
-    "collage2": 2323,
-    "fecha_toma": "2025-11-12",
-    "telefono": "32323",
-    "entrega": "Pendiente",
-    "urgencia": "Urgente"
+    "urgencia": "Normal",
+    "precio": 56,
+    "abono": 0,
+    "pago_estado": "Pendiente"
   }
 ]

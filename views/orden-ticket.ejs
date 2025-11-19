@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= title || 'Ticket' %></title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f3f4f6;
+    }
+
+    .no-print {
+      padding: 6px 10px;
+      background: #0f172a;
+      color: #e5e7eb;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .no-print button {
+      background: #22c55e;
+      border: none;
+      color: #fff;
+      border-radius: 999px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .no-print a {
+      color: #9ca3af;
+      text-decoration: none;
+      font-size: 12px;
+      margin-left: 8px;
+    }
+    .recibo-logo {
+      text-align: center;
+    }
+    .recibo-logo img {
+      max-width: 60px;
+      height: auto;
+    }
+    /* CONTENEDOR TICKET 80 mm */
+    .ticket-wrapper {
+      width: 80mm;
+      margin: 8px auto;
+      background: #ffffff;
+      padding: 4mm 3mm;
+      border: 1px solid #e5e7eb;
+    }
+
+    .ticket {
+      font-size: 11px;
+      line-height: 1.25;
+      color: #111827;
+    }
+
+    .center { text-align: center; }
+    .right  { text-align: right; }
+
+    .title {
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+
+    .subtitle {
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .small { font-size: 10px; }
+
+    hr {
+      border: 0;
+      border-top: 1px dashed #9ca3af;
+      margin: 4px 0;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+
+    .label {
+      font-weight: 600;
+      margin-right: 4px;
+    }
+.separator {
+      border-top: 1px dashed #9ca3af;
+      margin: 4px 0;
+    }
+    .mt-2 { margin-top: 4px; }
+    .mt-4 { margin-top: 8px; }
+
+    .observaciones {
+      min-height: 20mm;
+      border: 1px solid #d1d5db;
+      margin-top: 4px;
+      padding: 2px;
+      font-size: 10px;
+      white-space: pre-line;
+    }
+
+    @page {
+      /* ANCHO 80 mm, alto automático (la impressora corta) */
+      size: 80mm auto;
+      margin: 3mm;
+    }
+
+    @media print {
+      body { background: #fff; }
+      .no-print { display: none; }
+      .ticket-wrapper {
+        margin: 0;
+        border: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <div>
+      Ticket — <%= tipo === 'institucion' ? 'Institución' : 'Persona' %>
+    </div>
+    <div>
+      <button onclick="window.print()">🖨 Imprimir ticket</button>
+      <a href="/admin/ordenes?tab=<%= tipo === 'institucion' ? 'instituciones' : 'personas' %>">
+        ← Volver
+      </a>
+    </div>
+  </div>
+
+  <%
+    const precioLocal = Number(precio ?? orden.precio ?? 0) || 0;
+    const abonoLocal  = Number(abono  ?? orden.abono  ?? 0) || 0;
+    const saldoLocal  = Math.max(precioLocal - abonoLocal, 0);
+    const fechaToma   = (orden.fecha_toma || '').slice(0,10);
+    const fechaEnt    = (orden.fecha_entrega || '').slice(0,10);
+  %>
+
+  <div class="ticket-wrapper">
+    <div class="ticket">
+
+      <!-- CABECERA -->
+      <div class="center">
+        <div class="recibo-logo">
+            <img src="/admin-public/bg-arte.jpg" alt="Arte Fotográfico">
+          </div>
+        <div class="title">Arte Fotográfico</div>
+        <div class="subtitle small">Captura · Edita · Imprime</div>
+        <div class="small">
+          Calle Masferrer, Av. Morazán 2a Av. Norte #1-2<br />
+          Sonsonate, El Salvador<br />
+          Tel: 2429-3010 / 7875-6115
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="row small">
+        <span class="label">Ticket:</span>
+        <span>
+          <% if (tipo === 'persona') { %>
+            <%= orden.numero_orden || (1000 + idx) %>
+          <% } else { %>
+            <%= orden.id || (2000 + idx) %>
+          <% } %>
+        </span>
+      </div>
+
+      <div class="row small">
+        <span class="label">Fecha toma:</span>
+        <span><%= fechaToma || '--' %></span>
+      </div>
+
+      <% if (fechaEnt) { %>
+      <div class="row small">
+        <span class="label">Entrega:</span>
+        <span><%= fechaEnt %></span>
+      </div>
+      <% } %>
+
+      <hr />
+
+      <!-- CLIENTE / INSTITUCIÓN -->
+      <div class="small">
+        <div class="label">Orden de:</div>
+        <div>
+          <% if (tipo === 'persona') { %>
+            <%= orden.nombre || '' %>
+          <% } else { %>
+            <%= orden.institucion || '' %>
+            <% if (orden.nombre) { %><br />Contacto: <%= orden.nombre %><% } %>
+          <% } %>
+        </div>
+
+        <% if (orden.telefono) { %>
+          <div class="mt-2">
+            <span class="label">Tel:</span> <%= orden.telefono %>
+          </div>
+        <% } %>
+      </div>
+
+      <hr />
+
+      <!-- DETALLE BÁSICO (puedes ajustar campos) -->
+      <div class="small">
+        <% if (tipo === 'institucion') { %>
+          <% if (orden.seccion) { %>
+            <div class="row">
+              <span class="label">Sección:</span>
+              <span><%= orden.seccion %></span>
+            </div>
+          <% } %>
+
+          <% if (orden.paquete) { %>
+            <div class="row">
+              <span class="label">Paquete:</span>
+              <span><%= orden.paquete %></span>
+            </div>
+          <% } %>
+
+          <div class="row">
+            <span class="label">Tomas:</span>
+            <span>
+              Princ: <%= orden.toma_principal || 0 %>,
+              C1: <%= orden.collage1 || 0 %>,
+              C2: <%= orden.collage2 || 0 %>,
+              C3: <%= orden.collage3 || 0 %>
+            </span>
+          </div>
+        <% } else { %>
+          <div class="row">
+            <span class="label">N° orden:</span>
+            <span><%= orden.numero_orden || '' %></span>
+          </div>
+          <div class="row">
+            <span class="label">N° toma:</span>
+            <span><%= orden.numero_toma || '' %></span>
+          </div>
+        <% } %>
+      </div>
+
+      <hr />
+
+      <!-- PAGO -->
+      <div class="small">
+        <div class="row">
+          <span class="label">Precio:</span>
+          <span>$ <%= precioLocal.toFixed(2) %></span>
+        </div>
+        <div class="row">
+          <span class="label">Abono:</span>
+          <span>$ <%= abonoLocal.toFixed(2) %></span>
+        </div>
+        <div class="row">
+          <span class="label">Saldo:</span>
+          <span>$ <%= saldoLocal.toFixed(2) %></span>
+        </div>
+        <div class="row">
+          <span class="label">Pago:</span>
+          <span><%= pagoEstado || '' %></span>
+        </div>
+      </div>
+
+      <div class="small mt-2">
+        * Todo abono o reservación de evento no es reembolsable.
+      </div>
+       <div class="vertical-note">
+              NOTA: FOTOS DISPONIBLES POR UN PERIODO DE 30 días.
+            </div>
+      <hr />
+
+      <!-- OBSERVACIONES (escribes a mano o dejas en blanco) -->
+      <div class="small">
+        Observaciones:
+        <div class="observaciones">
+          <!-- Puedes agregar aquí un campo de observaciones si luego lo tienes en la BD -->
+        </div>
+      </div>
+
+     
+
+      <div class="center small mt-2">
+        ¡Gracias por su preferencia!
+      </div>
+
+    </div>
+<div class="separator"></div>
+
+<div class="ticket">
+
+      <!-- CABECERA -->
+      <div class="center">
+        <div class="recibo-logo">
+            <img src="/admin-public/bg-arte.jpg" alt="Arte Fotográfico">
+          </div>
+        <div class="title">Arte Fotográfico</div>
+        <div class="subtitle small">Captura · Edita · Imprime</div>
+        <div class="small">
+          Calle Masferrer, Av. Morazán 2a Av. Norte #1-2<br />
+          Sonsonate, El Salvador<br />
+          Tel: 2429-3010 / 7875-6115
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="row small">
+        <span class="label">Ticket:</span>
+        <span>
+          <% if (tipo === 'persona') { %>
+            <%= orden.numero_orden || (1000 + idx) %>
+          <% } else { %>
+            <%= orden.id || (2000 + idx) %>
+          <% } %>
+        </span>
+      </div>
+
+      <div class="row small">
+        <span class="label">Fecha toma:</span>
+        <span><%= fechaToma || '--' %></span>
+      </div>
+
+      <% if (fechaEnt) { %>
+      <div class="row small">
+        <span class="label">Entrega:</span>
+        <span><%= fechaEnt %></span>
+      </div>
+      <% } %>
+
+      <hr />
+
+      <!-- CLIENTE / INSTITUCIÓN -->
+      <div class="small">
+        <div class="label">Orden de:</div>
+        <div>
+          <% if (tipo === 'persona') { %>
+            <%= orden.nombre || '' %>
+          <% } else { %>
+            <%= orden.institucion || '' %>
+            <% if (orden.nombre) { %><br />Contacto: <%= orden.nombre %><% } %>
+          <% } %>
+        </div>
+
+        <% if (orden.telefono) { %>
+          <div class="mt-2">
+            <span class="label">Tel:</span> <%= orden.telefono %>
+          </div>
+        <% } %>
+      </div>
+
+      <hr />
+
+      <!-- DETALLE BÁSICO (puedes ajustar campos) -->
+      <div class="small">
+        <% if (tipo === 'institucion') { %>
+          <% if (orden.seccion) { %>
+            <div class="row">
+              <span class="label">Sección:</span>
+              <span><%= orden.seccion %></span>
+            </div>
+          <% } %>
+
+          <% if (orden.paquete) { %>
+            <div class="row">
+              <span class="label">Paquete:</span>
+              <span><%= orden.paquete %></span>
+            </div>
+          <% } %>
+
+          <div class="row">
+            <span class="label">Tomas:</span>
+            <span>
+              Princ: <%= orden.toma_principal || 0 %>,
+              C1: <%= orden.collage1 || 0 %>,
+              C2: <%= orden.collage2 || 0 %>,
+              C3: <%= orden.collage3 || 0 %>
+            </span>
+          </div>
+        <% } else { %>
+          <div class="row">
+            <span class="label">N° orden:</span>
+            <span><%= orden.numero_orden || '' %></span>
+          </div>
+          <div class="row">
+            <span class="label">N° toma:</span>
+            <span><%= orden.numero_toma || '' %></span>
+          </div>
+        <% } %>
+      </div>
+
+      <hr />
+
+      <!-- PAGO -->
+      <div class="small">
+        <div class="row">
+          <span class="label">Precio:</span>
+          <span>$ <%= precioLocal.toFixed(2) %></span>
+        </div>
+        <div class="row">
+          <span class="label">Abono:</span>
+          <span>$ <%= abonoLocal.toFixed(2) %></span>
+        </div>
+        <div class="row">
+          <span class="label">Saldo:</span>
+          <span>$ <%= saldoLocal.toFixed(2) %></span>
+        </div>
+        <div class="row">
+          <span class="label">Pago:</span>
+          <span><%= pagoEstado || '' %></span>
+        </div>
+      </div>
+
+      <div class="small mt-2">
+        * Todo abono o reservación de evento no es reembolsable.
+      </div>
+<div class="vertical-note">
+              NOTA: FOTOS DISPONIBLES POR UN PERIODO DE 30 días.
+            </div>
+      <hr />
+
+      <!-- OBSERVACIONES (escribes a mano o dejas en blanco) -->
+      <div class="small">
+        Observaciones:
+        <div class="observaciones">
+          <!-- Puedes agregar aquí un campo de observaciones si luego lo tienes en la BD -->
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="center small mt-2">
+        ¡Gracias por su preferencia!
+      </div>
+
+    </div>
+
+  </div>
+</body>
+</html>

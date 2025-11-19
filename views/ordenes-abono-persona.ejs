@@ -1,0 +1,63 @@
+<%- include('_head', { title }) %>
+
+<header class="p-4 bg-white shadow">
+  <div class="max-w-3xl mx-auto flex items-center justify-between">
+    <h1 class="text-xl font-semibold">Registrar abono</h1>
+    <a href="/admin/ordenes?tab=personas" class="text-sm text-slate-600 hover:text-slate-900">← Volver</a>
+  </div>
+</header>
+
+<main class="max-w-3xl mx-auto p-4">
+  <section class="bg-white rounded-2xl shadow p-4 space-y-4">
+    <p class="text-sm text-slate-600">
+      Cliente: <span class="font-semibold"><%= orden.nombre %></span><br>
+      N° orden: <span class="font-mono"><%= orden.numero_orden %></span>
+    </p>
+
+    <%
+      const precioNum = Number(orden.precio || 0);
+      const abonoNum  = Number(orden.pago_abono || 0);
+      const saldo     = Math.max(precioNum - abonoNum, 0);
+    %>
+
+    <p class="text-sm text-slate-600">
+      Precio: <strong>$<%= precioNum.toFixed(2) %></strong> –
+      Abonado: <strong>$<%= abonoNum.toFixed(2) %></strong> –
+      Saldo: <strong>$<%= saldo.toFixed(2) %></strong>
+    </p>
+
+    <form method="POST" action="/admin/ordenes/persona/<%= idx %>/abono" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Monto del abono</label>
+        <input type="number" name="monto" step="0.01" min="0.01"
+               class="w-full border rounded-lg px-3 py-2" required>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Fecha del abono</label>
+        <input type="date" name="fecha"
+               value="<%= new Date().toISOString().slice(0,10) %>"
+               class="w-full border rounded-lg px-3 py-2">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Nota (opcional)</label>
+        <input name="nota" class="w-full border rounded-lg px-3 py-2"
+               placeholder="Ej.: Abono en efectivo">
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2">
+        <a href="/admin/ordenes/persona/<%= idx %>"
+           class="px-4 py-2 rounded-lg border text-sm text-slate-600 hover:bg-slate-50">
+          Cancelar
+        </a>
+        <button type="submit"
+                class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">
+          Guardar abono
+        </button>
+      </div>
+    </form>
+  </section>
+</main>
+
+<%- include('_foot') %>

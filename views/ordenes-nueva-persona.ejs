@@ -6,32 +6,37 @@
   <form method="POST" action="/admin/ordenes/nueva-persona" class="space-y-4">
 
     <div>
-      <label class="block text-sm font-medium">Nombre</label>
-      <input name="nombre" required class="w-full px-4 py-2 rounded border" placeholder="Nombre completo" />
+      <label class="block text-sm font-medium mb-1">Nombre</label>
+      <input name="nombre" required class="w-full px-4 py-2 rounded border"
+             placeholder="Nombre completo" />
     </div>
 
     <div>
-      <label class="block text-sm font-medium">Número de orden</label>
-      <input name="numero_orden" required class="w-full px-4 py-2 rounded border" placeholder="Ej.: 4521" />
+      <label class="block text-sm font-medium mb-1">Orden</label>
+      <input name="numero_orden" required class="w-full px-4 py-2 rounded border"
+             placeholder="Ej.: 4521" />
     </div>
 
     <div>
-      <label class="block text-sm font-medium">Número de toma</label>
-      <input name="numero_toma" required class="w-full px-4 py-2 rounded border" placeholder="Ej.: 18" />
+      <label class="block text-sm font-medium mb-1">Número de toma</label>
+      <input name="numero_toma" required class="w-full px-4 py-2 rounded border"
+             placeholder="Ej.: 18" />
     </div>
 
     <div>
-      <label class="block text-sm font-medium">Fecha de toma</label>
-      <input type="date" name="fecha_toma" required class="w-full px-4 py-2 rounded border" />
+      <label class="block text-sm font-medium mb-1">Fecha de toma</label>
+      <input type="date" name="fecha_toma" required
+             class="w-full px-4 py-2 rounded border" />
     </div>
 
     <div>
-      <label class="block text-sm font-medium">Fecha de entrega</label>
-      <input type="date" name="fecha_entrega" required class="w-full px-4 py-2 rounded border" />
+      <label class="block text-sm font-medium mb-1">Fecha de entrega</label>
+      <input type="date" name="fecha_entrega" required
+             class="w-full px-4 py-2 rounded border" />
     </div>
 
     <div>
-      <label class="block text-sm font-medium">Urgencia</label>
+      <label class="block text-sm font-medium mb-1">Urgencia</label>
       <select name="urgencia" class="w-full px-4 py-2 rounded border">
         <option value="Normal">Normal</option>
         <option value="Urgente">Urgente</option>
@@ -39,17 +44,49 @@
       </select>
     </div>
 
-    <div>
-      <label class="block text-sm font-medium">Precio ($)</label>
-      <input name="precio" required class="w-full px-4 py-2 rounded border" placeholder="Ej.: 12.00" />
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Precio ($)</label>
+        <input name="precio" required class="w-full px-4 py-2 rounded border"
+               placeholder="Ej.: 12.00" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Abono inicial ($ opcional)</label>
+        <input name="pago_abono" class="w-full px-4 py-2 rounded border"
+               placeholder="Ej.: 5.00 (dejar vacío si no abona)" />
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Teléfono</label>
+        <input name="telefono" class="w-full px-4 py-2 rounded border"
+               placeholder="5037XXXXXX" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Estado de entrega</label>
+        <select name="estado_entrega" class="w-full px-4 py-2 rounded border">
+          <option value="Pendiente">Pendiente</option>
+          <option value="Entregado">Entregado</option>
+        </select>
+      </div>
     </div>
 
     <div>
-      <label class="block text-sm font-medium">Teléfono</label>
-      <input name="telefono" class="w-full px-4 py-2 rounded border" placeholder="5037XXXXXX" />
+      <label class="block text-sm font-medium mb-1">Estado de pago</label>
+      <select name="pago_estado" class="w-full px-4 py-2 rounded border">
+        <option value="Pendiente">Pendiente</option>
+        <option value="Abono">Abono</option>
+        <option value="Pagado">Pagado (si ya canceló todo)</option>
+      </select>
+      <p class="text-xs text-slate-500 mt-1">
+        Si eliges <strong>Pagado</strong> y dejas el abono vacío, se asumirá que el cliente pagó el total.
+      </p>
     </div>
 
-    <div class="flex justify-end space-x-2">
+    <div class="flex justify-end space-x-2 pt-2">
       <a href="/admin/ordenes?tab=personas"
          class="px-4 py-2 rounded-lg border text-slate-700 hover:bg-slate-50">
         Cancelar

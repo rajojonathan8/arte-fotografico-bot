@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= title || 'Recibo' %></title>
+  <style>
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f3f4f6;
+    }
+
+    .no-print {
+      padding: 10px;
+      background: #0f172a;
+      color: #e5e7eb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    .no-print button {
+      background: #22c55e;
+      border: none;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .no-print a {
+      color: #9ca3af;
+      text-decoration: none;
+      font-size: 13px;
+      margin-left: 10px;
+    }
+
+    /* Media carta vertical */
+    .page {
+  width: 5.5in;
+  height: 8.5in;
+  margin: 0 auto;              /* menos margen externo */
+  background: white;
+  padding: 0;                  /* 🔥 sin espacio a los lados */
+  border: none;                /* quitamos ese marco gris */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+
+    .recibo {
+      width: 100%;
+      border: 1px solid #000;
+      padding: 4px 6px;
+      margin: 0 0 5px 0; 
+      
+    }
+
+    .recibo-inner {
+      font-size: 9.5px;
+    }
+
+    /* ===== NUEVO ENCABEZADO DEL RECIBO (logo izq, empresa centro, copia/numero der) ===== */
+    .recibo-header {
+      display: grid;
+      grid-template-columns: 70px 1fr 120px;
+      column-gap: 4px;
+      align-items: flex-start;
+      border-bottom: 1px solid #000;
+      padding-bottom: 2px;
+      margin-bottom: 3px;
+    }
+
+    .recibo-logo {
+      text-align: left;
+    }
+    .recibo-logo img {
+      max-width: 60px;
+      height: auto;
+    }
+
+    .recibo-empresa {
+      text-align: center;
+      line-height: 1.2;
+      font-size: 8.5px;
+    }
+    .recibo-empresa .titulo {
+      font-weight: bold;
+      font-size: 13px;
+    }
+    .recibo-empresa .slogan {
+      font-weight: bold;
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .recibo-copia {
+      text-align: right;
+      font-size: 9px;
+    }
+    .recibo-copia .copia-texto {
+      font-size: 8px;
+      text-transform: uppercase;
+    }
+    .recibo-copia .numero {
+      margin-top: 10px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    /* --- ZONA SUPERIOR (tres columnas: izquierda / centro / derecha) --- */
+    .top-row {
+      display: grid;
+      grid-template-columns: 24% 44% 32%;
+      column-gap: 4px;
+      margin-top: 3px;
+      margin-bottom: 4px;
+    }
+
+    .center-block label,
+    .left-block label,
+    .bottom-grid label {
+      font-weight: bold;
+      margin-right: 2px;
+    }
+    .line {
+      display: inline-block;
+      border-bottom: 1px solid #000;
+      min-height: 10px;
+      padding: 0 2px;
+      width: 100%;
+    }
+    .center-block .fila {
+      margin-bottom: 2px;
+    }
+
+    .check-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 2px;
+      font-size: 9px;
+    }
+    .check {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border: 1px solid #000;
+      margin-right: 2px;
+    }
+
+    .left-block .row {
+      margin-bottom: 3px;
+    }
+    .vertical-note {
+      margin-top: 10px;
+      font-size: 8.5px;
+      line-height: 1.2;
+    }
+
+    /* columna derecha (texto legal) */
+    .right-note {
+      font-size: 8px;
+      text-align: justify;
+    }
+
+    /* OBSERVACIONES */
+    .observaciones-title {
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    .observaciones-box {
+      border: 1px solid #000;
+      height: 48px;
+    }
+
+    /* PARTE INFERIOR (tres columnas) */
+    .bottom-grid {
+      margin-top: 4px;
+      border-top: 1px solid #000;
+      padding-top: 3px;
+      display: grid;
+      grid-template-columns: 33% 34% 33%;
+      column-gap: 4px;
+      font-size: 9px;
+    }
+    .bottom-grid .row {
+      margin-bottom: 3px;
+    }
+    .bottom-grid .small-line {
+      display: inline-block;
+      border-bottom: 1px solid #000;
+      min-width: 70px;
+      min-height: 10px;
+      padding: 0 2px;
+    }
+
+    .nota-abono {
+      font-size: 8px;
+      margin-top: 3px;
+    }
+
+    .firmas {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 8.5px;
+    }
+    .firmas .col {
+      width: 45%;
+      text-align: center;
+    }
+    .firmas .firma-line {
+      border-top: 1px solid #000;
+      margin-top: 12px;
+      padding-top: 2px;
+    }
+
+    .separator {
+      border-top: 1px dashed #9ca3af;
+      margin: 4px 0;
+    }
+
+    @page {
+  size: 5.5in 8.5in;
+  margin: 0;       /* 🔥 deja que el recibo use todo el ancho posible */
+}
+
+    @media print {
+      .no-print { display: none; }
+      body { background: white; }
+      .page { margin: 0; border: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <div>
+      Recibo — <%= tipo === 'institucion' ? 'Institución' : 'Persona' %> |
+      <span style="font-size: 12px;">
+        Orden:
+        <% if (tipo === 'persona') { %>
+          <%= orden.numero_orden || 'N/A' %>
+        <% } else { %>
+          <%= orden.institucion || 'N/A' %>
+        <% } %>
+      </span>
+    </div>
+    <div>
+      <button onclick="window.print()">🖨 Imprimir recibos</button>
+      <a href="/admin/ordenes?tab=<%= tipo === 'institucion' ? 'instituciones' : 'personas' %>">← Volver</a>
+    </div>
+  </div>
+
+  <%
+    const precioLocal = Number(precio ?? orden.precio ?? 0) || 0;
+    const abonoLocal  = Number(abono  ?? orden.abono  ?? 0) || 0;
+    const saldoLocal  = Math.max(precioLocal - abonoLocal, 0);
+    const fechaToma   = (orden.fecha_toma || '').slice(0,10);
+    const fechaEnt    = (orden.fecha_entrega || '').slice(0,10);
+
+    function numeroRecibo() {
+      if (tipo === 'persona') return orden.numero_orden || (1000 + (idx || 0));
+      return orden.id || (2000 + (idx || 0));
+    }
+  %>
+
+  <div class="page">
+    <!-- ================= COPIA CLIENTE ================= -->
+    <div class="recibo">
+      <div class="recibo-inner">
+
+        <!-- Encabezado nuevo -->
+        <div class="recibo-header">
+          <div class="recibo-logo">
+            <!-- coloca tu logo real en esta ruta -->
+            <img src="/admin-public/bg-arte.jpg" alt="Arte Fotográfico">
+          </div>
+          <div class="recibo-empresa">
+            <div class="titulo">Arte Fotográfico</div>
+            <div class="slogan">CAPTURA · EDITA · IMPRIME</div>
+            <div>Calle Masferrer, Av. Morazán 2a Av. Norte #1-2</div>
+            <div>Sonsonate, El Salvador</div>
+            <div>Tel: 2429-3010 / 7875-6115</div>
+          </div>
+          <div class="recibo-copia">
+            <div class="copia-texto">Copia cliente</div>
+            <div class="numero">N°: <%= numeroRecibo() %></div>
+          </div>
+        </div>
+
+        <!-- Fila superior con 3 columnas (como el papel) -->
+        <div class="top-row">
+          <!-- Columna izquierda: Valor total, Resta, Fecha, Nota -->
+          <div class="left-block">
+            <div class="row">
+              <label>Valor total $</label><div class="line"><%= precioLocal ? precioLocal.toFixed(2) : '' %></div>
+            </div>
+            <div class="row">
+              <label>Resta $</label><div class="line"><%= saldoLocal ? saldoLocal.toFixed(2) : '' %></div>
+            </div>
+            <div class="row">
+              <label>Fecha</label><div class="line"><%= fechaToma || '' %></div>
+            </div>
+            <div class="vertical-note">
+              NOTA: FOTOS DISPONIBLES POR UN PERIODO DE 30 días.
+            </div>
+            <div class="small mt-2">
+        * Todo abono o reservación de evento no es reembolsable.
+      </div>
+          </div>
+
+          <!-- Columna central: Orden de, Evento, etc. -->
+          <div class="center-block">
+            <div class="fila">
+              <label>Orden de:</label>
+              <div class="line">
+                <% if (tipo === 'persona') { %>
+                  <%= orden.nombre || '' %>
+                <% } else { %>
+                  <%= orden.institucion || '' %>
+                <% } %>
+              </div>
+            </div>
+            <div class="fila">
+              <label>Evento:</label>
+              <div class="line"><%= orden.evento || '' %></div>
+            </div>
+            <div class="fila">
+              <label>Tel:</label>
+              <div class="line"><%= orden.telefono || '' %></div>
+            </div>
+            <div class="fila">
+              <label>Cant. de fotografías:</label>
+              <div class="line"><%= orden.cantidad_fotos || '' %></div>
+            </div>
+            <div class="fila">
+              <label>Tamaño:</label>
+              <div class="line"><%= orden.tamano || '' %></div>
+            </div>
+            <div class="fila">
+              <label>Ampliaciones:</label>
+              <div class="line"><%= orden.ampliaciones || '' %></div>
+            </div>
+            <div class="fila">
+              <label>Tipo de papel:</label>
+              <div class="line"><%= orden.tipo_papel || '' %></div>
+            </div>
+            
+          </div>
+
+          <!-- Columna derecha: texto legal (como en el papel) -->
+          <div class="right-note">
+           <div class="check-line">
+              <span><span class="check"></span>Fotografías</span>
+              <span><span class="check"></span>Videos</span>
+              <span><span class="check"></span>Marcos</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Observaciones -->
+        <div class="observaciones-title">OBSERVACIONES:</div>
+        <div class="observaciones-box">
+          <%= orden.observaciones || '' %>
+        </div>
+
+        <!-- Parte inferior: 3 columnas -->
+        <div class="bottom-grid">
+          <div class="col">
+            <div class="row">
+              <label>Marco Moldura Cod:</label>
+              <span class="small-line"><%= orden.marco_moldura || '' %></span>
+            </div>
+            <div class="row">
+              <label>Vidrio especial:</label>
+              <span class="small-line"><%= orden.vidrio_especial || '' %></span>
+            </div>
+            <div class="row">
+              <label>Vidrio corriente:</label>
+              <span class="small-line"><%= orden.vidrio_corriente || '' %></span>
+            </div>
+          </div>
+
+          <div class="col">
+            <div class="row">
+              <label>Precio $</label>
+              <span class="small-line"><%= precioLocal ? precioLocal.toFixed(2) : '' %></span>
+            </div>
+            <div class="row">
+              <label>Abono $</label>
+              <span class="small-line"><%= abonoLocal ? abonoLocal.toFixed(2) : '' %></span>
+            </div>
+            <div class="row">
+              <label>c/ fondo</label>
+              <span class="small-line"><%= orden.con_fondo || '' %></span>
+            </div>
+            <div class="row">
+              <label>Resta $</label>
+              <span class="small-line"><%= saldoLocal ? saldoLocal.toFixed(2) : '' %></span>
+            </div>
+    
+          </div>
+
+          <div class="col">
+            <div class="row">
+              <label>Tamaño:</label>
+              <span class="small-line"><%= orden.tamano_inferior || '' %></span>
+            </div>
+            <div class="row">
+              <label>Atendido por:</label>
+              <span class="small-line"><%= orden.atendido_por || '' %></span>
+            </div>
+            <div class="row">
+              <label>Fecha de entrega:</label>
+              <span class="small-line"><%= fechaEnt || '' %></span>
+            </div>
+          </div>
+        </div>
+
+       
+      </div>
+    </div>
+
+    <div class="separator"></div>
+
+    <!-- ================= COPIA EMPRESA ================= -->
+    <div class="recibo">
+      <div class="recibo-inner">
+
+        <div class="recibo-header">
+          <div class="recibo-logo">
+            <img src="/admin-public/bg-arte.jpg" alt="Arte Fotográfico">
+          </div>
+          <div class="recibo-empresa">
+            <div class="titulo">Arte Fotográfico</div>
+            <div class="slogan">CAPTURA · EDITA · IMPRIME</div>
+            <div>Calle Masferrer, Av. Morazán 2a Av. Norte #1-2</div>
+            <div>Sonsonate, El Salvador</div>
+            <div>Tel: 2429-3010 / 7875-6115</div>
+          </div>
+          <div class="recibo-copia">
+            <div class="copia-texto">Copia empresa</div>
+            <div class="numero">N°: <%= numeroRecibo() %></div>
+          </div>
+        </div>
+
+        <div class="top-row">
+          <div class="left-block">
+            <div class="row">
+              <label>Valor total $</label><div class="line"><%= precioLocal ? precioLocal.toFixed(2) : '' %></div>
+            </div>
+            <div class="row">
+              <label>Resta $</label><div class="line"><%= saldoLocal ? saldoLocal.toFixed(2) : '' %></div>
+            </div>
+            <div class="row">
+              <label>Fecha</label><div class="line"><%= fechaToma || '' %></div>
+            </div>
+            <div class="vertical-note">
+              NOTA: FOTOS DISPONIBLES POR UN PERIODO DE 30 DÍAS.
+            </div>
+            <div class="small mt-2">
+        * Todo abono o reservación de evento no es reembolsable.
+      </div>
+          </div>
+
+          <div class="center-block">
+            <div class="fila">
+              <label>Orden de:</label>
+              <div class="line">
+                <% if (tipo === 'persona') { %>
+                  <%= orden.nombre || '' %>
+                <% } else { %>
+                  <%= orden.institucion || '' %>
+                <% } %>
+              </div>
+            </div>
+            <div class="fila">
+              <label>Evento:</label>
+              <div class="line"><%= orden.evento || '' %></div>
+            </div>
+            <div class="fila">
+              <label>Tel:</label>
+              <div class="line"><%= orden.telefono || '' %></div>
+            </div>
+            <div class="fila">
+              <label>Cant. de fotografías:</label>
+              <div class="line"><%= orden.cantidad_fotos || '' %></div>
+            </div>
+            <div class="fila">
+              <label>Tamaño:</label>
+              <div class="line"><%= orden.tamano || '' %></div>
+            </div>
+            <div class="fila">
+              <label>Ampliaciones:</label>
+              <div class="line"><%= orden.ampliaciones || '' %></div>
+            </div>
+            <div class="fila">
+              <label>Tipo de papel:</label>
+              <div class="line"><%= orden.tipo_papel || '' %></div>
+            </div>
+          
+          </div>
+
+          <div class="right-note">
+             <div class="check-line">
+              <span><span class="check"></span>Fotografías</span>
+              <span><span class="check"></span>Videos</span>
+              <span><span class="check"></span>Marcos</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="observaciones-title">OBSERVACIONES:</div>
+        <div class="observaciones-box">
+          <%= orden.observaciones || '' %>
+        </div>
+
+        <div class="bottom-grid">
+          <div class="col">
+            <div class="row">
+              <label>Marco Moldura Cod:</label>
+              <span class="small-line"><%= orden.marco_moldura || '' %></span>
+            </div>
+            <div class="row">
+              <label>Vidrio especial:</label>
+              <span class="small-line"><%= orden.vidrio_especial || '' %></span>
+            </div>
+            <div class="row">
+              <label>Vidrio corriente:</label>
+              <span class="small-line"><%= orden.vidrio_corriente || '' %></span>
+            </div>
+          </div>
+
+          <div class="col">
+            <div class="row">
+              <label>Precio $</label>
+              <span class="small-line"><%= precioLocal ? precioLocal.toFixed(2) : '' %></span>
+            </div>
+            <div class="row">
+              <label>Abono $</label>
+              <span class="small-line"><%= abonoLocal ? abonoLocal.toFixed(2) : '' %></span>
+            </div>
+            <div class="row">
+              <label>c/ fondo</label>
+              <span class="small-line"><%= orden.con_fondo || '' %></span>
+            </div>
+            <div class="row">
+              <label>Resta $</label>
+              <span class="small-line"><%= saldoLocal ? saldoLocal.toFixed(2) : '' %></span>
+            </div>
+          </div>
+
+          <div class="col">
+            <div class="row">
+              <label>Tamaño:</label>
+              <span class="small-line"><%= orden.tamano_inferior || '' %></span>
+            </div>
+            <div class="row">
+              <label>Atendido por:</label>
+              <span class="small-line"><%= orden.atendido_por || '' %></span>
+            </div>
+            <div class="row">
+              <label>Fecha de entrega:</label>
+              <span class="small-line"><%= fechaEnt || '' %></span>
+            </div>
+          </div>
+        </div>
+
+       
+      </div>
+    </div>
+  </div>
+</body>
+</html>

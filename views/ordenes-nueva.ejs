@@ -1,137 +1,197 @@
 <%- include('_head', { title }) %>
 
-<header class="p-4 bg-white shadow">
-  <div class="max-w-3xl mx-auto flex items-center justify-between">
-    <h1 class="text-xl font-semibold"><%= title %></h1>
-    <a href="/admin/ordenes" class="text-sm text-slate-600 hover:text-slate-900">← Volver a órdenes</a>
-  </div>
-</header>
-
 <main class="max-w-3xl mx-auto p-4">
-  <form
-    action="/admin/ordenes/nueva-institucion"
-    method="post"
-    class="bg-white rounded-2xl shadow p-6 space-y-4"
-  >
-    <div class="grid md:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm font-medium text-slate-700">Institución</label>
-        <input
-          name="institucion"
-          required
-          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          placeholder="Nombre de la institución"
-        />
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700">Sección</label>
-        <input
-          name="seccion"
-          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          placeholder="9° A, 2° Bachillerato..."
-        />
-      </div>
-    </div>
+  <h1 class="text-2xl font-semibold mb-6">Nueva orden — Institución</h1>
 
+  <form action="/admin/ordenes/nueva-institucion" method="POST" class="space-y-4">
+
+    <!-- Institución -->
     <div>
-      <label class="block text-sm font-medium text-slate-700">Paquete</label>
+      <label class="block text-sm font-medium mb-1">Institución</label>
       <input
-        name="paquete"
-        class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        placeholder="Paquete A, solo foto título..."
+        type="text"
+        name="institucion"
+        class="w-full px-4 py-2 rounded border"
+        placeholder="Nombre de la institución"
+        required
       />
     </div>
 
-    <div class="grid md:grid-cols-3 gap-4">
+    <!-- Nombre alumno / contacto -->
+    <div>
+      <label class="block text-sm font-medium mb-1">Nombre</label>
+      <input
+        type="text"
+        name="nombre"
+        class="w-full px-4 py-2 rounded border"
+        placeholder="Nombre del alumno / contacto"
+      />
+    </div>
+
+    <!-- Sección / Grupo + Paquete -->
+    <div class="grid md:grid-cols-2 gap-4">
       <div>
-        <label class="block text-sm font-medium text-slate-700">Toma principal</label>
+        <label class="block text-sm font-medium mb-1">Sección / Grupo</label>
         <input
-          type="number"
-          min="0"
-          name="toma_principal"
-          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          value="0"
+          type="text"
+          name="seccion"
+          class="w-full px-4 py-2 rounded border"
+          placeholder="Ej.: 9° A, 3° Bachillerato…"
         />
       </div>
+
       <div>
-        <label class="block text-sm font-medium text-slate-700">Collage 1</label>
+        <label class="block text-sm font-medium mb-1">Paquete</label>
         <input
-          type="number"
-          min="0"
-          name="collage1"
-          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          value="0"
-        />
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700">Collage 2</label>
-        <input
-          type="number"
-          min="0"
-          name="collage2"
-          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          value="0"
+          type="text"
+          name="paquete"
+          class="w-full px-4 py-2 rounded border"
+          placeholder="Paquete contratado (A, B, C…)"
         />
       </div>
     </div>
 
+    <!-- Toma principal + Collages -->
+    <div>
+      <label class="block text-sm font-medium mb-1">Tomas y collages</label>
+      <div class="grid md:grid-cols-4 gap-4">
+        <div>
+          <span class="block text-xs text-slate-600 mb-1">Toma principal</span>
+          <input
+            type="number"
+            name="toma_principal"
+            class="w-full px-4 py-2 rounded border"
+            value="0"
+          />
+        </div>
+        <div>
+          <span class="block text-xs text-slate-600 mb-1">Collage 1</span>
+          <input
+            type="number"
+            name="collage1"
+            class="w-full px-4 py-2 rounded border"
+            value="0"
+          />
+        </div>
+        <div>
+          <span class="block text-xs text-slate-600 mb-1">Collage 2</span>
+          <input
+            type="number"
+            name="collage2"
+            class="w-full px-4 py-2 rounded border"
+            value="0"
+          />
+        </div>
+        <div>
+          <span class="block text-xs text-slate-600 mb-1">Collage 3</span>
+          <input
+            type="number"
+            name="collage3"
+            class="w-full px-4 py-2 rounded border"
+            value="0"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Fechas / teléfono -->
     <div class="grid md:grid-cols-2 gap-4">
       <div>
-        <label class="block text-sm font-medium text-slate-700">Fecha de toma</label>
+        <label class="block text-sm font-medium mb-1">Fecha de toma</label>
         <input
           type="date"
           name="fecha_toma"
-          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          class="w-full px-4 py-2 rounded border"
         />
       </div>
+
       <div>
-        <label class="block text-sm font-medium text-slate-700">Teléfono</label>
+        <label class="block text-sm font-medium mb-1">Teléfono de contacto</label>
         <input
+          type="text"
           name="telefono"
-          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          placeholder="5037XXXXXXX"
+          class="w-full px-4 py-2 rounded border"
+          placeholder="5037XXXXXX"
         />
       </div>
     </div>
 
+    <!-- Urgencia -->
+    <div>
+      <label class="block text-sm font-medium mb-1">Urgencia</label>
+      <select name="urgencia" class="w-full px-4 py-2 rounded border">
+        <option value="Normal">Normal</option>
+        <option value="Urgente">Urgente</option>
+      </select>
+    </div>
+
+    <!-- Precio + Abono inicial -->
     <div class="grid md:grid-cols-2 gap-4">
       <div>
-        <label class="block text-sm font-medium text-slate-700">Estado de entrega</label>
-        <select
-          name="estado_entrega"
-          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        >
+        <label class="block text-sm font-medium mb-1">Precio total ($)</label>
+        <input
+          type="number"
+          step="0.01"
+          name="precio"
+          class="w-full px-4 py-2 rounded border"
+          placeholder="Ej.: 150.00"
+        />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">
+          Abono inicial ($ opcional)
+        </label>
+        <input
+          type="number"
+          step="0.01"
+          name="abono_inicial"
+          class="w-full px-4 py-2 rounded border"
+          placeholder="Ej.: 50.00 (dejar vacío si no ha abonado)"
+        />
+        <p class="text-xs text-slate-500 mt-1">
+          Si dejas el abono vacío, se asumirá que todavía no ha abonado nada.
+        </p>
+      </div>
+    </div>
+
+    <!-- Estado de pago + entrega -->
+    <div class="grid md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Estado de pago</label>
+        <select name="pago_estado" class="w-full px-4 py-2 rounded border">
+          <option value="Pendiente">Pendiente</option>
+          <option value="Abono">Abono</option>
+          <option value="Pagado">Pagado</option>
+        </select>
+        <p class="text-xs text-slate-500 mt-1">
+          Si eliges <strong>Pagado</strong>, el sistema asumirá que se canceló
+          el 100% del precio.
+        </p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Estado de entrega</label>
+        <select name="entrega" class="w-full px-4 py-2 rounded border">
           <option value="Pendiente">Pendiente</option>
           <option value="Entregado">Entregado</option>
         </select>
       </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700">Urgencia</label>
-        <select
-          name="urgencia"
-          class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        >
-          <option value="Normal">Normal</option>
-          <option value="Urgente">Urgente</option>
-          <option value="Muy urgente">Muy urgente</option>
-        </select>
-      </div>
     </div>
 
+    <!-- Botones -->
     <div class="flex justify-end space-x-2 pt-2">
-      <a
-        href="/admin/ordenes"
-        class="px-4 py-2 rounded-lg text-sm font-medium border border-slate-300 text-slate-700 hover:bg-slate-50"
-      >
+      <a href="/admin/ordenes?tab=instituciones"
+         class="px-4 py-2 rounded-lg border text-slate-700 hover:bg-slate-50">
         Cancelar
       </a>
-      <button
-        type="submit"
-        class="px-4 py-2 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700"
-      >
+
+      <button type="submit"
+        class="px-4 py-2 rounded-lg text-white bg-emerald-600 hover:bg-emerald-700">
         Guardar orden
       </button>
     </div>
+
   </form>
 </main>
 

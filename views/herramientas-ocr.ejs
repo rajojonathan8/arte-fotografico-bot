@@ -1,0 +1,389 @@
+<%- include('_head', { title: 'Herramientas OCR' }) %> 
+
+<main class="max-w-5xl mx-auto p-4 space-y-8">
+  <h1 class="text-2xl font-semibold mb-2">Herramientas IA — Listas y Mensajes</h1>
+  <p class="text-sm text-slate-600">
+    Panel de apoyo para Arte Fotográfico: lectura de listas con OCR y generador de mensajes para WhatsApp.
+  </p>
+
+  <!-- ================== BLOQUE 1: SUBIR IMAGEN (OCR) ================== -->
+  <section class="border rounded-lg p-4 bg-white shadow-sm space-y-3">
+    <h2 class="font-semibold text-sm">1. Subir imagen de la lista (OCR)</h2>
+
+    <form
+      action="/admin/herramientas/ocr"
+      method="POST"
+      enctype="multipart/form-data"
+      class="flex flex-col md:flex-row items-start gap-3"
+    >
+      <input
+        type="file"
+        name="imagen_lista"
+        accept="image/*"
+        class="border rounded px-3 py-2 text-sm"
+        required
+      />
+      <button
+        type="submit"
+        class="px-4 py-2 rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 text-sm"
+      >
+        Procesar con OCR
+      </button>
+    </form>
+
+    <p class="text-xs text-slate-500">
+      Recomendación: foto tomada desde arriba, buena luz, que la tabla ocupe la mayor parte de la imagen.
+    </p>
+  </section>
+
+  <!-- ================== BLOQUE 2: TEXTO DETECTADO ================== -->
+  <section class="border rounded-lg p-4 bg-white shadow-sm space-y-2">
+    <h2 class="font-semibold text-sm">2. Texto detectado (crudo)</h2>
+    <p class="text-xs text-slate-500">
+      Este es el texto tal cual lo devolvió el OCR. En el paso siguiente vamos a limpiarlo,
+      separar en líneas y reordenar apellidos / nombres.
+    </p>
+
+    <textarea
+      id="ocr_raw"
+      class="w-full h-40 border rounded px-3 py-2 text-xs font-mono whitespace-pre"
+      readonly
+    ><%= typeof ocrText !== 'undefined' ? ocrText : '' %></textarea>
+
+    <button
+      type="button"
+      onclick="copiarCrudoAEditable()"
+      class="mt-2 px-3 py-1.5 rounded border text-xs text-slate-700 hover:bg-slate-50"
+    >
+      ➜ Copiar este texto a la zona editable
+    </button>
+  </section>
+
+  <!-- ================== BLOQUE 3: LIMPIAR Y REORDENAR ================== -->
+  <section class="grid md:grid-cols-2 gap-4">
+    <!-- Lado izquierdo: texto editable -->
+    <div class="border rounded-lg p-4 bg-white shadow-sm space-y-2">
+      <h2 class="font-semibold text-sm">3A. Texto editable / limpieza</h2>
+      <p class="text-xs text-slate-500">
+        Aquí puedes corregir errores del OCR, borrar encabezados, etc. Luego pulsa
+        <strong>“Limpiar y reordenar”</strong>.
+      </p>
+
+      <textarea
+        id="ocr_editable"
+        class="w-full h-72 border rounded px-3 py-2 text-xs font-mono whitespace-pre"
+        placeholder="Pega aquí el texto a limpiar o pulsa el botón para copiar desde 'Texto detectado (crudo)'..."
+      ></textarea>
+
+      <button
+        type="button"
+        onclick="limpiarYReordenar()"
+        class="mt-2 px-3 py-1.5 rounded-lg text-xs text-white bg-blue-600 hover:bg-blue-700"
+      >
+        ⚙️ Limpiar y reordenar (APELLIDOS APELLIDOS NOMBRES)
+      </button>
+    </div>
+
+    <!-- Lado derecho: resultado final -->
+    <div class="border rounded-lg p-4 bg-white shadow-sm space-y-2">
+      <h2 class="font-semibold text-sm">3B. Resultado limpio (para Excel, Word, etc.)</h2>
+      <p class="text-xs text-slate-500">
+        El resultado se genera aquí, una línea por alumno, en formato
+        <strong>APELLIDO APELLIDO NOMBRES</strong>.
+      </p>
+
+      <textarea
+        id="ocr_resultado"
+        class="w-full h-72 border rounded px-3 py-2 text-xs font-mono whitespace-pre"
+        placeholder="Aquí aparecerá el resultado..."
+      ></textarea>
+
+      <div class="flex flex-wrap gap-2 mt-2">
+        <button
+          type="button"
+          onclick="copiarResultado()"
+          class="px-3 py-1.5 rounded-lg text-xs text-white bg-emerald-600 hover:bg-emerald-700"
+        >
+          📋 Copiar resultado al portapapeles
+        </button>
+        <button
+          type="button"
+          onclick="descargarTxtResultado()"
+          class="px-3 py-1.5 rounded-lg text-xs border text-slate-700 hover:bg-slate-50"
+        >
+          ⬇️ Descargar como .txt
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <!-- ============ BLOQUE 4: GENERADOR DE MENSAJES WHATSAPP ========= -->
+  <!-- ================================================================ -->
+  <section class="border rounded-lg p-4 bg-white shadow-sm space-y-3">
+    <h2 class="font-semibold text-sm">4. Generador de mensajes para WhatsApp</h2>
+    <p class="text-xs text-slate-500">
+      Completa los datos y genera mensajes listos para enviar por WhatsApp a tus clientes
+      (recordatorio de entrega, abono/cobro, confirmación de reserva, etc.).
+    </p>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <!-- Lado izquierdo: formulario de parámetros -->
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium mb-1">Tipo de mensaje</label>
+          <select id="msg_tipo" class="w-full px-3 py-2 border rounded text-sm">
+            <option value="recordatorio">Recordatorio de entrega</option>
+            <option value="cobro">Cobro suave / abono</option>
+            <option value="reserva">Confirmación de reserva</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium mb-1">Nombre del cliente</label>
+          <input
+            id="msg_nombre"
+            type="text"
+            class="w-full px-3 py-2 border rounded text-sm"
+            placeholder="Ej.: Ana Martínez"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium mb-1">Tipo de sesión / evento</label>
+          <input
+            id="msg_evento"
+            type="text"
+            class="w-full px-3 py-2 border rounded text-sm"
+            placeholder="Ej.: sesión de fotos de graduación"
+          />
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium mb-1">
+              Fecha de entrega / evento
+            </label>
+            <input
+              id="msg_fecha"
+              type="text"
+              class="w-full px-3 py-2 border rounded text-sm"
+              placeholder="Ej.: viernes 25 a las 3:00 p.m."
+            />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium mb-1">
+              Monto pendiente ($) <span class="text-[10px] text-slate-400">(solo para cobro)</span>
+            </label>
+            <input
+              id="msg_monto"
+              type="number"
+              step="0.01"
+              class="w-full px-3 py-2 border rounded text-sm"
+              placeholder="Ej.: 15.00"
+            />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onclick="generarMensajeWhatsApp()"
+          class="px-4 py-2 rounded-lg text-xs text-white bg-indigo-600 hover:bg-indigo-700"
+        >
+          ✉️ Generar mensaje
+        </button>
+      </div>
+
+      <!-- Lado derecho: mensaje generado -->
+      <div class="space-y-2">
+        <label class="block text-xs font-medium mb-1">
+          Mensaje generado (para copiar y pegar en WhatsApp)
+        </label>
+        <textarea
+          id="msg_resultado"
+          class="w-full h-56 border rounded px-3 py-2 text-xs whitespace-pre-line"
+          placeholder="Aquí aparecerá el mensaje listo para copiar..."
+        ></textarea>
+
+        <button
+          type="button"
+          onclick="copiarMensajeWhatsApp()"
+          class="px-3 py-1.5 rounded-lg text-xs text-white bg-emerald-600 hover:bg-emerald-700"
+        >
+          📋 Copiar mensaje
+        </button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  // =================== FUNCIONES OCR ===================
+
+  // Copia el texto crudo (solo lectura) al área editable
+  function copiarCrudoAEditable() {
+    const raw = document.getElementById('ocr_raw');
+    const editable = document.getElementById('ocr_editable');
+    if (!raw || !editable) return;
+
+    editable.value = raw.value.trim();
+    editable.focus();
+  }
+
+  // Limpia líneas, elimina numeración y teléfonos, y reordena apellidos / nombres
+  function limpiarYReordenar() {
+    const editable = document.getElementById('ocr_editable');
+    const salida = document.getElementById('ocr_resultado');
+    if (!editable || !salida) return;
+
+    const texto = editable.value || '';
+    const lineas = texto.split(/\r?\n/);
+    const resultado = [];
+
+    for (let linea of lineas) {
+      let t = linea.trim();
+      if (!t) continue;
+
+      // 1) Quitar numeración al inicio: "1 ", "12.", "3 - " etc.
+      t = t.replace(/^\d+\s*[\.\-\)]?\s*/, '');
+
+      // 2) Quitar teléfonos al final: secuencias largas de dígitos y espacios
+      t = t.replace(/\s+\d[\d\s-]{5,}$/, '').trim();
+
+      if (!t) continue;
+
+      // 3) Reordenar. Asumimos que el formato general es:
+      //    NOMBRES APELLIDO1 APELLIDO2
+      const partes = t.split(/\s+/);
+      if (partes.length <= 2) {
+        // Si no hay suficientes palabras, la dejamos tal cual
+        resultado.push(t.toUpperCase());
+        continue;
+      }
+
+      const apellido2 = partes.pop();
+      const apellido1 = partes.pop();
+      const nombres = partes.join(' ');
+
+      // 👉 SIN coma, como me pediste
+      const lineaFinal = `${apellido1} ${apellido2} ${nombres}`;
+      resultado.push(lineaFinal.toUpperCase());
+    }
+
+    salida.value = resultado.join('\n');
+  }
+
+  // Copiar el resultado al portapapeles
+  async function copiarResultado() {
+    const salida = document.getElementById('ocr_resultado');
+    if (!salida) return;
+
+    const texto = salida.value.trim();
+    if (!texto) {
+      alert('No hay texto para copiar.');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(texto);
+      alert('Resultado copiado al portapapeles ✅');
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo copiar automáticamente. Puedes copiarlo manualmente.');
+    }
+  }
+
+  // Descargar el resultado como archivo .txt
+  function descargarTxtResultado() {
+    const salida = document.getElementById('ocr_resultado');
+    if (!salida) return;
+
+    const texto = salida.value.trim();
+    if (!texto) {
+      alert('No hay texto para descargar.');
+      return;
+    }
+
+    const blob = new Blob([texto], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'lista_alumnos_limpia.txt';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+  }
+
+  // =================== GENERADOR MENSAJES WHATSAPP ===================
+
+  function generarMensajeWhatsApp() {
+    const tipo   = document.getElementById('msg_tipo').value;
+    const nombre = (document.getElementById('msg_nombre').value || '').trim();
+    const evento = (document.getElementById('msg_evento').value || '').trim();
+    const fecha  = (document.getElementById('msg_fecha').value || '').trim();
+    const monto  = (document.getElementById('msg_monto').value || '').trim();
+    const out    = document.getElementById('msg_resultado');
+
+    let msg = '';
+
+    const nombreMostrar = nombre ? ` ${nombre}` : '';
+    const eventoMostrar = evento || 'la sesión de fotos';
+
+    if (tipo === 'recordatorio') {
+      msg =
+        `Hola${nombreMostrar}, te saluda Arte Fotográfico 👋\n\n` +
+        `Solo queremos recordarte que tus fotografías de ${eventoMostrar} ` +
+        (fecha ? `estarán listas para entrega el ${fecha}.` : 'ya están listas para entrega en nuestro estudio.') +
+        `\n\n📍 Calle Masferrer, Av. Morazán 2a Av. Norte #1-2, Sonsonate.\n` +
+        `📞 2429-3010 / 7875-6115\n\n` +
+        `¡Gracias por confiar en nosotros! 📸`;
+    } else if (tipo === 'cobro') {
+      const montoTexto = monto ? `un saldo pendiente de $${Number(monto).toFixed(2)} ` : 'un saldo pendiente ';
+      msg =
+        `Hola${nombreMostrar}, te saluda Arte Fotográfico 👋\n\n` +
+        `Te escribimos para comentarte que queda ${montoTexto} ` +
+        `correspondiente a ${eventoMostrar}. ` +
+        (fecha ? `Puedes pasar a cancelar y retirar tus fotografías el ${fecha}.` : 'Puedes pasar a cancelar y retirar tus fotografías cuando te sea posible en horario de atención.') +
+        `\n\nCualquier duda, estamos a la orden.\n` +
+        `📍 Calle Masferrer, Av. Morazán 2a Av. Norte #1-2, Sonsonate.\n` +
+        `📞 2429-3010 / 7875-6115`;
+    } else if (tipo === 'reserva') {
+      msg =
+        `Hola${nombreMostrar}, te saluda Arte Fotográfico 👋\n\n` +
+        `Confirmamos tu reserva para ${eventoMostrar}` +
+        (fecha ? ` el día ${fecha}.` : '.') +
+        `\n\nPor favor llega unos minutos antes para preparar la sesión.\n` +
+        `Cualquier cambio o consulta, escríbenos por este medio.\n\n` +
+        `📸 Arte Fotográfico\n` +
+        `📍 Calle Masferrer, Av. Morazán 2a Av. Norte #1-2, Sonsonate.\n` +
+        `📞 2429-3010 / 7875-6115`;
+    }
+
+    out.value = msg.trim();
+  }
+
+  async function copiarMensajeWhatsApp() {
+    const out = document.getElementById('msg_resultado');
+    if (!out) return;
+
+    const texto = out.value.trim();
+    if (!texto) {
+      alert('No hay mensaje para copiar.');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(texto);
+      alert('Mensaje copiado al portapapeles ✅');
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo copiar automáticamente. Puedes copiarlo manualmente.');
+    }
+  }
+</script>
+
+<%- include('_foot') %>

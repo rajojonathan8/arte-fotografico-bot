@@ -26,127 +26,171 @@
     </a>
   </div>
 
-  <!-- 🔍 Filtros (fecha, estado, urgencia, búsqueda) -->
-<section class="bg-white rounded-2xl shadow p-4 mb-4">
-  <form action="/admin/ordenes" method="GET" class="flex flex-wrap items-end gap-4">
-    <!-- mantener la pestaña actual -->
-    <input type="hidden" name="tab" value="<%= tab %>">
+  <!-- 🔍 Filtros avanzados (fecha, texto, urgencia, entrega, pago) -->
+  <section class="bg-white rounded-2xl shadow p-4 mb-4">
+    <form action="/admin/ordenes" method="GET" class="flex flex-wrap items-end gap-4">
+      <!-- mantener la pestaña actual -->
+      <input type="hidden" name="tab" value="<%= tab %>">
 
-    <!-- Fecha desde -->
-    <div>
-      <label for="fecha_desde" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
-        Desde (fecha toma)
-      </label>
-      <input
-        type="date"
-        id="fecha_desde"
-        name="fecha_desde"
-        value="<%= fechaDesde || '' %>"
-        class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
-    </div>
+      <!-- Texto libre -->
+      <div>
+        <label for="q" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
+          Buscar
+        </label>
+        <input
+          type="text"
+          id="q"
+          name="q"
+          placeholder="Nombre, institución, teléfono, N° orden..."
+          value="<%= busqueda || '' %>"
+          class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm w-64
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+      </div>
 
-    <!-- Fecha hasta -->
-    <div>
-      <label for="fecha_hasta" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
-        Hasta (fecha toma)
-      </label>
-      <input
-        type="date"
-        id="fecha_hasta"
-        name="fecha_hasta"
-        value="<%= fechaHasta || '' %>"
-        class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
-    </div>
+      <!-- Fecha desde -->
+      <div>
+        <label for="fecha_desde" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
+          Desde (fecha toma)
+        </label>
+        <input
+          type="date"
+          id="fecha_desde"
+          name="fecha_desde"
+          value="<%= fechaDesde || '' %>"
+          class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+      </div>
 
-    <!-- Estado de entrega -->
-    <div>
-      <label for="estado" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
-        Entrega
-      </label>
-      <select
-        id="estado"
-        name="estado"
-        class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-        <option value="" <%= !estadoFiltro ? 'selected' : '' %>>Todas</option>
-        <option value="Pendiente" <%= estadoFiltro === 'Pendiente' ? 'selected' : '' %>>Pendiente</option>
-        <option value="Entregado" <%= estadoFiltro === 'Entregado' ? 'selected' : '' %>>Entregado</option>
-      </select>
-    </div>
+      <!-- Fecha hasta -->
+      <div>
+        <label for="fecha_hasta" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
+          Hasta (fecha toma)
+        </label>
+        <input
+          type="date"
+          id="fecha_hasta"
+          name="fecha_hasta"
+          value="<%= fechaHasta || '' %>"
+          class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+      </div>
 
-    <!-- Urgencia -->
-    <div>
-      <label for="urgencia" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
-        Urgencia
-      </label>
-      <select
-        id="urgencia"
-        name="urgencia"
-        class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-        <option value="" <%= !urgenciaFiltro ? 'selected' : '' %>>Todas</option>
-        <option value="Normal" <%= urgenciaFiltro === 'Normal' ? 'selected' : '' %>>Normal</option>
-        <option value="Urgente" <%= urgenciaFiltro === 'Urgente' ? 'selected' : '' %>>Urgente</option>
-        <option value="Muy urgente" <%= urgenciaFiltro === 'Muy urgente' ? 'selected' : '' %>>Muy urgente</option>
-      </select>
-    </div>
+      <!-- Urgencia -->
+      <div>
+        <label for="urgencia" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
+          Urgencia
+        </label>
+        <select
+          id="urgencia"
+          name="urgencia"
+          class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          <option value="" <%= !filtroUrg ? 'selected' : '' %>>Todas</option>
+          <option value="Normal" <%= filtroUrg === 'Normal' ? 'selected' : '' %>>Normal</option>
+          <option value="Urgente" <%= filtroUrg === 'Urgente' ? 'selected' : '' %>>Urgente</option>
+          <option value="Muy urgente" <%= filtroUrg === 'Muy urgente' ? 'selected' : '' %>>Muy urgente</option>
+        </select>
+      </div>
 
-    <!-- Búsqueda de texto -->
-    <div class="flex-1 min-w-[200px]">
-      <label for="q" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
-        Buscar
-      </label>
-      <input
-        type="text"
-        id="q"
-        name="q"
-        placeholder="Nombre, institución, teléfono, N° orden..."
-        value="<%= textoFiltro || '' %>"
-        class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
-    </div>
+      <!-- Entrega -->
+      <div>
+        <label for="entrega" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
+          Entrega
+        </label>
+        <select
+          id="entrega"
+          name="entrega"
+          class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          <option value="" <%= !filtroEnt ? 'selected' : '' %>>Todas</option>
+          <option value="Pendiente" <%= filtroEnt === 'Pendiente' ? 'selected' : '' %>>Pendiente</option>
+          <option value="Entregado" <%= filtroEnt === 'Entregado' ? 'selected' : '' %>>Entregado</option>
+        </select>
+      </div>
 
-    <!-- Botones -->
-    <div class="flex gap-2">
-      <button
-        type="submit"
-        class="px-4 py-2 text-sm rounded-full bg-emerald-600 text-white hover:bg-emerald-700">
-        Aplicar filtros
-      </button>
+      <!-- Pago -->
+      <div>
+        <label for="pago" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
+          Pago
+        </label>
+        <select
+          id="pago"
+          name="pago"
+          class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+          <option value="" <%= !filtroPago ? 'selected' : '' %>>Todos</option>
+          <option value="Pendiente" <%= filtroPago === 'Pendiente' ? 'selected' : '' %>>Pendiente</option>
+          <option value="Abono" <%= filtroPago === 'Abono' ? 'selected' : '' %>>Abono</option>
+          <option value="Pagado" <%= filtroPago === 'Pagado' ? 'selected' : '' %>>Pagado</option>
+        </select>
+      </div>
 
-      <a
-        href="/admin/ordenes?tab=<%= tab %>"
-        class="px-4 py-2 text-sm rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200">
-        Limpiar
-      </a>
-    </div>
-  </form>
+      <div class="flex gap-2">
+        <button
+          type="submit"
+          class="px-4 py-2 text-sm rounded-full bg-emerald-600 text-white hover:bg-emerald-700">
+          Aplicar filtro
+        </button>
 
-  <% if (fechaDesde || fechaHasta || estadoFiltro || urgenciaFiltro || textoFiltro) { %>
-    <p class="mt-2 text-xs text-slate-500">
-      Filtros activos:
-      <% if (fechaDesde || fechaHasta) { %>
-        <span>Fecha toma</span>
-        <% if (fechaDesde) { %> desde <span class="font-semibold"><%= fechaDesde %></span><% } %>
-        <% if (fechaDesde && fechaHasta) { %> y <% } %>
-        <% if (fechaHasta) { %> hasta <span class="font-semibold"><%= fechaHasta %></span><% } %>;
-      <% } %>
-      <% if (estadoFiltro) { %>
-        <span>Entrega: <span class="font-semibold"><%= estadoFiltro %></span>;</span>
-      <% } %>
-      <% if (urgenciaFiltro) { %>
-        <span>Urgencia: <span class="font-semibold"><%= urgenciaFiltro %></span>;</span>
-      <% } %>
-      <% if (textoFiltro) { %>
-        <span>Búsqueda: "<span class="font-semibold"><%= textoFiltro %></span>"</span>
-      <% } %>
-    </p>
-  <% } %>
-</section>
+        <a
+          href="/admin/ordenes?tab=<%= tab %>"
+          class="px-4 py-2 text-sm rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200">
+          Limpiar
+        </a>
+      </div>
+    </form>
 
+    <% if (fechaDesde || fechaHasta || busqueda || filtroUrg || filtroEnt || filtroPago) { %>
+      <p class="mt-2 text-xs text-slate-500">
+        Mostrando órdenes
+        <% if (busqueda) { %>
+          que coinciden con "<span class="font-semibold"><%= busqueda %></span>"
+        <% } %>
+        <% if (fechaDesde || fechaHasta) { %>
+          con <span class="font-semibold">fecha de toma</span>
+          <% if (fechaDesde) { %> desde <span class="font-semibold"><%= fechaDesde %></span><% } %>
+          <% if (fechaDesde && fechaHasta) { %> y <% } %>
+          <% if (fechaHasta) { %> hasta <span class="font-semibold"><%= fechaHasta %></span><% } %>
+        <% } %>
+        <% if (filtroUrg) { %>
+          , urgencia <span class="font-semibold"><%= filtroUrg %></span>
+        <% } %>
+        <% if (filtroEnt) { %>
+          , entrega <span class="font-semibold"><%= filtroEnt %></span>
+        <% } %>
+        <% if (filtroPago) { %>
+          , pago <span class="font-semibold"><%= filtroPago %></span>
+        <% } %>.
+      </p>
+    <% } %>
+  </section>
 
+  <!-- =============================================================== -->
   <!-- Tabla de INSTITUCIONES -->
+  <!-- =============================================================== -->
   <% if (tab === 'instituciones') { %>
     <section class="bg-white rounded-2xl shadow p-4">
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-lg font-semibold">Libro de instituciones</h2>
+        <div class="mt-2 mb-4 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+  <div class="bg-slate-50 rounded-xl px-3 py-2">
+    <p class="text-slate-500">Total facturado</p>
+    <p class="text-sm font-semibold">$<%= (resumenInstituciones.totalPrecio || 0).toFixed(2) %></p>
+  </div>
+  <div class="bg-slate-50 rounded-xl px-3 py-2">
+    <p class="text-slate-500">Total abonado</p>
+    <p class="text-sm font-semibold">$<%= (resumenInstituciones.totalAbono || 0).toFixed(2) %></p>
+  </div>
+  <div class="bg-slate-50 rounded-xl px-3 py-2">
+    <p class="text-slate-500">Saldo pendiente</p>
+    <p class="text-sm font-semibold">$<%= (resumenInstituciones.totalSaldo || 0).toFixed(2) %></p>
+  </div>
+  <div class="bg-slate-50 rounded-xl px-3 py-2">
+    <p class="text-slate-500">Órdenes (filtro actual)</p>
+    <p class="text-sm font-semibold"><%= resumenInstituciones.cantidad || 0 %></p>
+  </div>
+</div>
+
         <a
           href="/admin/ordenes/nueva-institucion"
           class="px-4 py-2 text-sm rounded-full bg-emerald-600 text-white hover:bg-emerald-700">
@@ -159,13 +203,19 @@
           <thead class="bg-slate-50 text-slate-600">
             <tr>
               <th class="px-3 py-2 text-left">Institución</th>
+              <th class="px-3 py-2 text-left">Nombre</th>
               <th class="px-3 py-2 text-left">Sección</th>
               <th class="px-3 py-2 text-left">Paquete</th>
               <th class="px-3 py-2 text-center">Toma principal</th>
               <th class="px-3 py-2 text-center">Collage 1</th>
               <th class="px-3 py-2 text-center">Collage 2</th>
+              <th class="px-3 py-2 text-center">Collage 3</th>
               <th class="px-3 py-2 text-left">Fecha toma</th>
               <th class="px-3 py-2 text-left">Teléfono</th>
+              <th class="px-3 py-2 text-right">Precio</th>
+              <th class="px-3 py-2 text-right">Abonado</th>
+              <th class="px-3 py-2 text-right">Saldo</th>
+              <th class="px-3 py-2 text-center">Pago</th>
               <th class="px-3 py-2 text-center">Entrega</th>
               <th class="px-3 py-2 text-center">Urgencia</th>
               <th class="px-3 py-2 text-center">Acciones</th>
@@ -174,21 +224,51 @@
           <tbody class="divide-y divide-slate-100">
             <% if (!ordenesInstituciones || ordenesInstituciones.length === 0) { %>
               <tr>
-                <td colspan="11" class="px-3 py-4 text-center text-slate-500">
+                <td colspan="15" class="px-3 py-4 text-center text-slate-500">
                   No hay órdenes de instituciones registradas para este filtro.
                 </td>
               </tr>
             <% } else { %>
-              <% ordenesInstituciones.forEach((o, idx) => { %>
+              <% ordenesInstituciones.forEach((o, idx) => { 
+                   const precio = Number(o.precio || 0);
+                   const abono = Number(o.abono || 0);
+                   const saldo = Math.max(precio - abono, 0);
+                   let pago = o.pago_estado || 'Pendiente';
+                   if (!o.pago_estado) {
+                     if (precio <= 0 && abono <= 0) pago = 'Pendiente';
+                     else if (abono >= precio && precio > 0) pago = 'Pagado';
+                     else if (abono > 0 && abono < precio) pago = 'Abono';
+                   }
+              %>
                 <tr class="hover:bg-slate-50">
                   <td class="px-3 py-2"><%= o.institucion %></td>
+                  <td class="px-3 py-2"><%= o.nombre || '' %></td>
                   <td class="px-3 py-2"><%= o.seccion %></td>
                   <td class="px-3 py-2"><%= o.paquete %></td>
                   <td class="px-3 py-2 text-center"><%= o.toma_principal %></td>
                   <td class="px-3 py-2 text-center"><%= o.collage1 %></td>
                   <td class="px-3 py-2 text-center"><%= o.collage2 %></td>
+                  <td class="px-3 py-2 text-center"><%= o.collage3 || 0 %></td>
                   <td class="px-3 py-2"><%= o.fecha_toma %></td>
                   <td class="px-3 py-2"><%= o.telefono %></td>
+                  <td class="px-3 py-2 text-right">$<%= precio.toFixed(2) %></td>
+                  <td class="px-3 py-2 text-right">$<%= abono.toFixed(2) %></td>
+                  <td class="px-3 py-2 text-right">$<%= saldo.toFixed(2) %></td>
+                  <td class="px-3 py-2 text-center">
+                    <% if (pago === 'Pagado') { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
+                        Pagado
+                      </span>
+                    <% } else if (pago === 'Abono') { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-sky-100 text-sky-700">
+                        Abono
+                      </span>
+                    <% } else { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">
+                        Pendiente
+                      </span>
+                    <% } %>
+                  </td>
                   <td class="px-3 py-2 text-center">
                     <% const estadoInst = o.entrega || o.estado_entrega || 'Pendiente'; %>
                     <% if (estadoInst === 'Entregado') { %>
@@ -214,25 +294,70 @@
                     <% } %>
                   </td>
                   <td class="px-3 py-2 text-center">
-                    <div class="inline-flex gap-2">
-                      <a href="/admin/ordenes/institucion/<%= idx %>"
-                         class="text-xs text-slate-600 hover:underline">
-                        Ver
-                      </a>
-                      <a href="/admin/ordenes/institucion/<%= idx %>/editar"
-                         class="text-xs text-emerald-700 hover:underline">
-                        Editar
-                      </a>
-                      <form
-                        action="/admin/ordenes/institucion/<%= idx %>/eliminar"
-                        method="POST"
-                        onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de institución?');"
-                        class="inline">
-                        <button type="submit"
-                                class="text-xs text-red-600 hover:underline">
-                          Eliminar
-                        </button>
-                      </form>
+                    <div class="flex flex-col gap-1 items-start text-xs">
+                      <div class="flex gap-2">
+                        <a href="/admin/ordenes/institucion/<%= idx %>"
+                           class="text-slate-600 hover:underline">
+                          Ver
+                        </a>
+                        <a href="/admin/ordenes/institucion/<%= idx %>/editar"
+                           class="text-emerald-700 hover:underline">
+                          Editar
+                        </a>
+
+                       
+                        <form
+                          action="/admin/ordenes/institucion/<%= idx %>/eliminar"
+                          method="POST"
+                          onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de institución?');"
+                          class="inline">
+                          <button type="submit"
+                                  class="text-red-600 hover:underline">
+                            Eliminar
+                          </button>
+                        </form>
+                        <a href="/admin/ordenes/institucion/<%= idx %>/ticket" target="_blank">Ticket 80mm</a>
+
+                          <a href="/admin/ordenes/institucion/<%= idx %>/recibo"
+       target="_blank"
+       class="text-xs text-blue-600 hover:underline">
+      Recibo
+    </a>
+                      </div>
+                      <div class="flex gap-2">
+                        <!-- Abonar -->
+                        <a href="#"
+                           class="text-sky-700 hover:underline"
+                           onclick="
+                             event.preventDefault();
+                             var monto = prompt('Monto a abonar para esta institución (US$):');
+                             if(!monto) return;
+                             var f = document.createElement('form');
+                             f.method = 'POST';
+                             f.action = '/admin/ordenes/institucion/<%= idx %>/abonar';
+                             var input = document.createElement('input');
+                             input.type = 'hidden';
+                             input.name = 'monto';
+                             input.value = monto;
+                             f.appendChild(input);
+                             document.body.appendChild(f);
+                             f.submit();
+                           ">
+                          Abonar
+                        </a>
+
+                        <!-- Marcar pagado -->
+                        <form
+                          action="/admin/ordenes/institucion/<%= idx %>/marcar-pagado"
+                          method="POST"
+                          class="inline"
+                          onsubmit="return confirm('¿Marcar como pagado el total de esta orden?');">
+                          <button type="submit"
+                                  class="text-emerald-700 hover:underline">
+                            Marcar pagado
+                          </button>
+                        </form>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -241,14 +366,59 @@
           </tbody>
         </table>
       </div>
+
+       <div class="mt-4 grid gap-3 sm:grid-cols-4 text-xs">
+        <div class="rounded-xl border border-slate-200 px-3 py-2">
+          <p class="text-slate-500">Órdenes (filtradas)</p>
+          <p class="text-lg font-semibold"><%= resumenInstituciones.cantidad %></p>
+        </div>
+        <div class="rounded-xl border border-slate-200 px-3 py-2">
+          <p class="text-slate-500">Total precio</p>
+          <p class="text-lg font-semibold">
+            $<%= resumenInstituciones.totalPrecio.toFixed(2) %>
+          </p>
+        </div>
+        <div class="rounded-xl border border-slate-200 px-3 py-2">
+          <p class="text-slate-500">Total abonado</p>
+          <p class="text-lg font-semibold">
+            $<%= resumenInstituciones.totalAbono.toFixed(2) %>
+          </p>
+        </div>
+        <div class="rounded-xl border border-slate-200 px-3 py-2">
+          <p class="text-slate-500">Saldo pendiente</p>
+          <p class="text-lg font-semibold text-amber-700">
+            $<%= resumenInstituciones.totalSaldo.toFixed(2) %>
+          </p>
+        </div>
     </section>
   <% } %>
 
+  <!-- =============================================================== -->
   <!-- Tabla de PERSONAS -->
+  <!-- =============================================================== -->
   <% if (tab === 'personas') { %>
     <section class="bg-white rounded-2xl shadow p-4">
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-lg font-semibold">Libro de personas</h2>
+        <div class="mt-2 mb-4 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+  <div class="bg-slate-50 rounded-xl px-3 py-2">
+    <p class="text-slate-500">Total facturado</p>
+    <p class="text-sm font-semibold">$<%= (resumenPersonas.totalPrecio || 0).toFixed(2) %></p>
+  </div>
+  <div class="bg-slate-50 rounded-xl px-3 py-2">
+    <p class="text-slate-500">Total abonado</p>
+    <p class="text-sm font-semibold">$<%= (resumenPersonas.totalAbono || 0).toFixed(2) %></p>
+  </div>
+  <div class="bg-slate-50 rounded-xl px-3 py-2">
+    <p class="text-slate-500">Saldo pendiente</p>
+    <p class="text-sm font-semibold">$<%= (resumenPersonas.totalSaldo || 0).toFixed(2) %></p>
+  </div>
+  <div class="bg-slate-50 rounded-xl px-3 py-2">
+    <p class="text-slate-500">Órdenes (filtro actual)</p>
+    <p class="text-sm font-semibold"><%= resumenPersonas.cantidad || 0 %></p>
+  </div>
+</div>
+
         <a
           href="/admin/ordenes/nueva-persona"
           class="px-4 py-2 text-sm rounded-full bg-emerald-600 text-white hover:bg-emerald-700">
@@ -261,12 +431,15 @@
           <thead class="bg-slate-50 text-slate-600">
             <tr>
               <th class="px-3 py-2 text-left">Nombre</th>
-              <th class="px-3 py-2 text-left">N° orden</th>
+              <th class="px-3 py-2 text-left">Orden</th>
               <th class="px-3 py-2 text-center">N° toma</th>
               <th class="px-3 py-2 text-left">Fecha toma</th>
               <th class="px-3 py-2 text-left">Fecha entrega</th>
               <th class="px-3 py-2 text-center">Urgente</th>
               <th class="px-3 py-2 text-right">Precio</th>
+              <th class="px-3 py-2 text-right">Abonado</th>
+              <th class="px-3 py-2 text-right">Saldo</th>
+              <th class="px-3 py-2 text-center">Pago</th>
               <th class="px-3 py-2 text-left">Teléfono</th>
               <th class="px-3 py-2 text-center">Entrega</th>
               <th class="px-3 py-2 text-center">Acciones</th>
@@ -275,12 +448,22 @@
           <tbody class="divide-y divide-slate-100">
             <% if (!ordenesPersonas || ordenesPersonas.length === 0) { %>
               <tr>
-                <td colspan="10" class="px-3 py-4 text-center text-slate-500">
+                <td colspan="13" class="px-3 py-4 text-center text-slate-500">
                   No hay órdenes de personas registradas para este filtro.
                 </td>
               </tr>
             <% } else { %>
-              <% ordenesPersonas.forEach((o, idx) => { %>
+              <% ordenesPersonas.forEach((o, idx) => { 
+                   const precio = Number(o.precio || 0);
+                   const abono = Number(o.abono || 0);
+                   const saldo = Math.max(precio - abono, 0);
+                   let pago = o.pago_estado || 'Pendiente';
+                   if (!o.pago_estado) {
+                     if (precio <= 0 && abono <= 0) pago = 'Pendiente';
+                     else if (abono >= precio && precio > 0) pago = 'Pagado';
+                     else if (abono > 0 && abono < precio) pago = 'Abono';
+                   }
+              %>
                 <tr class="hover:bg-slate-50">
                   <td class="px-3 py-2"><%= o.nombre %></td>
                   <td class="px-3 py-2"><%= o.numero_orden || o.n_orden %></td>
@@ -300,7 +483,28 @@
                     <% } %>
                   </td>
                   <td class="px-3 py-2 text-right">
-                    $<%= Number(o.precio || 0).toFixed(2) %>
+                    $<%= precio.toFixed(2) %>
+                  </td>
+                  <td class="px-3 py-2 text-right">
+                    $<%= abono.toFixed(2) %>
+                  </td>
+                  <td class="px-3 py-2 text-right">
+                    $<%= saldo.toFixed(2) %>
+                  </td>
+                  <td class="px-3 py-2 text-center">
+                    <% if (pago === 'Pagado') { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
+                        Pagado
+                      </span>
+                    <% } else if (pago === 'Abono') { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-sky-100 text-sky-700">
+                        Abono
+                      </span>
+                    <% } else { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">
+                        Pendiente
+                      </span>
+                    <% } %>
                   </td>
                   <td class="px-3 py-2"><%= o.telefono %></td>
                   <td class="px-3 py-2 text-center">
@@ -316,25 +520,69 @@
                     <% } %>
                   </td>
                   <td class="px-3 py-2 text-center">
-                    <div class="inline-flex gap-2">
-                      <a href="/admin/ordenes/persona/<%= idx %>"
-                         class="text-xs text-slate-600 hover:underline">
-                        Ver
-                      </a>
-                      <a href="/admin/ordenes/persona/<%= idx %>/editar"
-                         class="text-xs text-emerald-700 hover:underline">
-                        Editar
-                      </a>
-                      <form
-                        action="/admin/ordenes/persona/<%= idx %>/eliminar"
-                        method="POST"
-                        onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de persona?');"
-                        class="inline">
-                        <button type="submit"
-                                class="text-xs text-red-600 hover:underline">
-                          Eliminar
-                        </button>
-                      </form>
+                    <div class="flex flex-col gap-1 items-start text-xs">
+                      <div class="flex gap-2">
+                        <a href="/admin/ordenes/persona/<%= idx %>"
+                           class="text-slate-600 hover:underline">
+                          Ver
+                        </a>
+                        <a href="/admin/ordenes/persona/<%= idx %>/editar"
+                           class="text-emerald-700 hover:underline">
+                          Editar
+                        </a>
+                   
+                        <form
+                          action="/admin/ordenes/persona/<%= idx %>/eliminar"
+                          method="POST"
+                          onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de persona?');"
+                          class="inline">
+                          <button type="submit"
+                                  class="text-red-600 hover:underline">
+                            Eliminar
+                          </button>
+                        </form>
+                        <a href="/admin/ordenes/persona/<%= idx %>/ticket" target="_blank">Ticket 80mm</a>
+
+                             <a href="/admin/ordenes/persona/<%= idx %>/recibo"
+       target="_blank"
+       class="text-xs text-blue-600 hover:underline">
+      Recibo
+    </a>
+                      </div>
+                      <div class="flex gap-2">
+                        <!-- Abonar -->
+                        <a href="#"
+                           class="text-sky-700 hover:underline"
+                           onclick="
+                             event.preventDefault();
+                             var monto = prompt('Monto a abonar para esta persona (US$):');
+                             if(!monto) return;
+                             var f = document.createElement('form');
+                             f.method = 'POST';
+                             f.action = '/admin/ordenes/persona/<%= idx %>/abonar';
+                             var input = document.createElement('input');
+                             input.type = 'hidden';
+                             input.name = 'monto';
+                             input.value = monto;
+                             f.appendChild(input);
+                             document.body.appendChild(f);
+                             f.submit();
+                           ">
+                          Abonar
+                        </a>
+
+                        <!-- Marcar pagado -->
+                        <form
+                          action="/admin/ordenes/persona/<%= idx %>/marcar-pagado"
+                          method="POST"
+                          class="inline"
+                          onsubmit="return confirm('¿Marcar como pagado el total de esta orden?');">
+                          <button type="submit"
+                                  class="text-emerald-700 hover:underline">
+                            Marcar pagado
+                          </button>
+                        </form>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -342,6 +590,30 @@
             <% } %>
           </tbody>
         </table>
+      </div>
+      <div class="mt-4 grid gap-3 sm:grid-cols-4 text-xs">
+        <div class="rounded-xl border border-slate-200 px-3 py-2">
+          <p class="text-slate-500">Órdenes (filtradas)</p>
+          <p class="text-lg font-semibold"><%= resumenPersonas.cantidad %></p>
+        </div>
+        <div class="rounded-xl border border-slate-200 px-3 py-2">
+          <p class="text-slate-500">Total precio</p>
+          <p class="text-lg font-semibold">
+            $<%= resumenPersonas.totalPrecio.toFixed(2) %>
+          </p>
+        </div>
+        <div class="rounded-xl border border-slate-200 px-3 py-2">
+          <p class="text-slate-500">Total abonado</p>
+          <p class="text-lg font-semibold">
+            $<%= resumenPersonas.totalAbono.toFixed(2) %>
+          </p>
+        </div>
+        <div class="rounded-xl border border-slate-200 px-3 py-2">
+          <p class="text-slate-500">Saldo pendiente</p>
+          <p class="text-lg font-semibold text-amber-700">
+            $<%= resumenPersonas.totalSaldo.toFixed(2) %>
+          </p>
+        </div>
       </div>
     </section>
   <% } %>

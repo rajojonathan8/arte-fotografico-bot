@@ -1,212 +1,99 @@
 <%- include('_head', { title }) %>
 
 <header class="p-4 bg-white shadow">
-  <div class="max-w-5xl mx-auto flex items-center justify-between">
-    <div>
-      <p class="text-xs uppercase tracking-wide text-slate-400">
-        <%= tipo === 'institucion' ? 'Orden de institución' : 'Orden de persona' %>
-      </p>
-      <h1 class="text-2xl font-semibold text-slate-900"><%= title %></h1>
-    </div>
-
-    <div class="flex gap-2">
-      <% if (tipo === 'institucion') { %>
-        <a
-          href="/admin/ordenes/institucion/<%= idx %>/editar"
-          class="px-3 py-1.5 text-sm rounded-full border border-emerald-600 text-emerald-700 hover:bg-emerald-50">
-          Editar
-        </a>
-        <form
-          action="/admin/ordenes/institucion/<%= idx %>/eliminar"
-          method="POST"
-          onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de institución?');">
-          <button
-            type="submit"
-            class="px-3 py-1.5 text-sm rounded-full border border-red-600 text-red-700 hover:bg-red-50">
-            Eliminar
-          </button>
-        </form>
-      <% } else { %>
-        <a
-          href="/admin/ordenes/persona/<%= idx %>/editar"
-          class="px-3 py-1.5 text-sm rounded-full border border-emerald-600 text-emerald-700 hover:bg-emerald-50">
-          Editar
-        </a>
-        <form
-          action="/admin/ordenes/persona/<%= idx %>/eliminar"
-          method="POST"
-          onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de persona?');">
-          <button
-            type="submit"
-            class="px-3 py-1.5 text-sm rounded-full border border-red-600 text-red-700 hover:bg-red-50">
-            Eliminar
-          </button>
-        </form>
-      <% } %>
-    </div>
+  <div class="max-w-4xl mx-auto flex items-center justify-between">
+    <h1 class="text-xl font-semibold">Detalle de orden — <%= tipo === 'persona' ? 'Persona' : 'Institución' %></h1>
+    <a href="/admin/ordenes?tab=<%= tipo === 'persona' ? 'personas' : 'instituciones' %>"
+       class="text-sm text-slate-600 hover:text-slate-900">← Volver</a>
   </div>
 </header>
 
-<main class="max-w-5xl mx-auto p-4 space-y-6">
-  <a
-    href="/admin/ordenes?<%= tipo === 'institucion' ? 'tab=instituciones' : 'tab=personas' %>"
-    class="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
-    ← Volver a órdenes
-  </a>
+<main class="max-w-4xl mx-auto p-4 space-y-4">
 
-  <!-- Tarjeta principal -->
-  <section class="bg-white rounded-2xl shadow p-6 space-y-4">
-    <% if (tipo === 'institucion') { %>
-      <div class="flex flex-wrap gap-6">
-        <div class="space-y-1">
-          <p class="text-xs uppercase text-slate-400">Institución</p>
-          <p class="text-lg font-semibold"><%= orden.institucion %></p>
-        </div>
-
-        <div class="space-y-1">
-          <p class="text-xs uppercase text-slate-400">Sección</p>
-          <p class="font-medium"><%= orden.seccion %></p>
-        </div>
-
-        <div class="space-y-1">
-          <p class="text-xs uppercase text-slate-400">Paquete</p>
-          <p class="font-medium"><%= orden.paquete %></p>
-        </div>
-      </div>
-
-      <hr class="border-slate-100">
-
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div>
-          <p class="text-xs uppercase text-slate-400">Toma principal</p>
-          <p class="font-semibold"><%= orden.toma_principal || 0 %></p>
-        </div>
-        <div>
-          <p class="text-xs uppercase text-slate-400">Collage 1</p>
-          <p class="font-semibold"><%= orden.collage1 || 0 %></p>
-        </div>
-        <div>
-          <p class="text-xs uppercase text-slate-400">Collage 2</p>
-          <p class="font-semibold"><%= orden.collage2 || 0 %></p>
-        </div>
-        <div>
-          <p class="text-xs uppercase text-slate-400">Fecha toma</p>
-          <p class="font-semibold"><%= orden.fecha_toma || '—' %></p>
-        </div>
-      </div>
-
-      <hr class="border-slate-100">
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-        <div>
-          <p class="text-xs uppercase text-slate-400">Teléfono</p>
-          <p class="font-semibold"><%= orden.telefono || '—' %></p>
-        </div>
-
-        <div>
-          <p class="text-xs uppercase text-slate-400">Entrega</p>
-          <% const estadoInst = orden.entrega || orden.estado_entrega || 'Pendiente'; %>
-          <% if (estadoInst === 'Entregado') { %>
-            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
-              Entregado
-            </span>
-          <% } else { %>
-            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">
-              Pendiente
-            </span>
-          <% } %>
-        </div>
-
-        <div>
-          <p class="text-xs uppercase text-slate-400">Urgencia</p>
-          <% const urgInst = orden.urgencia || 'Normal'; %>
-          <% if (urgInst === 'Urgente' || urgInst === 'Muy urgente') { %>
-            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
-              <%= urgInst %>
-            </span>
-          <% } else { %>
-            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700">
-              <%= urgInst %>
-            </span>
-          <% } %>
-        </div>
-      </div>
-
+  <section class="bg-white rounded-2xl shadow p-4 space-y-2">
+    <% if (tipo === 'persona') { %>
+      <p><strong>Nombre:</strong> <%= orden.nombre %></p>
+      <p><strong>N° orden:</strong> <%= orden.numero_orden %></p>
+      <p><strong>N° toma:</strong> <%= orden.numero_toma %></p>
+      <p><strong>Fecha toma:</strong> <%= orden.fecha_toma %></p>
+      <p><strong>Fecha entrega:</strong> <%= orden.fecha_entrega %></p>
+      <p><strong>Urgencia:</strong> <%= orden.urgencia %></p>
+      <p><strong>Teléfono:</strong> <%= orden.telefono %></p>
+      <p><strong>Entrega:</strong> <%= orden.entrega %></p>
     <% } else { %>
-      <!-- DETALLE PERSONA -->
-      <div class="flex flex-wrap gap-6">
-        <div class="space-y-1">
-          <p class="text-xs uppercase text-slate-400">Nombre</p>
-          <p class="text-lg font-semibold"><%= orden.nombre %></p>
-        </div>
-
-        <div class="space-y-1">
-          <p class="text-xs uppercase text-slate-400">N° orden</p>
-          <p class="font-medium"><%= orden.numero_orden || orden.n_orden || '—' %></p>
-        </div>
-
-        <div class="space-y-1">
-          <p class="text-xs uppercase text-slate-400">N° toma</p>
-          <p class="font-medium"><%= orden.numero_toma || orden.n_toma || '—' %></p>
-        </div>
-      </div>
-
-      <hr class="border-slate-100">
-
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div>
-          <p class="text-xs uppercase text-slate-400">Fecha toma</p>
-          <p class="font-semibold"><%= orden.fecha_toma || '—' %></p>
-        </div>
-        <div>
-          <p class="text-xs uppercase text-slate-400">Fecha entrega</p>
-          <p class="font-semibold"><%= orden.fecha_entrega || '—' %></p>
-        </div>
-        <div>
-          <p class="text-xs uppercase text-slate-400">Urgencia</p>
-          <% const urgPers = orden.urgencia || 'Normal'; %>
-          <% if (urgPers === 'Urgente' || urgPers === 'Muy urgente') { %>
-            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
-              <%= urgPers %>
-            </span>
-          <% } else { %>
-            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700">
-              <%= urgPers %>
-            </span>
-          <% } %>
-        </div>
-        <div>
-          <p class="text-xs uppercase text-slate-400">Precio</p>
-          <p class="font-semibold">
-            $<%= Number(orden.precio || 0).toFixed(2) %>
-          </p>
-        </div>
-      </div>
-
-      <hr class="border-slate-100">
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <p class="text-xs uppercase text-slate-400">Teléfono</p>
-          <p class="font-semibold"><%= orden.telefono || '—' %></p>
-        </div>
-
-        <div>
-          <p class="text-xs uppercase text-slate-400">Entrega</p>
-          <% const estadoPers = orden.entrega || orden.estado_entrega || 'Pendiente'; %>
-          <% if (estadoPers === 'Entregado') { %>
-            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
-              Entregado
-            </span>
-          <% } else { %>
-            <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">
-              Pendiente
-            </span>
-          <% } %>
-        </div>
-      </div>
+      <p><strong>Institución:</strong> <%= orden.institucion %></p>
+      <p><strong>Sección:</strong> <%= orden.seccion %></p>
+      <p><strong>Paquete:</strong> <%= orden.paquete %></p>
+      <p><strong>Toma principal:</strong> <%= orden.toma_principal %></p>
+      <p><strong>Collage 1:</strong> <%= orden.collage1 %></p>
+      <p><strong>Collage 2:</strong> <%= orden.collage2 %></p>
+      <p><strong>Fecha toma:</strong> <%= orden.fecha_toma %></p>
+      <p><strong>Teléfono:</strong> <%= orden.telefono %></p>
+      <p><strong>Entrega:</strong> <%= orden.entrega %></p>
+      <p><strong>Urgencia:</strong> <%= orden.urgencia %></p>
     <% } %>
   </section>
+
+  <% if (tipo === 'persona') { %>
+    <%
+      const precioNum = Number(orden.precio || 0);
+      const abonoNum  = Number(orden.pago_abono || 0);
+      const saldo     = Math.max(precioNum - abonoNum, 0);
+      const estadoPago = orden.pago_estado || 'Pendiente';
+    %>
+
+    <section class="bg-white rounded-2xl shadow p-4 space-y-2">
+      <h2 class="text-lg font-semibold mb-2">Información de pago</h2>
+      <p><strong>Precio:</strong> $<%= precioNum.toFixed(2) %></p>
+      <p><strong>Abonado:</strong> $<%= abonoNum.toFixed(2) %></p>
+      <p><strong>Saldo:</strong> $<%= saldo.toFixed(2) %></p>
+      <p><strong>Estado de pago:</strong> <%= estadoPago %></p>
+
+      <div class="mt-3 flex gap-2">
+        <a href="/admin/ordenes/persona/<%= idx %>/abono"
+           class="px-3 py-1.5 rounded-lg bg-sky-100 text-sky-800 text-xs">
+          Registrar abono
+        </a>
+        <form method="POST" action="/admin/ordenes/persona/<%= idx %>/marcar-pagado"
+              onsubmit="return confirm('¿Marcar esta orden como PAGADA?');">
+          <button type="submit"
+                  class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs">
+            Marcar como pagado
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-2xl shadow p-4 space-y-2">
+      <h2 class="text-lg font-semibold mb-2">Historial de abonos</h2>
+
+      <% if (!orden.pagos || orden.pagos.length === 0) { %>
+        <p class="text-sm text-slate-500">No hay pagos registrados.</p>
+      <% } else { %>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="bg-slate-50 text-slate-600">
+              <tr>
+                <th class="px-3 py-2 text-left">Fecha</th>
+                <th class="px-3 py-2 text-right">Monto</th>
+                <th class="px-3 py-2 text-left">Nota</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <% orden.pagos.forEach(p => { %>
+                <tr>
+                  <td class="px-3 py-2"><%= p.fecha %></td>
+                  <td class="px-3 py-2 text-right">$<%= Number(p.monto || 0).toFixed(2) %></td>
+                  <td class="px-3 py-2"><%= p.nota || '' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </section>
+  <% } %>
+
 </main>
 
 <%- include('_foot') %>

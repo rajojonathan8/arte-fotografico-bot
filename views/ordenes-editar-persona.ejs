@@ -9,7 +9,21 @@
 
 <main class="max-w-4xl mx-auto p-4">
   <form action="/admin/ordenes/persona/<%= idx %>/editar" method="POST"
-        class="bg-white rounded-2xl shadow p-4 space-y-4">
+        class="bg-white rounded-2xl shadow p-4 space-y-4" id="formEditarPersona">
+
+    <% 
+      const precioNum = Number(orden.precio || 0);
+      const abonoNum  = Number(orden.abono  || 0);
+      const saldoNum  = Math.max(precioNum - abonoNum, 0);
+
+      let pagoEstadoLocal = orden.pago_estado || '';
+      if (!pagoEstadoLocal) {
+        if (precioNum <= 0 && abonoNum <= 0)      pagoEstadoLocal = 'Pendiente';
+        else if (abonoNum >= precioNum && precioNum > 0) pagoEstadoLocal = 'Pagado';
+        else if (abonoNum > 0 && abonoNum < precioNum)   pagoEstadoLocal = 'Abono';
+        else pagoEstadoLocal = 'Pendiente';
+      }
+    %>
 
     <div class="grid md:grid-cols-2 gap-4">
       <div>
@@ -33,28 +47,43 @@
       <div>
         <label class="block text-sm mb-1">Fecha toma</label>
         <input type="date" name="fecha_toma" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.fecha_toma %>">
+               value="<%= (orden.fecha_toma || '').slice(0,10) %>">
       </div>
 
       <div>
         <label class="block text-sm mb-1">Fecha entrega</label>
         <input type="date" name="fecha_entrega" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.fecha_entrega %>">
+               value="<%= (orden.fecha_entrega || '').slice(0,10) %>">
       </div>
 
       <div>
         <label class="block text-sm mb-1">Urgencia</label>
         <select name="urgencia" class="w-full border rounded-lg px-3 py-2">
-          <option value="Normal" <%= orden.urgencia === 'Normal' ? 'selected' : '' %>>Normal</option>
+          <option value="Normal"  <%= orden.urgencia === 'Normal'  ? 'selected' : '' %>>Normal</option>
           <option value="Urgente" <%= orden.urgencia === 'Urgente' ? 'selected' : '' %>>Urgente</option>
           <option value="Muy urgente" <%= orden.urgencia === 'Muy urgente' ? 'selected' : '' %>>Muy urgente</option>
         </select>
       </div>
 
+      <!-- PRECIO -->
       <div>
         <label class="block text-sm mb-1">Precio</label>
-        <input type="number" step="0.01" min="0" name="precio" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.precio || 0 %>">
+        <input type="number" step="0.01" min="0" name="precio"
+               id="inputPrecio"
+               class="w-full border rounded-lg px-3 py-2"
+               value="<%= precioNum.toFixed(2) %>">
+      </div>
+
+      <!-- ABONO (TOTAL) -->
+      <div>
+        <label class="block text-sm mb-1">Abonado (total)</label>
+        <input type="number" step="0.01" min="0" name="abono"
+               id="inputAbono"
+               class="w-full border rounded-lg px-3 py-2"
+               value="<%= abonoNum.toFixed(2) %>">
+        <p class="text-xs text-slate-500 mt-1">
+          Este es el total abonado (suma de pagos). Puedes corregirlo manualmente si lo necesitas.
+        </p>
       </div>
 
       <div>
@@ -63,12 +92,34 @@
                value="<%= orden.telefono %>">
       </div>
 
+      <!-- ENTREGA -->
       <div>
         <label class="block text-sm mb-1">Entrega</label>
         <select name="estado_entrega" class="w-full border rounded-lg px-3 py-2">
           <option value="Pendiente" <%= orden.entrega !== 'Entregado' ? 'selected' : '' %>>Pendiente</option>
           <option value="Entregado" <%= orden.entrega === 'Entregado' ? 'selected' : '' %>>Entregado</option>
         </select>
+      </div>
+
+      <!-- ESTADO DE PAGO (solo visual: el back se recalcula por número) -->
+      <div>
+        <label class="block text-sm mb-1">Estado de pago</label>
+        <select name="pago_estado" class="w-full border rounded-lg px-3 py-2" disabled>
+          <option value="Pendiente" <%= pagoEstadoLocal === 'Pendiente' ? 'selected' : '' %>>Pendiente</option>
+          <option value="Abono"     <%= pagoEstadoLocal === 'Abono'     ? 'selected' : '' %>>Abono</option>
+          <option value="Pagado"    <%= pagoEstadoLocal === 'Pagado'    ? 'selected' : '' %>>Pagado</option>
+        </select>
+        <p class="text-xs text-slate-500 mt-1">
+          El estado se calcula automáticamente según Precio y Abonado.
+        </p>
+      </div>
+
+      <!-- SALDO SOLO LECTURA -->
+      <div>
+        <label class="block text-sm mb-1">Saldo (auto-calculado)</label>
+        <input type="text" id="inputSaldo" readonly
+               class="w-full border rounded-lg px-3 py-2 bg-slate-50"
+               value="$<%= saldoNum.toFixed(2) %>">
       </div>
     </div>
 
@@ -84,5 +135,27 @@
     </div>
   </form>
 </main>
+
+<script>
+  // Recalcular saldo en tiempo real
+  (function() {
+    const inputPrecio = document.getElementById('inputPrecio');
+    const inputAbono  = document.getElementById('inputAbono');
+    const inputSaldo  = document.getElementById('inputSaldo');
+
+    function recalcularSaldo() {
+      const p = parseFloat(inputPrecio.value) || 0;
+      const a = parseFloat(inputAbono.value)  || 0;
+      const s = Math.max(p - a, 0);
+      inputSaldo.value = '$' + s.toFixed(2);
+    }
+
+    if (inputPrecio && inputAbono && inputSaldo) {
+      inputPrecio.addEventListener('input', recalcularSaldo);
+      inputAbono.addEventListener('input', recalcularSaldo);
+      recalcularSaldo();
+    }
+  })();
+</script>
 
 <%- include('_foot') %>
