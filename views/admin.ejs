@@ -2,9 +2,14 @@
 <header class="p-4 bg-white shadow">
   <div class="max-w-6xl mx-auto flex items-center justify-between">
     <h1 class="text-xl font-semibold">Panel — Arte Fotográfico</h1>
-    <form method="POST" action="/admin/logout">
-      <button class="text-sm text-slate-600 hover:text-slate-900">Salir</button>
-    </form>
+
+    <!-- 🔹 Antes era un form POST; ahora usamos un link GET que coincide con router.get('/logout') -->
+    <a
+      href="/admin/logout"
+      class="text-sm text-slate-600 hover:text-slate-900"
+    >
+      Salir
+    </a>
   </div>
 </header>
 

@@ -14,13 +14,22 @@ const PORT = process.env.PORT || 3000;
 
 // ===== Entorno
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+
+
 const GOOGLE_SERVICE_ACCOUNT = process.env.GOOGLE_SERVICE_ACCOUNT;
 const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''; // opcional
 
 // ===== Config fijos
-const VERIFY_TOKEN = 'MI_TOKEN_SECRETO_ARTE_FOTOGRAFICO';
-const PHONE_NUMBER_ID = '805856909285040';
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+const ADMIN_PIN = process.env.ADMIN_PIN;
+const SESSION_SECRET = process.env.SESSION_SECRET;
+const BUSINESS_PHONE = process.env.BUSINESS_PHONE;
+
+
+
+
 
 // Dirección fija (usada por IA)
 const ADDRESS_TEXT =
@@ -573,6 +582,21 @@ app.get('/admin/api/chat', (req, res) => {
   }
 });
 
+// Enviar mensaje desde el panel al cliente (WhatsApp real)
+app.post('/admin/api/chat/send', async (req, res) => {
+  try {
+    const { to, text } = req.body || {};
+    if (!to || !text) {
+      return res.status(400).json({ ok: false, error: 'Faltan datos (to, text).' });
+    }
+
+    await sendWhatsAppMessage(to, text, { log: true, phone: to });
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('❌ Error en /admin/api/chat/send:', e.message);
+    return res.status(500).json({ ok: false, error: 'Error interno.' });
+  }
+});
 
 app.post('/webhook', async (req, res) => {
   try {

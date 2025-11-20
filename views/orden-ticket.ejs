@@ -41,7 +41,7 @@
       text-align: center;
     }
     .recibo-logo img {
-      max-width: 60px;
+      max-width: 170px;
       height: auto;
     }
     /* CONTENEDOR TICKET 80 mm */
@@ -54,7 +54,7 @@
     }
 
     .ticket {
-      font-size: 11px;
+      font-size: 25px;
       line-height: 1.25;
       color: #111827;
     }
@@ -63,17 +63,20 @@
     .right  { text-align: right; }
 
     .title {
-      font-weight: 700;
-      font-size: 13px;
+      font-weight: 900;
+      font-size: 30px;
       margin-bottom: 2px;
     }
 
     .subtitle {
-      font-size: 11px;
+      font-size: 25px;
       text-transform: uppercase;
     }
 
-    .small { font-size: 10px; }
+    .small { 
+      font-size: 16px; 
+      font-weight: 790;
+    }
 
     hr {
       border: 0;
@@ -88,8 +91,9 @@
     }
 
     .label {
-      font-weight: 600;
-      margin-right: 4px;
+      font-weight: 900;      /* un poco más grueso */
+  font-size: 24px;
+  margin-right: 4px;
     }
 .separator {
       border-top: 1px dashed #9ca3af;
@@ -103,10 +107,13 @@
       border: 1px solid #d1d5db;
       margin-top: 4px;
       padding: 2px;
-      font-size: 10px;
+      font-size: 23px;
       white-space: pre-line;
     }
-
+.vertical-note {
+  font-size: 22px;
+  margin-top: 4px;
+}
     @page {
       /* ANCHO 80 mm, alto automático (la impressora corta) */
       size: 80mm auto;
@@ -150,10 +157,9 @@
       <!-- CABECERA -->
       <div class="center">
         <div class="recibo-logo">
-            <img src="/admin-public/bg-arte.jpg" alt="Arte Fotográfico">
+            <img src="/admin-public/LOGO SIN FONDO (2).png" alt="Arte Fotográfico">
           </div>
-        <div class="title">Arte Fotográfico</div>
-        <div class="subtitle small">Captura · Edita · Imprime</div>
+        
         <div class="small">
           Calle Masferrer, Av. Morazán 2a Av. Norte #1-2<br />
           Sonsonate, El Salvador<br />
@@ -294,153 +300,7 @@
     </div>
 <div class="separator"></div>
 
-<div class="ticket">
 
-      <!-- CABECERA -->
-      <div class="center">
-        <div class="recibo-logo">
-            <img src="/admin-public/bg-arte.jpg" alt="Arte Fotográfico">
-          </div>
-        <div class="title">Arte Fotográfico</div>
-        <div class="subtitle small">Captura · Edita · Imprime</div>
-        <div class="small">
-          Calle Masferrer, Av. Morazán 2a Av. Norte #1-2<br />
-          Sonsonate, El Salvador<br />
-          Tel: 2429-3010 / 7875-6115
-        </div>
-      </div>
-
-      <hr />
-
-      <div class="row small">
-        <span class="label">Ticket:</span>
-        <span>
-          <% if (tipo === 'persona') { %>
-            <%= orden.numero_orden || (1000 + idx) %>
-          <% } else { %>
-            <%= orden.id || (2000 + idx) %>
-          <% } %>
-        </span>
-      </div>
-
-      <div class="row small">
-        <span class="label">Fecha toma:</span>
-        <span><%= fechaToma || '--' %></span>
-      </div>
-
-      <% if (fechaEnt) { %>
-      <div class="row small">
-        <span class="label">Entrega:</span>
-        <span><%= fechaEnt %></span>
-      </div>
-      <% } %>
-
-      <hr />
-
-      <!-- CLIENTE / INSTITUCIÓN -->
-      <div class="small">
-        <div class="label">Orden de:</div>
-        <div>
-          <% if (tipo === 'persona') { %>
-            <%= orden.nombre || '' %>
-          <% } else { %>
-            <%= orden.institucion || '' %>
-            <% if (orden.nombre) { %><br />Contacto: <%= orden.nombre %><% } %>
-          <% } %>
-        </div>
-
-        <% if (orden.telefono) { %>
-          <div class="mt-2">
-            <span class="label">Tel:</span> <%= orden.telefono %>
-          </div>
-        <% } %>
-      </div>
-
-      <hr />
-
-      <!-- DETALLE BÁSICO (puedes ajustar campos) -->
-      <div class="small">
-        <% if (tipo === 'institucion') { %>
-          <% if (orden.seccion) { %>
-            <div class="row">
-              <span class="label">Sección:</span>
-              <span><%= orden.seccion %></span>
-            </div>
-          <% } %>
-
-          <% if (orden.paquete) { %>
-            <div class="row">
-              <span class="label">Paquete:</span>
-              <span><%= orden.paquete %></span>
-            </div>
-          <% } %>
-
-          <div class="row">
-            <span class="label">Tomas:</span>
-            <span>
-              Princ: <%= orden.toma_principal || 0 %>,
-              C1: <%= orden.collage1 || 0 %>,
-              C2: <%= orden.collage2 || 0 %>,
-              C3: <%= orden.collage3 || 0 %>
-            </span>
-          </div>
-        <% } else { %>
-          <div class="row">
-            <span class="label">N° orden:</span>
-            <span><%= orden.numero_orden || '' %></span>
-          </div>
-          <div class="row">
-            <span class="label">N° toma:</span>
-            <span><%= orden.numero_toma || '' %></span>
-          </div>
-        <% } %>
-      </div>
-
-      <hr />
-
-      <!-- PAGO -->
-      <div class="small">
-        <div class="row">
-          <span class="label">Precio:</span>
-          <span>$ <%= precioLocal.toFixed(2) %></span>
-        </div>
-        <div class="row">
-          <span class="label">Abono:</span>
-          <span>$ <%= abonoLocal.toFixed(2) %></span>
-        </div>
-        <div class="row">
-          <span class="label">Saldo:</span>
-          <span>$ <%= saldoLocal.toFixed(2) %></span>
-        </div>
-        <div class="row">
-          <span class="label">Pago:</span>
-          <span><%= pagoEstado || '' %></span>
-        </div>
-      </div>
-
-      <div class="small mt-2">
-        * Todo abono o reservación de evento no es reembolsable.
-      </div>
-<div class="vertical-note">
-              NOTA: FOTOS DISPONIBLES POR UN PERIODO DE 30 días.
-            </div>
-      <hr />
-
-      <!-- OBSERVACIONES (escribes a mano o dejas en blanco) -->
-      <div class="small">
-        Observaciones:
-        <div class="observaciones">
-          <!-- Puedes agregar aquí un campo de observaciones si luego lo tienes en la BD -->
-        </div>
-      </div>
-
-      <hr />
-
-      <div class="center small mt-2">
-        ¡Gracias por su preferencia!
-      </div>
-
-    </div>
 
   </div>
 </body>

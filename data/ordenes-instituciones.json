@@ -12,7 +12,7 @@
     "entrega": "Pendiente",
     "urgencia": "Normal",
     "precio": 56,
-    "abono": 0,
-    "pago_estado": "Pendiente"
+    "abono": 52,
+    "pago_estado": "Abono"
   }
 ]
