@@ -462,7 +462,7 @@ async function listarCitasPorTelefono(telefono) {
 // =====================================================================================
 //                                      4) HORARIO
 // =====================================================================================
-function esHorarioLaboralActual() {
+/* function esHorarioLaboralActual() {
   const loc = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/El_Salvador' }));
   const d = loc.getDay(); // 0 dom, 6 sáb
   const h = loc.getHours();
@@ -493,7 +493,7 @@ function esHorarioLaboralEnFecha(fechaHoraTexto) {
 function normalizarHora(h) {
   const [H, M] = h.split(':').map(Number);
   return `${String(H).padStart(2, '0')}:${String(M).padStart(2, '0')}`;
-}
+} */
 
 // =====================================================================================
 //                                         5) IA (OpenAI)
@@ -616,7 +616,7 @@ app.post('/webhook', async (req, res) => {
     registrarMensaje(from, contactName, 'cliente', texto, Number(message.timestamp || Date.now()) * 1000);
 
     // Fuera de horario actual
-    if (!esHorarioLaboralActual()) {
+    /* if (!esHorarioLaboralActual()) {
       const out = esDomingo()
         ? '📸 *Gracias por contactarnos con Arte Fotográfico.*\n\n' +
           'Hoy es *domingo* y estamos *cerrados* por descanso del personal.\n\n' +
@@ -627,7 +627,7 @@ app.post('/webhook', async (req, res) => {
           '🕓 *Horario:*\nL-V: 8:00–12:30 y 14:00–18:00\nSáb: 8:00–12:30';
       await sendWhatsAppMessage(from, out, { log: true, phone: from });
       return res.sendStatus(200);
-    }
+    } */
 
     // ================== Cancelar flujo guiado
     const estado = estadosUsuarios[from];
