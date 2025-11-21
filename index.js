@@ -645,7 +645,7 @@ app.post('/webhook', async (req, res) => {
         estado.paso = 'esperandoFecha';
         const msg =
           `📅 Gracias, *${estado.datos.nombre}*.\n\n` +
-          'Ahora indícame la *fecha y hora * en formato:\n⭐año-mes-días \n⭐ 2025-11-15 15:00';
+          'Ahora indícame la *fecha y hora * en formato:\n⭐año-mes-días hora \n⭐ 2025-11-15 15:00';
         await sendWhatsAppMessage(from, msg, { log: true, phone: from });
         return res.sendStatus(200);
       }
