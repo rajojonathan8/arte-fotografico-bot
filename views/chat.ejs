@@ -246,10 +246,11 @@
     // enviamos al backend para que salga por WhatsApp y se guarde en JSON
     try {
       const resp = await fetch('/admin/api/chat/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, text }),
-      });
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ to: phone, text }),
+});
+
       if (!resp.ok) {
         console.error('Error al enviar mensaje desde el panel');
       }

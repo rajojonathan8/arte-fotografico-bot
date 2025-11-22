@@ -585,18 +585,21 @@ app.get('/admin/api/chat', (req, res) => {
 // Enviar mensaje desde el panel al cliente (WhatsApp real)
 app.post('/admin/api/chat/send', async (req, res) => {
   try {
-    const { to, text } = req.body || {};
-    if (!to || !text) {
-      return res.status(400).json({ ok: false, error: 'Faltan datos (to, text).' });
+    const { to, phone, text } = req.body || {};
+    const destino = to || phone; // acepta cualquiera
+
+    if (!destino || !text) {
+      return res.status(400).json({ ok: false, error: 'Faltan datos (to/phone, text).' });
     }
 
-    await sendWhatsAppMessage(to, text, { log: true, phone: to });
+    await sendWhatsAppMessage(destino, text, { log: true, phone: destino });
     return res.json({ ok: true });
   } catch (e) {
     console.error('❌ Error en /admin/api/chat/send:', e.message);
     return res.status(500).json({ ok: false, error: 'Error interno.' });
   }
 });
+
 
 app.post('/webhook', async (req, res) => {
   try {
