@@ -319,25 +319,16 @@ const displayName = hasRealName ? c.name : c.phone;
     return;
   }
 
-  const hasRealName =
-    c.name &&
-    c.name !== c.phone &&
-    !/^arte fotografico/i.test(c.name) &&
-    !/^arte fotográfico/i.test(c.name);
+  // 👀 Si ya tiene nombre guardado distinto del teléfono, lo mostramos.
+  // Si no, mostramos el número como título.
+  const tieneNombreReal = c.name && c.name !== c.phone;
 
-  if (hasRealName) {
-    // 🔹 Ya tiene nombre guardado
-    chatNameEl.textContent = c.name;
-    chatPhoneEl.textContent = c.phone;
-    if (editNameBtn) editNameBtn.classList.add("hidden");
-  } else {
-    // 🔹 Solo número (sin nombre guardado)
-    chatNameEl.textContent = c.phone;
-    chatPhoneEl.textContent = "Sin nombre guardado";
-    if (editNameBtn) editNameBtn.classList.remove("hidden");
-  }
-
+  chatNameEl.textContent = tieneNombreReal ? c.name : c.phone;
+  chatPhoneEl.textContent = c.phone;
   chatLastEl.textContent = c.lastMessageAt || "";
+
+  // 🔓 Siempre dejamos visible el botón "Guardar nombre" cuando hay cliente activo.
+  if (editNameBtn) editNameBtn.classList.remove("hidden");
 }
 
 
