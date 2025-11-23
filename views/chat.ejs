@@ -95,10 +95,21 @@
 </div>
 
           </div>
-          <span
-            id="chat-last"
-            class="text-[11px] md:text-xs text-slate-500"
-          ></span>
+         <div class="flex items-center gap-2">
+  <span
+    id="chat-last"
+    class="text-[11px] md:text-xs text-slate-500"
+  ></span>
+  <button
+    id="delete-chat-btn"
+    type="button"
+    class="hidden ml-2 inline-flex items-center justify-center rounded-full border border-red-500/40 bg-transparent px-2 py-1 text-[10px] md:text-xs text-red-400 hover:bg-red-500/10 hover:border-red-500/70 transition"
+    title="Eliminar historial de este chat"
+  >
+    🗑
+  </button>
+</div>
+
         </div>
 
         <!-- Mensajes -->
@@ -183,7 +194,7 @@
   const editNameBtn = document.getElementById("edit-name-btn");
   const asideEl = document.getElementById("chat-aside");
   const sectionEl = document.getElementById("chat-section");
-
+  const deleteChatBtn = document.getElementById("delete-chat-btn");
   let shouldAutoScroll = true;
 
   // ====================== MÓVIL: mostrar / ocultar panel derecho ======================
@@ -316,20 +327,40 @@ const displayName = hasRealName ? c.name : c.phone;
     chatPhoneEl.textContent = "";
     chatLastEl.textContent = "";
     if (editNameBtn) editNameBtn.classList.add("hidden");
+    if (deleteChatBtn) deleteChatBtn.classList.add("hidden");
     return;
   }
 
-  // 👀 Si ya tiene nombre guardado distinto del teléfono, lo mostramos.
-  // Si no, mostramos el número como título.
-  const tieneNombreReal = c.name && c.name !== c.phone;
+  const hasRealName =
+    c.name &&
+    c.name !== c.phone &&
+    !/^arte fotografico/i.test(c.name) &&
+    !/^arte fotográfico/i.test(c.name);
 
-  chatNameEl.textContent = tieneNombreReal ? c.name : c.phone;
-  chatPhoneEl.textContent = c.phone;
+  if (hasRealName) {
+    // Ya tiene nombre guardado
+    chatNameEl.textContent = c.name;
+    chatPhoneEl.textContent = c.phone;
+    if (editNameBtn) {
+      editNameBtn.textContent = "Editar nombre";
+      editNameBtn.classList.remove("hidden");
+    }
+  } else {
+    // Solo número (sin nombre guardado)
+    chatNameEl.textContent = c.phone;
+    chatPhoneEl.textContent = "Sin nombre guardado";
+    if (editNameBtn) {
+      editNameBtn.textContent = "Guardar nombre";
+      editNameBtn.classList.remove("hidden");
+    }
+  }
+
   chatLastEl.textContent = c.lastMessageAt || "";
 
-  // 🔓 Siempre dejamos visible el botón "Guardar nombre" cuando hay cliente activo.
-  if (editNameBtn) editNameBtn.classList.remove("hidden");
+  // Botón de eliminar siempre visible cuando hay chat activo
+  if (deleteChatBtn) deleteChatBtn.classList.remove("hidden");
 }
+
 
 
   // ====================== MENSAJES DERECHA ======================
@@ -436,6 +467,75 @@ if (editNameBtn) {
   });
 }
 
+// ====================== ELIMINAR CHAT DESDE EL PANEL ======================
+if (deleteChatBtn) {
+  deleteChatBtn.addEventListener("click", async () => {
+    const c = getActiveConversation();
+    if (!c) return;
+
+    const label = c.name && c.name !== c.phone ? `${c.name} (${c.phone})` : c.phone;
+
+    const confirmar = confirm(
+      `¿Seguro que deseas eliminar el historial de chat con:\n\n${label}?\n\n` +
+      'Esto NO borra los mensajes de WhatsApp, solo el historial del panel.'
+    );
+    if (!confirmar) return;
+
+    try {
+      const resp = await fetch("/admin/api/chat/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: c.phone }),
+      });
+
+      if (!resp.ok) {
+        console.error("Error al eliminar chat en el servidor");
+        alert("No se pudo eliminar el chat. Intenta de nuevo.");
+        return;
+      }
+
+      const data = await resp.json();
+      if (!data.ok) {
+        console.error("Respuesta de error al eliminar chat:", data);
+        alert("No se pudo eliminar el chat. Intenta de nuevo.");
+        return;
+      }
+
+      // 🧹 Actualizar lista en memoria
+      conversations = (conversations || []).filter((conv) => conv.phone !== c.phone);
+
+      // Ajustar el activo
+      if (conversations.length > 0) {
+        activeId = conversations[0].id;
+      } else {
+        activeId = null;
+      }
+
+      renderChatHeader();
+      renderChatList(searchEl.value || "");
+      renderMessages();
+
+      if (!activeId) {
+        // mostrar pantalla vacía si ya no hay chats
+        chatMessagesEl.innerHTML = `
+          <div class="h-full flex items-center justify-center">
+            <div class="text-center max-w-xs text-slate-400">
+              <div class="w-10 h-10 mx-auto mb-3 rounded-2xl bg-emerald-500/15 flex items-center justify-center">
+                💬
+              </div>
+              <p class="text-sm font-medium text-slate-200">No hay chats registrados</p>
+              <p class="text-xs mt-1 text-slate-400">
+                Cuando lleguen mensajes nuevos, aparecerán automáticamente aquí.
+              </p>
+            </div>
+          </div>`;
+      }
+    } catch (err) {
+      console.error("Error de red al eliminar chat:", err);
+      alert("Error de red al eliminar el chat. Revisa la consola.");
+    }
+  });
+}
 
   // ====================== CARGAR DESDE EL SERVIDOR ======================
   async function reloadFromServer() {

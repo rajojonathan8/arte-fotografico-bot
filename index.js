@@ -648,6 +648,33 @@ app.post('/admin/api/chat/name', (req, res) => {
   }
 });
 
+// Eliminar historial de un chat desde el panel
+app.post('/admin/api/chat/delete', (req, res) => {
+  try {
+    const { phone, to } = req.body || {};
+    const destino = (phone || to || '').toString().trim();
+
+    if (!destino) {
+      return res.status(400).json({ ok: false, error: 'Falta el número (phone/to).' });
+    }
+
+    const convs = loadConversaciones();
+    const originales = convs.length;
+
+    const nuevas = convs.filter((c) => c.phone !== destino);
+
+    if (nuevas.length === originales) {
+      // No se encontró nada, pero devolvemos ok para no romper UX
+      return res.json({ ok: true, removed: 0 });
+    }
+
+    saveConversaciones(nuevas);
+    return res.json({ ok: true, removed: originales - nuevas.length });
+  } catch (e) {
+    console.error('❌ Error en /admin/api/chat/delete:', e.message);
+    return res.status(500).json({ ok: false, error: 'Error interno.' });
+  }
+});
 
 app.post('/webhook', async (req, res) => {
   try {
