@@ -95,6 +95,10 @@
   font-size: 24px;
   margin-right: 4px;
     }
+    .urgencia1{
+       font-weight: 750;      /* un poco más grueso */
+        font-size: 18px;
+    }
 .separator {
       border-top: 1px dashed #9ca3af;
       margin: 4px 0;
@@ -163,7 +167,7 @@
         <div class="small">
           Calle Masferrer, Av. Morazán 2a Av. Norte #1-2<br />
           Sonsonate, El Salvador<br />
-          Tel: 2429-3010 / 7875-6115
+          Tel: 2429-3010 / 61782099 / 7875-6115 
         </div>
       </div>
 
@@ -187,11 +191,14 @@
 
       <% if (fechaEnt) { %>
       <div class="row small">
-        <span class="label">Entrega:</span>
+        <span class="label">Fecha Entrega:</span>
         <span><%= fechaEnt %></span>
       </div>
       <% } %>
-
+      <div class="row small">
+  <span class="label">Tipo de Entrega:</span>
+  <span class="urgencia1"><%= orden.urgencia || 'Normal' %></span>
+</div>
       <hr />
 
       <!-- CLIENTE / INSTITUCIÓN -->
