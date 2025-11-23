@@ -211,6 +211,7 @@
               <th class="px-3 py-2 text-center">Collage 2</th>
               <th class="px-3 py-2 text-center">Collage 3</th>
               <th class="px-3 py-2 text-left">Fecha toma</th>
+              <th class="px-3 py-2 text-left">Fecha entrega</th>  <!-- ⬅️ NUEVA -->
               <th class="px-3 py-2 text-left">Teléfono</th>
               <th class="px-3 py-2 text-right">Precio</th>
               <th class="px-3 py-2 text-right">Abonado</th>
@@ -250,15 +251,16 @@
                   <td class="px-3 py-2 text-center"><%= o.collage2 %></td>
                   <td class="px-3 py-2 text-center"><%= o.collage3 || 0 %></td>
                   <td class="px-3 py-2"><%= o.fecha_toma %></td>
+                  <td class="px-3 py-2"><%= o.fecha_entrega || '' %></td> <!-- ⬅️ NUEVA -->
                   <td class="px-3 py-2"><%= o.telefono %></td>
                   <td class="px-3 py-2 text-right">$<%= precio.toFixed(2) %></td>
                   <td class="px-3 py-2 text-right">$<%= abono.toFixed(2) %></td>
                   <td class="px-3 py-2 text-right">$<%= saldo.toFixed(2) %></td>
                   <td class="px-3 py-2 text-center">
                     <% if (pago === 'Pagado') { %>
-                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
-                        Pagado
-                      </span>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-500 text-white font-semibold">
+      Pagado
+    </span>
                     <% } else if (pago === 'Abono') { %>
                       <span class="inline-flex px-2 py-1 rounded-full text-xs bg-sky-100 text-sky-700">
                         Abono

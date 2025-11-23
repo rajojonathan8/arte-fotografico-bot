@@ -377,6 +377,7 @@ function mountAdmin(app) {
       collage3: Number(datos.collage3 || 0),
 
       fecha_toma: datos.fecha_toma || '',
+      fecha_entrega: datos.fecha_entrega || '', 
       telefono: datos.telefono || '',
       entrega: datos.entrega || 'Pendiente',
       urgencia: datos.urgencia || 'Normal',
@@ -516,6 +517,7 @@ router.post(
       collage2: Number(datos.collage2 || 0),
       collage3: Number(datos.collage3 || 0), // 🔹 nuevo
       fecha_toma: datos.fecha_toma || '',
+      fecha_entrega: datos.fecha_entrega || '',
       telefono: datos.telefono || '',
       entrega: datos.entrega || 'Pendiente',
       urgencia: datos.urgencia || 'Normal',
