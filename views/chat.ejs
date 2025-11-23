@@ -197,6 +197,9 @@
   const deleteChatBtn = document.getElementById("delete-chat-btn");
   let shouldAutoScroll = true;
 
+const notifySound = new Audio("/admin-public/notify.mp3");
+let lastUpdateMap = {};
+let hasInitializedChatPoll = false;
   // ====================== MÓVIL: mostrar / ocultar panel derecho ======================
   function isMobile() {
     return window.innerWidth < 768; // md breakpoint
@@ -538,32 +541,85 @@ if (deleteChatBtn) {
 }
 
   // ====================== CARGAR DESDE EL SERVIDOR ======================
-  async function reloadFromServer() {
-    try {
-      if (chatMessagesEl) {
-        const distance =
-          chatMessagesEl.scrollHeight -
-          (chatMessagesEl.scrollTop + chatMessagesEl.clientHeight);
-        shouldAutoScroll = distance < 120;
-      }
-
-      const res = await fetch("/admin/api/chat");
-      const data = await res.json();
-
-      conversations = Array.isArray(data) ? data : [];
-      enhanceConversations(conversations);
-
-      if (!activeId && conversations.length > 0) {
-        activeId = conversations[0].id;
-      }
-
-      renderChatHeader();
-      renderChatList(searchEl.value || "");
-      renderMessages();
-    } catch (err) {
-      console.error("Error recargando conversaciones:", err);
+// ====================== CARGAR DESDE EL SERVIDOR (con notificación) ======================
+async function reloadFromServer() {
+  try {
+    // Mantener auto-scroll si el usuario está casi abajo
+    if (chatMessagesEl) {
+      const distance =
+        chatMessagesEl.scrollHeight -
+        (chatMessagesEl.scrollTop + chatMessagesEl.clientHeight);
+      shouldAutoScroll = distance < 120;
     }
+
+    // 📝 Guardamos el estado anterior para comparar
+    const prevMap = { ...lastUpdateMap };
+
+    const res = await fetch("/admin/api/chat");
+    const data = await res.json();
+
+    conversations = Array.isArray(data) ? data : [];
+    enhanceConversations(conversations);
+
+    // 🔄 Reconstruimos el mapa con la info nueva
+    lastUpdateMap = {};
+    (conversations || []).forEach((c) => {
+      lastUpdateMap[c.phone] = c.lastUpdate || 0;
+    });
+
+    // 🔔 Detectar NUEVOS mensajes de CLIENTE (no en la primera carga)
+    if (hasInitializedChatPoll) {
+      let shouldNotify = false;
+
+      (conversations || []).forEach((c) => {
+        const prev = prevMap[c.phone] || 0;
+        const current = c.lastUpdate || 0;
+
+        if (current > prev) {
+          const msgs = c.messages || [];
+          if (msgs.length) {
+            const last = msgs[msgs.length - 1];
+            if (last.from === "cliente") {
+              shouldNotify = true;
+            }
+          }
+        }
+      });
+
+      if (shouldNotify) {
+        // Sonido
+        try {
+          notifySound.currentTime = 0;
+          notifySound.play().catch(() => {});
+        } catch (e) {
+          console.warn("No se pudo reproducir el sonido:", e);
+        }
+
+        // ✨ Animación suave en el header
+        const header = document.getElementById("chat-header");
+        if (header) {
+          header.classList.add("animate-pulse");
+          setTimeout(() => header.classList.remove("animate-pulse"), 600);
+        }
+      }
+    } else {
+      // La primera vez solo inicializamos, sin sonar
+      hasInitializedChatPoll = true;
+    }
+
+    // Mantener selección de chat
+    if (!activeId && conversations.length > 0) {
+      activeId = conversations[0].id;
+    }
+
+    renderChatHeader();
+    renderChatList(searchEl.value || "");
+    renderMessages();
+  } catch (err) {
+    console.error("Error recargando conversaciones:", err);
   }
+}
+
 
   // ====================== BÚSQUEDA ======================
   searchEl.addEventListener("input", (e) => {
