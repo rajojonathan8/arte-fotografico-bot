@@ -192,27 +192,30 @@ function registrarMensaje(phone, name, lado, text, ts) {
   const convs = loadConversaciones();
   let conv = convs.find((c) => c.phone === tel);
 
-  // nombre "real" solo si no es el nombre del negocio
-  const rawName = (name || '').trim();
+  // nombre del contacto que viene de WhatsApp
+  const rawName = (name || "").trim();
   const isBusinessName =
-    rawName.toLowerCase().startsWith('arte fotografico') ||
-    rawName.toLowerCase().startsWith('arte fotográfico');
+    rawName.toLowerCase().startsWith("arte fotografico") ||
+    rawName.toLowerCase().startsWith("arte fotográfico");
 
+  // displayName = lo que viene de WhatsApp (si no es el negocio)
   const displayName = !rawName || isBusinessName ? tel : rawName;
 
   if (!conv) {
     conv = {
       phone: tel,
-      // 🔹 por defecto mostramos el NÚMERO
-      name: displayName, // normalmente será el número
+      name: displayName, // al inicio sí usamos el nombre de WhatsApp
       messages: [],
       lastUpdate: timestamp,
     };
     convs.push(conv);
   } else {
-    // si aún tiene nombre vacío o "Cliente sin nombre", podemos actualizar,
-    // pero nunca sobreescribimos un nombre que tú ya guardaste
-    if (!conv.name || conv.name === conv.phone || conv.name === 'Cliente sin nombre') {
+    // solo cambiamos el nombre si aún NO tiene uno “bueno”
+    if (
+      !conv.name ||
+      conv.name === conv.phone ||
+      conv.name === "Cliente sin nombre"
+    ) {
       conv.name = displayName;
     }
     conv.lastUpdate = timestamp;
@@ -227,11 +230,27 @@ function registrarMensaje(phone, name, lado, text, ts) {
   saveConversaciones(convs);
 
   // ===================== PostgreSQL (principal) =====================
-  // la llamamos sin await (fire-and-forget)
-  registrarMensajeDb(phone, name, lado, text, timestamp).catch((err) => {
-    console.error('❌ Error al registrar mensaje en Postgres desde registrarMensaje:', err);
-  });
+  // Solo mandamos nombre a la DB si aún NO tiene uno “bueno”
+  let safeNameForDb = null;
+  if (
+    !conv.name ||
+    conv.name === conv.phone ||
+    conv.name === "Cliente sin nombre"
+  ) {
+    // aquí sí usamos el nombre que viene de WhatsApp
+    safeNameForDb = displayName;
+  }
+
+  registrarMensajeDb(phone, safeNameForDb, lado, text, timestamp).catch(
+    (err) => {
+      console.error(
+        "❌ Error al registrar mensaje en Postgres desde registrarMensaje:",
+        err
+      );
+    }
+  );
 }
+
 
 
 
