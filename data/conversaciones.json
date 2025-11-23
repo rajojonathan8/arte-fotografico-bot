@@ -1,8 +1,8 @@
 [
   {
     "phone": "50371234567",
-    "name": "Arte Fotográfico",
-    "lastUpdate": 1763868515703,
+    "name": "prueba",
+    "lastUpdate": 1763912996834,
     "messages": [
       {
         "from": "cliente",
@@ -118,12 +118,17 @@
         "from": "bot",
         "text": "ñññ",
         "timestamp": 1763868515703
+      },
+      {
+        "from": "bot",
+        "text": "hola",
+        "timestamp": 1763912996834
       }
     ]
   },
   {
     "phone": "50378901234",
-    "name": "Arte Fotográfico",
+    "name": "juan",
     "lastUpdate": 1763868806434,
     "messages": [
       {

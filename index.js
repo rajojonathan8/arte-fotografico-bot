@@ -87,20 +87,33 @@ function registrarMensaje(phone, name, lado, text, ts) {
   if (!phone || !text) return;
   const timestamp = ts || Date.now();
   const tel = phone.toString();
-  
+
   const convs = loadConversaciones();
   let conv = convs.find((c) => c.phone === tel);
+
+  // nombre "real" solo si no es el nombre del negocio
+  const rawName = (name || '').trim();
+  const isBusinessName =
+    rawName.toLowerCase().startsWith('arte fotografico') ||
+    rawName.toLowerCase().startsWith('arte fotográfico');
+
+  const displayName = !rawName || isBusinessName ? tel : rawName;
 
   if (!conv) {
     conv = {
       phone: tel,
-      name: name || 'Cliente sin nombre',
+      // 🔹 por defecto mostramos el NÚMERO
+      name: displayName, // normalmente será el número
       messages: [],
       lastUpdate: timestamp,
     };
     convs.push(conv);
   } else {
-    if (name && name.trim()) conv.name = name;
+    // si aún tiene nombre vacío o "Cliente sin nombre", podemos actualizar,
+    // pero nunca sobreescribimos un nombre que tú ya guardaste
+    if (!conv.name || conv.name === conv.phone || conv.name === 'Cliente sin nombre') {
+      conv.name = displayName;
+    }
     conv.lastUpdate = timestamp;
   }
 
@@ -112,6 +125,7 @@ function registrarMensaje(phone, name, lado, text, ts) {
 
   saveConversaciones(convs);
 }
+
 
 // =====================================================================================
 //                              2) CATÁLOGO LOCAL (servicios.json)
@@ -596,6 +610,40 @@ app.post('/admin/api/chat/send', async (req, res) => {
     return res.json({ ok: true });
   } catch (e) {
     console.error('❌ Error en /admin/api/chat/send:', e.message);
+    return res.status(500).json({ ok: false, error: 'Error interno.' });
+  }
+});
+
+// Guardar / actualizar nombre del cliente desde el panel
+app.post('/admin/api/chat/name', (req, res) => {
+  try {
+    const { phone, to, name } = req.body || {};
+    const destino = (phone || to || '').toString().trim();
+    const nuevoNombre = (name || '').trim();
+
+    if (!destino || !nuevoNombre) {
+      return res.status(400).json({ ok: false, error: 'Faltan datos (phone/to, name).' });
+    }
+
+    const convs = loadConversaciones();
+    const idx = convs.findIndex((c) => c.phone === destino);
+
+    if (idx === -1) {
+      // Si no existe la conversación, la creamos básica
+      convs.push({
+        phone: destino,
+        name: nuevoNombre,
+        messages: [],
+        lastUpdate: Date.now(),
+      });
+    } else {
+      convs[idx].name = nuevoNombre;
+    }
+
+    saveConversaciones(convs);
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('❌ Error en /admin/api/chat/name:', e.message);
     return res.status(500).json({ ok: false, error: 'Error interno.' });
   }
 });

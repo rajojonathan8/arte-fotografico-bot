@@ -76,14 +76,24 @@
             </button>
 
             <div class="flex flex-col">
-              <p id="chat-name" class="font-semibold text-sm md:text-base text-[#f9fafb]">
-                Selecciona un cliente
-              </p>
-              <p
-                id="chat-phone"
-                class="text-[11px] md:text-xs text-slate-400"
-              ></p>
-            </div>
+  <p id="chat-name" class="font-semibold text-sm md:text-base text-[#f9fafb]">
+    Selecciona un cliente
+  </p>
+  <div class="flex items-center gap-2">
+    <p
+      id="chat-phone"
+      class="text-[11px] md:text-xs text-slate-400"
+    ></p>
+    <button
+      id="edit-name-btn"
+      type="button"
+      class="hidden text-[10px] md:text-xs text-emerald-400 hover:text-emerald-300 hover:underline"
+    >
+      Guardar nombre
+    </button>
+  </div>
+</div>
+
           </div>
           <span
             id="chat-last"
@@ -170,7 +180,7 @@
   const searchEl = document.getElementById("search");
   const formEl = document.getElementById("chat-form");
   const inputEl = document.getElementById("message-input");
-
+  const editNameBtn = document.getElementById("edit-name-btn");
   const asideEl = document.getElementById("chat-aside");
   const sectionEl = document.getElementById("chat-section");
 
@@ -228,7 +238,8 @@
     const q = filter.toLowerCase().trim();
 
     (conversations || []).forEach((c) => {
-      if (q && !c.name.toLowerCase().includes(q) && !c.phone.includes(q)) return;
+      const nombre = (c.name || "").toLowerCase();
+if (q && !nombre.includes(q) && !(c.phone || "").includes(q)) return;
 
       const lastMsg =
         c.messages && c.messages.length
@@ -238,6 +249,14 @@
           : "";
 
       const li = document.createElement("li");
+      const hasRealName =
+  c.name &&
+  c.name !== c.phone &&
+  !/^arte fotografico/i.test(c.name) &&
+  !/^arte fotográfico/i.test(c.name);
+
+const displayName = hasRealName ? c.name : c.phone;
+
       li.className =
         "cursor-pointer transition-all hover:bg-[#1f242b] " +
         (c.id === activeId ? "bg-[#1f242b]" : "");
@@ -245,13 +264,13 @@
       li.innerHTML = `
         <button class="w-full text-left px-3 py-2.5 flex items-center gap-3">
           <div class="w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center text-emerald-400 font-semibold text-sm">
-            ${c.name.charAt(0).toUpperCase()}
+            ${displayName.charAt(0).toUpperCase()}
           </div>
 
           <div class="flex-1 min-w-0">
             <div class="flex justify-between items-center gap-2">
               <span class="text-[13px] font-semibold text-slate-100">
-                ${c.name}
+                ${displayName}
               </span>
               <span class="text-[10px] text-slate-500 whitespace-nowrap">
                 ${c.lastMessageAt || ""}
@@ -291,17 +310,36 @@
 
   // ====================== CABECERA DERECHA ======================
   function renderChatHeader() {
-    const c = getActiveConversation();
-    if (!c) {
-      chatNameEl.textContent = "Selecciona un cliente";
-      chatPhoneEl.textContent = "";
-      chatLastEl.textContent = "";
-      return;
-    }
+  const c = getActiveConversation();
+  if (!c) {
+    chatNameEl.textContent = "Selecciona un cliente";
+    chatPhoneEl.textContent = "";
+    chatLastEl.textContent = "";
+    if (editNameBtn) editNameBtn.classList.add("hidden");
+    return;
+  }
+
+  const hasRealName =
+    c.name &&
+    c.name !== c.phone &&
+    !/^arte fotografico/i.test(c.name) &&
+    !/^arte fotográfico/i.test(c.name);
+
+  if (hasRealName) {
+    // 🔹 Ya tiene nombre guardado
     chatNameEl.textContent = c.name;
     chatPhoneEl.textContent = c.phone;
-    chatLastEl.textContent = c.lastMessageAt || "";
+    if (editNameBtn) editNameBtn.classList.add("hidden");
+  } else {
+    // 🔹 Solo número (sin nombre guardado)
+    chatNameEl.textContent = c.phone;
+    chatPhoneEl.textContent = "Sin nombre guardado";
+    if (editNameBtn) editNameBtn.classList.remove("hidden");
   }
+
+  chatLastEl.textContent = c.lastMessageAt || "";
+}
+
 
   // ====================== MENSAJES DERECHA ======================
   function renderMessages() {
@@ -370,6 +408,43 @@
       chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
     }
   }
+
+// ====================== GUARDAR NOMBRE DEL CLIENTE ======================
+if (editNameBtn) {
+  editNameBtn.addEventListener("click", async () => {
+    const c = getActiveConversation();
+    if (!c) return;
+
+    const current =
+      c.name && c.name !== c.phone ? c.name : "";
+
+    const nuevo = prompt("Escribe el nombre del cliente:", current);
+    if (!nuevo) return;
+
+    const name = nuevo.trim();
+    if (!name) return;
+
+    // Actualizamos en memoria
+    c.name = name;
+    renderChatHeader();
+    renderChatList(searchEl.value || "");
+
+    // Guardamos en el backend
+    try {
+      const resp = await fetch("/admin/api/chat/name", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: c.phone, name }),
+      });
+      if (!resp.ok) {
+        console.error("Error al guardar nombre del cliente");
+      }
+    } catch (err) {
+      console.error("Error de red al guardar nombre del cliente:", err);
+    }
+  });
+}
+
 
   // ====================== CARGAR DESDE EL SERVIDOR ======================
   async function reloadFromServer() {
