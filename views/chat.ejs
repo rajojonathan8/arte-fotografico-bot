@@ -17,7 +17,7 @@
 
     <div class="flex flex-1 min-h-0">
       <!-- LISTA IZQUIERDA -->
-      <aside class="w-64 border-r border-slate-200 bg-slate-50 flex flex-col">
+      <aside id="chat-aside" class="w-64 border-r border-slate-200 bg-slate-50 flex flex-col">
         <div class="p-3 border-b border-slate-200">
           <input
             id="search"
@@ -31,12 +31,26 @@
       </aside>
 
       <!-- PANEL DERECHO -->
-      <section class="flex-1 flex flex-col bg-gradient-to-b from-slate-50 to-slate-100">
+      <section
+        id="chat-section"
+        class="flex-1 flex flex-col bg-gradient-to-b from-slate-50 to-slate-100"
+      >
 
         <div id="chat-header" class="px-4 py-3 border-b border-slate-200 bg-white flex items-center justify-between">
-          <div>
-            <p id="chat-name" class="font-semibold text-slate-900">Selecciona un cliente</p>
-            <p id="chat-phone" class="text-xs text-slate-500"></p>
+          <div class="flex items-center gap-2">
+            <!-- botón atrás solo en móvil -->
+            <button
+              type="button"
+              class="md:hidden mr-1 rounded-full w-8 h-8 flex items-center justify-center border border-slate-200 text-slate-600 hover:bg-slate-100"
+              onclick="showListMobile()"
+            >
+              ←
+            </button>
+
+            <div>
+              <p id="chat-name" class="font-semibold text-slate-900">Selecciona un cliente</p>
+              <p id="chat-phone" class="text-xs text-slate-500"></p>
+            </div>
           </div>
           <span id="chat-last" class="text-xs text-slate-400"></span>
         </div>
@@ -67,7 +81,7 @@
 </main>
 
 <script>
-  // 💾 Conversaciones que vienen del servidor al cargar
+  // 💾 Conversaciones que viene del servidor al cargar
   let conversations = <%- JSON.stringify(conversations || []) %>;
 
   // Añade campos útiles (id y texto de última actualización)
@@ -95,8 +109,48 @@
   const formEl         = document.getElementById('chat-form');
   const inputEl        = document.getElementById('message-input');
 
-  // Controla si debemos hacer auto-scroll al final
+  const asideEl        = document.getElementById('chat-aside');
+  const sectionEl      = document.getElementById('chat-section');
+
   let shouldAutoScroll = true;
+
+  // ====================== MÓVIL: mostrar / ocultar panel derecho ======================
+  function isMobile() {
+    return window.innerWidth < 768; // md breakpoint
+  }
+
+  function showChatMobile() {
+    if (!isMobile()) return;
+    if (asideEl)   asideEl.classList.add('hidden');
+    if (sectionEl) sectionEl.classList.remove('hidden');
+  }
+
+  function showListMobile() {
+    if (!isMobile()) return;
+    activeId = null;
+    if (sectionEl) sectionEl.classList.add('hidden');
+    if (asideEl)   asideEl.classList.remove('hidden');
+    chatMessagesEl.innerHTML =
+      `<p class="text-slate-400 text-center mt-10">Elige un chat en la izquierda.</p>`;
+    renderChatHeader();
+  }
+
+  window.addEventListener("resize", () => {
+    if (!isMobile()) {
+      // Escritorio: siempre mostrar ambos paneles
+      asideEl.classList.remove('hidden');
+      sectionEl.classList.remove('hidden');
+    } else {
+      // Móvil: si no hay chat activo, solo lista
+      if (activeId) {
+        asideEl.classList.add('hidden');
+        sectionEl.classList.remove('hidden');
+      } else {
+        sectionEl.classList.add('hidden');
+        asideEl.classList.remove('hidden');
+      }
+    }
+  });
 
   // ====================== LISTA IZQUIERDA ======================
   function renderChatList(filter = "") {
@@ -130,9 +184,7 @@
             <span class="text-xs text-slate-500 truncate block">
               ${
                 (c.messages && c.messages.length)
-                  ? (c.messages[c.messages.length - 1].text ||
-                     c.messages[c.messages.length - 1].body ||
-                     "")
+                  ? (c.messages[c.messages.length - 1].text || c.messages[c.messages.length - 1].body || "")
                   : ""
               }
             </span>
@@ -143,9 +195,10 @@
       li.addEventListener("click", () => {
         activeId = c.id;
         renderChatHeader();
-        shouldAutoScroll = true;       // al cambiar de chat, queremos ver el final
+        shouldAutoScroll = true;
         renderMessages();
         renderChatList(q);
+        showChatMobile(); // para móvil
       });
 
       chatListEl.appendChild(li);
@@ -190,10 +243,8 @@
     let lastFrom = null;
 
     (c.messages || []).forEach(m => {
-      // Cliente = burbuja izquierda, todo lo demás (bot/admin) derecha
       const isClient = m.from === "cliente";
 
-      // Soporta ambos formatos: { text } y { body }
       const contenido =
         (m.text !== undefined && m.text !== null && m.text !== "")
           ? m.text
@@ -233,7 +284,6 @@
       chatMessagesEl.appendChild(wrap);
     });
 
-    // Solo auto-scroll si el usuario está cerca del final
     if (shouldAutoScroll) {
       chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
     }
@@ -242,14 +292,11 @@
   // ====================== CARGAR DESDE EL SERVIDOR ======================
   async function reloadFromServer() {
     try {
-      // Antes de recargar, vemos si el usuario está cerca del final
       if (chatMessagesEl) {
-        const distanceFromBottom =
+        const distance =
           chatMessagesEl.scrollHeight -
           (chatMessagesEl.scrollTop + chatMessagesEl.clientHeight);
-
-        // Si está a menos de 120px del final, consideramos que quiere auto-scroll
-        shouldAutoScroll = distanceFromBottom < 120;
+        shouldAutoScroll = distance < 120;
       }
 
       const res = await fetch('/admin/api/chat');
@@ -258,7 +305,6 @@
       conversations = Array.isArray(data) ? data : [];
       enhanceConversations(conversations);
 
-      // si no hay chat activo, seleccionamos el primero
       if (!activeId && conversations.length > 0) {
         activeId = conversations[0].id;
       }
@@ -287,7 +333,6 @@
 
     const phone = c.phone;
 
-    // pintamos de inmediato en el panel
     const ts = Date.now();
     c.messages = c.messages || [];
     c.messages.push({
@@ -297,13 +342,11 @@
     });
     c.lastMessageAt = new Date(ts).toLocaleString("es-SV");
     inputEl.value = "";
-
-    // al enviar desde el panel, queremos ir al final
     shouldAutoScroll = true;
+
     renderMessages();
     renderChatList(searchEl.value || "");
 
-    // enviamos al backend para que salga por WhatsApp y se guarde en JSON
     try {
       const resp = await fetch('/admin/api/chat/send', {
         method: 'POST',
@@ -321,7 +364,17 @@
 
   // ====================== INICIO ======================
   window.addEventListener("DOMContentLoaded", () => {
-    reloadFromServer();                  // carga inicial
+    // estado inicial responsive
+    if (isMobile()) {
+      // en móvil arrancamos solo con la lista
+      sectionEl.classList.add('hidden');
+      asideEl.classList.remove('hidden');
+    } else {
+      asideEl.classList.remove('hidden');
+      sectionEl.classList.remove('hidden');
+    }
+
+    reloadFromServer();               // carga inicial
     setInterval(reloadFromServer, 5000); // refresca cada 5 segundos
   });
 </script>

@@ -2,7 +2,7 @@
   {
     "phone": "50371234567",
     "name": "Arte Fotográfico",
-    "lastUpdate": 1763861267422,
+    "lastUpdate": 1763868515703,
     "messages": [
       {
         "from": "cliente",
@@ -113,13 +113,18 @@
         "from": "bot",
         "text": "hola",
         "timestamp": 1763861267422
+      },
+      {
+        "from": "bot",
+        "text": "ñññ",
+        "timestamp": 1763868515703
       }
     ]
   },
   {
     "phone": "50378901234",
     "name": "Arte Fotográfico",
-    "lastUpdate": 1763653970354,
+    "lastUpdate": 1763868806434,
     "messages": [
       {
         "from": "cliente",
@@ -140,6 +145,31 @@
         "from": "admin",
         "body": "hola",
         "timestamp": 1763678946566
+      },
+      {
+        "from": "bot",
+        "text": "hola",
+        "timestamp": 1763867965912
+      },
+      {
+        "from": "bot",
+        "text": "jjj",
+        "timestamp": 1763868502866
+      },
+      {
+        "from": "bot",
+        "text": "ii",
+        "timestamp": 1763868511086
+      },
+      {
+        "from": "bot",
+        "text": "jjj",
+        "timestamp": 1763868804042
+      },
+      {
+        "from": "bot",
+        "text": "uuu",
+        "timestamp": 1763868806434
       }
     ]
   }
