@@ -10,9 +10,11 @@
     "fecha_toma": "2025-11-18",
     "telefono": "3434",
     "entrega": "Pendiente",
-    "urgencia": "Normal",
+    "urgencia": "Muy urgente",
     "precio": 56,
     "abono": 52,
-    "pago_estado": "Abono"
+    "pago_estado": "Abono",
+    "nombre": "",
+    "collage3": 0
   }
 ]
