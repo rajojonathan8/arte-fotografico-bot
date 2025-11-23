@@ -31,7 +31,7 @@
       </aside>
 
       <!-- PANEL DERECHO -->
-      <section class="flex-1 flex flex-col bg-slate-100">
+      <section class="flex-1 flex flex-col bg-gradient-to-b from-slate-50 to-slate-100">
 
         <div id="chat-header" class="px-4 py-3 border-b border-slate-200 bg-white flex items-center justify-between">
           <div>
@@ -67,7 +67,7 @@
 </main>
 
 <script>
-  // 💾 Conversaciones que viene del servidor al cargar
+  // 💾 Conversaciones que vienen del servidor al cargar
   let conversations = <%- JSON.stringify(conversations || []) %>;
 
   // Añade campos útiles (id y texto de última actualización)
@@ -95,6 +95,9 @@
   const formEl         = document.getElementById('chat-form');
   const inputEl        = document.getElementById('message-input');
 
+  // Controla si debemos hacer auto-scroll al final
+  let shouldAutoScroll = true;
+
   // ====================== LISTA IZQUIERDA ======================
   function renderChatList(filter = "") {
     chatListEl.innerHTML = "";
@@ -105,20 +108,42 @@
 
       const li = document.createElement("li");
       li.className =
-        "border-b border-slate-200 cursor-pointer hover:bg-emerald-50 " +
-        (c.id === activeId ? "bg-emerald-50" : "");
+        "border-b border-slate-200 cursor-pointer transition-all hover:bg-emerald-50 " +
+        (c.id === activeId ? "bg-emerald-100" : "bg-slate-50");
 
       li.innerHTML = `
-        <button class="w-full text-left px-3 py-2 flex flex-col">
-          <span class="text-sm font-semibold text-slate-900 truncate">${c.name}</span>
-          <span class="text-xs text-slate-500">${c.phone}</span>
-          <span class="text-[11px] text-slate-400">${c.lastMessageAt || ""}</span>
+        <button class="w-full text-left px-3 py-3 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold">
+            ${c.name.charAt(0).toUpperCase()}
+          </div>
+
+          <div class="flex-1">
+            <div class="flex justify-between items-center">
+              <span class="text-sm font-semibold text-slate-900">
+                ${c.name}
+              </span>
+              <span class="text-[11px] text-slate-400 ml-2 whitespace-nowrap">
+                ${c.lastMessageAt || ""}
+              </span>
+            </div>
+
+            <span class="text-xs text-slate-500 truncate block">
+              ${
+                (c.messages && c.messages.length)
+                  ? (c.messages[c.messages.length - 1].text ||
+                     c.messages[c.messages.length - 1].body ||
+                     "")
+                  : ""
+              }
+            </span>
+          </div>
         </button>
       `;
 
       li.addEventListener("click", () => {
         activeId = c.id;
         renderChatHeader();
+        shouldAutoScroll = true;       // al cambiar de chat, queremos ver el final
         renderMessages();
         renderChatList(q);
       });
@@ -152,7 +177,7 @@
     chatLastEl.textContent = c.lastMessageAt || "";
   }
 
-   // ====================== MENSAJES DERECHA ======================
+  // ====================== MENSAJES DERECHA ======================
   function renderMessages() {
     const c = getActiveConversation();
     chatMessagesEl.innerHTML = "";
@@ -162,9 +187,9 @@
       return;
     }
 
-    (c.messages || []).forEach(m => {
-      const wrap = document.createElement("div");
+    let lastFrom = null;
 
+    (c.messages || []).forEach(m => {
       // Cliente = burbuja izquierda, todo lo demás (bot/admin) derecha
       const isClient = m.from === "cliente";
 
@@ -176,13 +201,18 @@
               ? m.body
               : "");
 
+      const isFirstOfGroup = m.from !== lastFrom;
+      lastFrom = m.from;
+
+      const wrap = document.createElement("div");
       wrap.className =
-        "w-full flex mb-1 " +
-        (isClient ? "justify-start" : "justify-end");
+        "w-full flex" +
+        (isClient ? " justify-start" : " justify-end") +
+        (isFirstOfGroup ? " mt-3" : " mt-1");
 
       const bubble = document.createElement("div");
       bubble.className =
-        "max-w-[75%] rounded-2xl px-3 py-2 text-sm shadow " +
+        "relative max-w-[70%] rounded-3xl px-4 py-2 text-sm shadow-sm " +
         (isClient
           ? "bg-white text-slate-900 border border-slate-200"
           : "bg-emerald-500 text-white");
@@ -195,7 +225,7 @@
         : "";
 
       bubble.innerHTML = `
-        <div>${contenido}</div>
+        <div class="whitespace-pre-wrap break-words">${contenido}</div>
         <div class="text-[10px] mt-1 opacity-70 text-right">${hora}</div>
       `;
 
@@ -203,13 +233,25 @@
       chatMessagesEl.appendChild(wrap);
     });
 
-    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+    // Solo auto-scroll si el usuario está cerca del final
+    if (shouldAutoScroll) {
+      chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+    }
   }
-
 
   // ====================== CARGAR DESDE EL SERVIDOR ======================
   async function reloadFromServer() {
     try {
+      // Antes de recargar, vemos si el usuario está cerca del final
+      if (chatMessagesEl) {
+        const distanceFromBottom =
+          chatMessagesEl.scrollHeight -
+          (chatMessagesEl.scrollTop + chatMessagesEl.clientHeight);
+
+        // Si está a menos de 120px del final, consideramos que quiere auto-scroll
+        shouldAutoScroll = distanceFromBottom < 120;
+      }
+
       const res = await fetch('/admin/api/chat');
       const data = await res.json();
 
@@ -256,16 +298,18 @@
     c.lastMessageAt = new Date(ts).toLocaleString("es-SV");
     inputEl.value = "";
 
+    // al enviar desde el panel, queremos ir al final
+    shouldAutoScroll = true;
     renderMessages();
     renderChatList(searchEl.value || "");
 
     // enviamos al backend para que salga por WhatsApp y se guarde en JSON
     try {
       const resp = await fetch('/admin/api/chat/send', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ to: phone, text }),
-});
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: phone, text }),
+      });
 
       if (!resp.ok) {
         console.error('Error al enviar mensaje desde el panel');
@@ -277,7 +321,7 @@
 
   // ====================== INICIO ======================
   window.addEventListener("DOMContentLoaded", () => {
-    reloadFromServer();               // carga inicial
+    reloadFromServer();                  // carga inicial
     setInterval(reloadFromServer, 5000); // refresca cada 5 segundos
   });
 </script>
