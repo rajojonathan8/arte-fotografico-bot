@@ -5,11 +5,11 @@
     "numero_toma": "3434",
     "fecha_toma": "2025-11-18",
     "fecha_entrega": "2025-11-18",
-    "urgencia": "Normal",
-    "precio": 45,
+    "urgencia": "Muy urgente",
+    "precio": 60,
     "telefono": "43434",
     "entrega": "Entregado",
-    "abono": 45,
+    "abono": 60,
     "pago_estado": "Pagado"
   }
 ]

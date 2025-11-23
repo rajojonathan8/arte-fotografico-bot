@@ -495,30 +495,30 @@
                   </td>
                   <td class="px-3 py-2 text-center">
                     <% if (pago === 'Pagado') { %>
-                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
-                        Pagado
-                      </span>
+                       <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-500 text-white font-semibold">
+    Pagado
+  </span>
                     <% } else if (pago === 'Abono') { %>
-                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-sky-100 text-sky-700">
-                        Abono
-                      </span>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-sky-400 text-white font-semibold">
+    Abono
+  </span>
                     <% } else { %>
-                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">
-                        Pendiente
-                      </span>
+                     <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-400 text-slate-900 font-semibold">
+    Pendiente
+  </span>
                     <% } %>
                   </td>
                   <td class="px-3 py-2"><%= o.telefono %></td>
                   <td class="px-3 py-2 text-center">
                     <% const estadoPers = o.entrega || o.estado_entrega || 'Pendiente'; %>
                     <% if (estadoPers === 'Entregado') { %>
-                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
-                        Entregado
-                      </span>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-500 text-white font-semibold">
+    Entregado
+  </span>
                     <% } else { %>
-                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">
-                        Pendiente
-                      </span>
+                     <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-400 text-slate-900 font-semibold">
+    Pendiente
+  </span>
                     <% } %>
                   </td>
                   <td class="px-3 py-2 text-center">
