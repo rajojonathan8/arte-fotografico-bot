@@ -200,6 +200,32 @@
 const notifySound = new Audio("/admin-public/notify.mp3");
 let lastUpdateMap = {};
 let hasInitializedChatPoll = false;
+
+// Desbloquear audio después de la primera interacción del usuario
+let audioUnlocked = false;
+
+document.addEventListener(
+  "click",
+  () => {
+    if (audioUnlocked) return;
+
+    notifySound.volume = 0.7;
+    notifySound
+      .play()
+      .then(() => {
+        // Lo pausamos enseguida, solo era para desbloquear
+        notifySound.pause();
+        notifySound.currentTime = 0;
+        audioUnlocked = true;
+        console.log("🔊 Audio de notificación desbloqueado");
+      })
+      .catch((err) => {
+        console.warn("No se pudo desbloquear el audio en el primer click:", err);
+      });
+  },
+  { once: true }
+);
+
   // ====================== MÓVIL: mostrar / ocultar panel derecho ======================
   function isMobile() {
     return window.innerWidth < 768; // md breakpoint
