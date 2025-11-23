@@ -11,6 +11,7 @@ const mountAdmin = require('./admin-panel'); // panel de empleados
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const { Pool } = require('pg');
 
 // ===== Entorno
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
@@ -38,6 +39,104 @@ const MAPS_LINK = 'https://maps.app.goo.gl/7GWy4QG27d9Jdw9G9';
 
 // ===== Estado por usuario (flujo guiado de citas)
 const estadosUsuarios = {}; // { [tel]: { paso, datos: { nombre, fechaHora, tipoSesion, telefono } } }
+
+// ===== PostgreSQL (Render) =====
+const pgPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+
+// Lee todas las conversaciones desde PostgreSQL
+async function loadConversacionesFromDb() {
+  try {
+    const result = await pgPool.query(
+      `SELECT phone, name, messages, last_update
+       FROM conversaciones
+       ORDER BY last_update DESC`
+    );
+
+    // Adaptamos al formato que usa el panel actualmente
+    return result.rows.map((row) => ({
+      phone: row.phone,
+      name: row.name || '',
+      messages: row.messages || [],
+      lastUpdate: row.last_update
+        ? new Date(row.last_update).getTime()
+        : Date.now(),
+    }));
+  } catch (err) {
+    console.error('❌ Error leyendo conversaciones desde Postgres:', err);
+    return [];
+  }
+}
+
+// Guarda un mensaje en la tabla "conversaciones" de PostgreSQL
+async function registrarMensajeDb(phone, name, lado, text, ts) {
+  if (!phone || !text) return;
+
+  const timestamp = ts || Date.now();
+  const tel = phone.toString();
+
+  // Mismo criterio que usamos en JSON: evitar guardar "Arte Fotográfico" como nombre
+  const rawName = (name || '').trim();
+  const isBusinessName =
+    rawName.toLowerCase().startsWith('arte fotografico') ||
+    rawName.toLowerCase().startsWith('arte fotográfico');
+
+  // Si el nombre es el del negocio o está vacío, NO forzamos nombre en DB (dejamos que siga el que ya tuviera)
+  const displayName = !rawName || isBusinessName ? null : rawName;
+
+  // Mensaje como array de 1 elemento (lo concatenaremos con el operador || en Postgres)
+  const newMessages = [
+    {
+      from: lado,
+      text,
+      timestamp,
+    },
+  ];
+
+  const lastUpdate = new Date(timestamp);
+
+  const sql = `
+    INSERT INTO conversaciones (phone, name, messages, last_update)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (phone)
+    DO UPDATE SET
+      -- si mandamos null en $2, conserva el nombre que ya tenía
+      name = COALESCE($2, conversaciones.name),
+      messages = conversaciones.messages || $3,
+      last_update = $4
+  `;
+
+  try {
+    await pgPool.query(sql, [
+      tel,
+      displayName,
+      JSON.stringify(newMessages),
+      lastUpdate,
+    ]);
+  } catch (err) {
+    console.error('❌ Error guardando mensaje en Postgres:', err);
+  }
+}
+
+// Borra por completo una conversación en PostgreSQL
+async function deleteConversacionDb(phone) {
+  if (!phone) return;
+
+  const tel = phone.toString();
+  const sql = 'DELETE FROM conversaciones WHERE phone = $1';
+
+  try {
+    await pgPool.query(sql, [tel]);
+    console.log('🗑 Conversación eliminada en Postgres para:', tel);
+  } catch (err) {
+    console.error('❌ Error eliminando conversación en Postgres:', err);
+  }
+}
 
 // =====================================================================================
 //                         1) REGISTRO DE CONVERSACIONES (JSON)
@@ -85,9 +184,11 @@ function saveConversaciones(arr) {
  */
 function registrarMensaje(phone, name, lado, text, ts) {
   if (!phone || !text) return;
+
   const timestamp = ts || Date.now();
   const tel = phone.toString();
 
+  // ===================== JSON local (legacy) =====================
   const convs = loadConversaciones();
   let conv = convs.find((c) => c.phone === tel);
 
@@ -124,7 +225,14 @@ function registrarMensaje(phone, name, lado, text, ts) {
   });
 
   saveConversaciones(convs);
+
+  // ===================== PostgreSQL (principal) =====================
+  // la llamamos sin await (fire-and-forget)
+  registrarMensajeDb(phone, name, lado, text, timestamp).catch((err) => {
+    console.error('❌ Error al registrar mensaje en Postgres desde registrarMensaje:', err);
+  });
 }
+
 
 
 // =====================================================================================
@@ -582,19 +690,17 @@ async function sendWhatsAppMessage(to, text, opts = {}) {
 // ======================================================================
 //     API para el panel de chat (lo consume admin-public/admin-chat.js)
 // ======================================================================
-app.get('/admin/api/chat', (req, res) => {
+app.get('/admin/api/chat', async (req, res) => {
   try {
-    const convs = loadConversaciones();
-
-    // Ordenar por última actualización (más reciente primero)
+    const convs = await loadConversacionesFromDb();
     convs.sort((a, b) => (b.lastUpdate || 0) - (a.lastUpdate || 0));
-
     res.json(convs);
   } catch (e) {
     console.error('❌ Error en /admin/api/chat:', e.message);
-    res.json([]); // Para que el panel no truene
+    res.json([]);
   }
 });
+
 
 // Enviar mensaje desde el panel al cliente (WhatsApp real)
 app.post('/admin/api/chat/send', async (req, res) => {
@@ -614,8 +720,8 @@ app.post('/admin/api/chat/send', async (req, res) => {
   }
 });
 
-// Guardar / actualizar nombre del cliente desde el panel
-app.post('/admin/api/chat/name', (req, res) => {
+// Guardar / actualizar nombre del cliente desde el panel (Postgres + JSON)
+app.post('/admin/api/chat/name', async (req, res) => {
   try {
     const { phone, to, name } = req.body || {};
     const destino = (phone || to || '').toString().trim();
@@ -625,31 +731,48 @@ app.post('/admin/api/chat/name', (req, res) => {
       return res.status(400).json({ ok: false, error: 'Faltan datos (phone/to, name).' });
     }
 
-    const convs = loadConversaciones();
-    const idx = convs.findIndex((c) => c.phone === destino);
+    // 1) Actualizar en PostgreSQL (tabla conversaciones)
+    const sql = `
+      INSERT INTO conversaciones (phone, name, messages, last_update)
+      VALUES ($1, $2, '[]'::jsonb, NOW())
+      ON CONFLICT (phone)
+      DO UPDATE SET
+        name = EXCLUDED.name,
+        last_update = NOW()
+    `;
+    await pgPool.query(sql, [destino, nuevoNombre]);
 
-    if (idx === -1) {
-      // Si no existe la conversación, la creamos básica
-      convs.push({
-        phone: destino,
-        name: nuevoNombre,
-        messages: [],
-        lastUpdate: Date.now(),
-      });
-    } else {
-      convs[idx].name = nuevoNombre;
+    // 2) (Opcional) Mantener el JSON local más o menos sincronizado
+    try {
+      const convs = loadConversaciones();
+      const idx = convs.findIndex((c) => c.phone === destino);
+
+      if (idx === -1) {
+        convs.push({
+          phone: destino,
+          name: nuevoNombre,
+          messages: [],
+          lastUpdate: Date.now(),
+        });
+      } else {
+        convs[idx].name = nuevoNombre;
+      }
+
+      saveConversaciones(convs);
+    } catch (e2) {
+      console.error('⚠️ No se pudo actualizar el JSON local al cambiar nombre:', e2.message);
+      // no rompemos la respuesta por esto
     }
 
-    saveConversaciones(convs);
     return res.json({ ok: true });
   } catch (e) {
-    console.error('❌ Error en /admin/api/chat/name:', e.message);
+    console.error('❌ Error en /admin/api/chat/name (Postgres):', e.message);
     return res.status(500).json({ ok: false, error: 'Error interno.' });
   }
 });
 
-// Eliminar historial de un chat desde el panel
-app.post('/admin/api/chat/delete', (req, res) => {
+// Eliminar historial de un chat desde el panel (JSON + Postgres)
+app.post('/admin/api/chat/delete', async (req, res) => {
   try {
     const { phone, to } = req.body || {};
     const destino = (phone || to || '').toString().trim();
@@ -658,17 +781,22 @@ app.post('/admin/api/chat/delete', (req, res) => {
       return res.status(400).json({ ok: false, error: 'Falta el número (phone/to).' });
     }
 
+    // 1️⃣ Borrar del JSON local (para desarrollo)
     const convs = loadConversaciones();
     const originales = convs.length;
-
     const nuevas = convs.filter((c) => c.phone !== destino);
-
-    if (nuevas.length === originales) {
-      // No se encontró nada, pero devolvemos ok para no romper UX
-      return res.json({ ok: true, removed: 0 });
+    if (nuevas.length !== originales) {
+      saveConversaciones(nuevas);
     }
 
-    saveConversaciones(nuevas);
+    // 2️⃣ Borrar también en PostgreSQL (Render)
+    try {
+      await deleteConversacionDb(destino);
+    } catch (err) {
+      console.error('❌ Error extra al borrar en Postgres desde /admin/api/chat/delete:', err);
+      // No rompemos la respuesta al panel aunque falle el delete en DB
+    }
+
     return res.json({ ok: true, removed: originales - nuevas.length });
   } catch (e) {
     console.error('❌ Error en /admin/api/chat/delete:', e.message);
