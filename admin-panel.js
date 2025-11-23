@@ -1029,6 +1029,27 @@ router.post(
     }
   );
 
+    // Eliminar una cita
+  router.post(
+    '/citas/:idx/eliminar',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    (req, res) => {
+      const idx = parseInt(req.params.idx, 10);
+      let lista = readJson(CITAS_PATH, []);
+
+      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+        return res.redirect('/admin/citas');
+      }
+
+      // Quitamos la cita del arreglo
+      lista.splice(idx, 1);
+      writeJson(CITAS_PATH, lista);
+
+      res.redirect('/admin/citas');
+    }
+  );
+
 
 
   // ---------------------------------------------------------------------------
