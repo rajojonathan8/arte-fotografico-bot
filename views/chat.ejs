@@ -152,7 +152,7 @@
     chatLastEl.textContent = c.lastMessageAt || "";
   }
 
-  // ====================== MENSAJES DERECHA ======================
+   // ====================== MENSAJES DERECHA ======================
   function renderMessages() {
     const c = getActiveConversation();
     chatMessagesEl.innerHTML = "";
@@ -164,9 +164,21 @@
 
     (c.messages || []).forEach(m => {
       const wrap = document.createElement("div");
-      const isClient = m.from === "cliente";   // "cliente" o "bot" (según index.js)
 
-      wrap.className = "w-full flex mb-1 " + (isClient ? "justify-start" : "justify-end");
+      // Cliente = burbuja izquierda, todo lo demás (bot/admin) derecha
+      const isClient = m.from === "cliente";
+
+      // Soporta ambos formatos: { text } y { body }
+      const contenido =
+        (m.text !== undefined && m.text !== null && m.text !== "")
+          ? m.text
+          : (m.body !== undefined && m.body !== null
+              ? m.body
+              : "");
+
+      wrap.className =
+        "w-full flex mb-1 " +
+        (isClient ? "justify-start" : "justify-end");
 
       const bubble = document.createElement("div");
       bubble.className =
@@ -176,11 +188,14 @@
           : "bg-emerald-500 text-white");
 
       const hora = m.timestamp
-        ? new Date(m.timestamp).toLocaleTimeString("es-SV", { hour: "2-digit", minute: "2-digit" })
+        ? new Date(m.timestamp).toLocaleTimeString("es-SV", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
         : "";
 
       bubble.innerHTML = `
-        <div>${m.text}</div>
+        <div>${contenido}</div>
         <div class="text-[10px] mt-1 opacity-70 text-right">${hora}</div>
       `;
 
@@ -190,6 +205,7 @@
 
     chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
   }
+
 
   // ====================== CARGAR DESDE EL SERVIDOR ======================
   async function reloadFromServer() {

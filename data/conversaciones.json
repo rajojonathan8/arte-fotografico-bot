@@ -2,7 +2,7 @@
   {
     "phone": "50371234567",
     "name": "Arte Fotográfico",
-    "lastUpdate": 1763656479970,
+    "lastUpdate": 1763859487479,
     "messages": [
       {
         "from": "cliente",
@@ -98,6 +98,11 @@
         "from": "admin",
         "body": "queeee",
         "timestamp": 1763681821214
+      },
+      {
+        "from": "bot",
+        "text": "hola",
+        "timestamp": 1763859487479
       }
     ]
   },
