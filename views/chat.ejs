@@ -1,33 +1,58 @@
 <%- include('_head', { title }) %>
 
-<header class="p-4 bg-white shadow">
+<header class="p-4 bg-white shadow-sm border-b border-slate-200">
   <div class="max-w-6xl mx-auto flex items-center justify-between">
-    <div>
-      <h1 class="text-xl font-semibold">Chat con clientes</h1>
-      <p class="text-sm text-slate-500">
-        Vista de mensajes de WhatsApp en tiempo real.
-      </p>
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+        <span class="text-lg">💬</span>
+      </div>
+      <div>
+        <h1 class="text-lg md:text-xl font-semibold tracking-tight">
+          Chat con clientes
+        </h1>
+        <p class="text-xs md:text-sm text-slate-500">
+          Vista de mensajes de WhatsApp en tiempo real desde el panel.
+        </p>
+      </div>
     </div>
-    <a href="/admin" class="text-sm text-slate-600 hover:text-slate-900">← Volver al panel</a>
+    <a
+      href="/admin"
+      class="inline-flex items-center gap-1.5 text-xs md:text-sm text-slate-600 hover:text-slate-900"
+    >
+      <span class="text-base">←</span>
+      Volver al panel
+    </a>
   </div>
 </header>
 
-<main class="max-w-6xl mx-auto p-4">
-  <div class="bg-white rounded-2xl shadow border border-slate-200 flex flex-col h-[540px] md:h-[600px] overflow-hidden">
-
+<main class="max-w-6xl mx-auto p-4 md:p-6">
+  <div
+    class="bg-white/80 backdrop-blur-sm rounded-3xl shadow-sm border border-slate-200/80 flex flex-col h-[540px] md:h-[620px] overflow-hidden"
+  >
     <div class="flex flex-1 min-h-0">
       <!-- LISTA IZQUIERDA -->
-      <aside id="chat-aside" class="w-64 border-r border-slate-200 bg-slate-50 flex flex-col">
-        <div class="p-3 border-b border-slate-200">
-          <input
-            id="search"
-            type="text"
-            placeholder="Buscar cliente..."
-            class="w-full rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm"
-          />
+      <aside
+        id="chat-aside"
+        class="w-64 border-r border-slate-200 bg-slate-50/80 flex flex-col shrink-0"
+      >
+        <div class="p-3 border-b border-slate-200/80">
+          <div class="relative">
+            <span class="absolute inset-y-0 left-2 flex items-center text-slate-400 text-xs">
+              🔍
+            </span>
+            <input
+              id="search"
+              type="text"
+              placeholder="Buscar por nombre o número..."
+              class="w-full rounded-full border border-slate-300 bg-white pl-7 pr-3 py-1.5 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/70 focus:border-emerald-500"
+            />
+          </div>
         </div>
 
-        <ul id="chat-list" class="flex-1 overflow-y-auto text-sm"></ul>
+        <ul
+          id="chat-list"
+          class="flex-1 overflow-y-auto text-sm divide-y divide-slate-200/80"
+        ></ul>
       </aside>
 
       <!-- PANEL DERECHO -->
@@ -35,9 +60,12 @@
         id="chat-section"
         class="flex-1 flex flex-col bg-gradient-to-b from-slate-50 to-slate-100"
       >
-
-        <div id="chat-header" class="px-4 py-3 border-b border-slate-200 bg-white flex items-center justify-between">
-          <div class="flex items-center gap-2">
+        <!-- Header del chat -->
+        <div
+          id="chat-header"
+          class="px-4 py-3 border-b border-slate-200 bg-white/90 flex items-center justify-between"
+        >
+          <div class="flex items-center gap-3">
             <!-- botón atrás solo en móvil -->
             <button
               type="button"
@@ -47,34 +75,66 @@
               ←
             </button>
 
-            <div>
-              <p id="chat-name" class="font-semibold text-slate-900">Selecciona un cliente</p>
-              <p id="chat-phone" class="text-xs text-slate-500"></p>
+            <div class="flex flex-col">
+              <p id="chat-name" class="font-semibold text-slate-900 text-sm md:text-base">
+                Selecciona un cliente
+              </p>
+              <p
+                id="chat-phone"
+                class="text-[11px] md:text-xs text-slate-500"
+              ></p>
             </div>
           </div>
-          <span id="chat-last" class="text-xs text-slate-400"></span>
+          <span
+            id="chat-last"
+            class="text-[11px] md:text-xs text-slate-400"
+          ></span>
         </div>
 
-        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-2 text-sm">
-          <p class="text-slate-400 text-center mt-10">Elige un chat en la izquierda.</p>
+        <!-- Mensajes -->
+        <div
+          id="chat-messages"
+          class="flex-1 overflow-y-auto px-3 md:px-4 py-4 space-y-2 text-xs md:text-sm bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.04)_0,_transparent_55%)]"
+        >
+          <div class="h-full flex items-center justify-center">
+            <div class="text-center max-w-xs text-slate-400">
+              <div
+                class="w-10 h-10 mx-auto mb-3 rounded-2xl bg-emerald-500/10 flex items-center justify-center"
+              >
+                💬
+              </div>
+              <p class="text-sm font-medium">
+                Elige un chat en la izquierda
+              </p>
+              <p class="text-xs mt-1">
+                Aquí verás el historial del cliente y podrás responder desde el panel.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <form id="chat-form" class="border-t border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
-          <input
-            id="message-input"
-            type="text"
-            placeholder="Responder al cliente…"
-            class="flex-1 rounded-full border border-slate-300 px-3 py-2 text-sm"
-            autocomplete="off"
-          />
+        <!-- Input de respuesta -->
+        <form
+          id="chat-form"
+          class="border-t border-slate-200 bg-white/95 px-3 py-2 flex items-center gap-2"
+        >
+          <div class="flex-1 flex items-center gap-2 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 focus-within:ring-2 focus-within:ring-emerald-500/70 focus-within:border-emerald-500">
+            <input
+              id="message-input"
+              type="text"
+              placeholder="Escribe una respuesta para el cliente…"
+              class="flex-1 bg-transparent text-xs md:text-sm outline-none"
+              autocomplete="off"
+            />
+          </div>
           <button
             type="submit"
-            class="rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-white"
+            class="inline-flex items-center gap-1 rounded-full bg-emerald-500 hover:bg-emerald-600 px-3 md:px-4 py-2 text-[11px] md:text-xs font-semibold text-white shadow-sm active:scale-[0.98] transition"
           >
-            Enviar
+            <span>Enviar</span>
+            <span>📤</span>
           </button>
         </form>
-
       </section>
     </div>
   </div>
@@ -86,7 +146,7 @@
 
   // Añade campos útiles (id y texto de última actualización)
   function enhanceConversations(list) {
-    (list || []).forEach(c => {
+    (list || []).forEach((c) => {
       c.id = c.phone;
       if (c.lastUpdate) {
         c.lastMessageAt = new Date(c.lastUpdate).toLocaleString("es-SV");
@@ -100,17 +160,17 @@
 
   let activeId = null;
 
-  const chatListEl     = document.getElementById('chat-list');
-  const chatMessagesEl = document.getElementById('chat-messages');
-  const chatNameEl     = document.getElementById('chat-name');
-  const chatPhoneEl    = document.getElementById('chat-phone');
-  const chatLastEl     = document.getElementById('chat-last');
-  const searchEl       = document.getElementById('search');
-  const formEl         = document.getElementById('chat-form');
-  const inputEl        = document.getElementById('message-input');
+  const chatListEl = document.getElementById("chat-list");
+  const chatMessagesEl = document.getElementById("chat-messages");
+  const chatNameEl = document.getElementById("chat-name");
+  const chatPhoneEl = document.getElementById("chat-phone");
+  const chatLastEl = document.getElementById("chat-last");
+  const searchEl = document.getElementById("search");
+  const formEl = document.getElementById("chat-form");
+  const inputEl = document.getElementById("message-input");
 
-  const asideEl        = document.getElementById('chat-aside');
-  const sectionEl      = document.getElementById('chat-section');
+  const asideEl = document.getElementById("chat-aside");
+  const sectionEl = document.getElementById("chat-section");
 
   let shouldAutoScroll = true;
 
@@ -121,33 +181,41 @@
 
   function showChatMobile() {
     if (!isMobile()) return;
-    if (asideEl)   asideEl.classList.add('hidden');
-    if (sectionEl) sectionEl.classList.remove('hidden');
+    if (asideEl) asideEl.classList.add("hidden");
+    if (sectionEl) sectionEl.classList.remove("hidden");
   }
 
   function showListMobile() {
     if (!isMobile()) return;
     activeId = null;
-    if (sectionEl) sectionEl.classList.add('hidden');
-    if (asideEl)   asideEl.classList.remove('hidden');
-    chatMessagesEl.innerHTML =
-      `<p class="text-slate-400 text-center mt-10">Elige un chat en la izquierda.</p>`;
+    if (sectionEl) sectionEl.classList.add("hidden");
+    if (asideEl) asideEl.classList.remove("hidden");
+    chatMessagesEl.innerHTML = `
+      <div class="h-full flex items-center justify-center">
+        <div class="text-center max-w-xs text-slate-400">
+          <div class="w-10 h-10 mx-auto mb-3 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+            💬
+          </div>
+          <p class="text-sm font-medium">Elige un chat en la izquierda</p>
+          <p class="text-xs mt-1">Aquí verás el historial del cliente y podrás responder desde el panel.</p>
+        </div>
+      </div>`;
     renderChatHeader();
   }
 
   window.addEventListener("resize", () => {
     if (!isMobile()) {
       // Escritorio: siempre mostrar ambos paneles
-      asideEl.classList.remove('hidden');
-      sectionEl.classList.remove('hidden');
+      asideEl.classList.remove("hidden");
+      sectionEl.classList.remove("hidden");
     } else {
       // Móvil: si no hay chat activo, solo lista
       if (activeId) {
-        asideEl.classList.add('hidden');
-        sectionEl.classList.remove('hidden');
+        asideEl.classList.add("hidden");
+        sectionEl.classList.remove("hidden");
       } else {
-        sectionEl.classList.add('hidden');
-        asideEl.classList.remove('hidden');
+        sectionEl.classList.add("hidden");
+        asideEl.classList.remove("hidden");
       }
     }
   });
@@ -157,36 +225,39 @@
     chatListEl.innerHTML = "";
     const q = filter.toLowerCase().trim();
 
-    (conversations || []).forEach(c => {
+    (conversations || []).forEach((c) => {
       if (q && !c.name.toLowerCase().includes(q) && !c.phone.includes(q)) return;
+
+      const lastMsg =
+        c.messages && c.messages.length
+          ? c.messages[c.messages.length - 1].text ||
+            c.messages[c.messages.length - 1].body ||
+            ""
+          : "";
 
       const li = document.createElement("li");
       li.className =
-        "border-b border-slate-200 cursor-pointer transition-all hover:bg-emerald-50 " +
-        (c.id === activeId ? "bg-emerald-100" : "bg-slate-50");
+        "cursor-pointer transition-all bg-slate-50/0 hover:bg-emerald-50/60 " +
+        (c.id === activeId ? "bg-emerald-100/80" : "");
 
       li.innerHTML = `
-        <button class="w-full text-left px-3 py-3 flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold">
+        <button class="w-full text-left px-3 py-2.5 flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 font-semibold text-sm">
             ${c.name.charAt(0).toUpperCase()}
           </div>
 
-          <div class="flex-1">
-            <div class="flex justify-between items-center">
-              <span class="text-sm font-semibold text-slate-900">
+          <div class="flex-1 min-w-0">
+            <div class="flex justify-between items-center gap-2">
+              <span class="text-[13px] font-semibold text-slate-900">
                 ${c.name}
               </span>
-              <span class="text-[11px] text-slate-400 ml-2 whitespace-nowrap">
+              <span class="text-[10px] text-slate-400 whitespace-nowrap">
                 ${c.lastMessageAt || ""}
               </span>
             </div>
 
-            <span class="text-xs text-slate-500 truncate block">
-              ${
-                (c.messages && c.messages.length)
-                  ? (c.messages[c.messages.length - 1].text || c.messages[c.messages.length - 1].body || "")
-                  : ""
-              }
+            <span class="text-[11px] text-slate-500 truncate block mt-0.5">
+              ${lastMsg}
             </span>
           </div>
         </button>
@@ -206,14 +277,14 @@
 
     if (!chatListEl.children.length) {
       const li = document.createElement("li");
-      li.className = "p-3 text-xs text-slate-400";
+      li.className = "p-3 text-[11px] text-slate-400";
       li.textContent = "No se encontraron clientes.";
       chatListEl.appendChild(li);
     }
   }
 
   function getActiveConversation() {
-    return (conversations || []).find(c => c.id === activeId) || null;
+    return (conversations || []).find((c) => c.id === activeId) || null;
   }
 
   // ====================== CABECERA DERECHA ======================
@@ -236,21 +307,30 @@
     chatMessagesEl.innerHTML = "";
 
     if (!c) {
-      chatMessagesEl.innerHTML = `<p class="text-slate-400 text-center mt-10">Elige un chat en la izquierda.</p>`;
+      chatMessagesEl.innerHTML = `
+        <div class="h-full flex items-center justify-center">
+          <div class="text-center max-w-xs text-slate-400">
+            <div class="w-10 h-10 mx-auto mb-3 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+              💬
+            </div>
+            <p class="text-sm font-medium">Elige un chat en la izquierda</p>
+            <p class="text-xs mt-1">Aquí verás el historial del cliente y podrás responder desde el panel.</p>
+          </div>
+        </div>`;
       return;
     }
 
     let lastFrom = null;
 
-    (c.messages || []).forEach(m => {
+    (c.messages || []).forEach((m) => {
       const isClient = m.from === "cliente";
 
       const contenido =
-        (m.text !== undefined && m.text !== null && m.text !== "")
+        m.text !== undefined && m.text !== null && m.text !== ""
           ? m.text
-          : (m.body !== undefined && m.body !== null
-              ? m.body
-              : "");
+          : m.body !== undefined && m.body !== null
+          ? m.body
+          : "";
 
       const isFirstOfGroup = m.from !== lastFrom;
       lastFrom = m.from;
@@ -263,7 +343,7 @@
 
       const bubble = document.createElement("div");
       bubble.className =
-        "relative max-w-[70%] rounded-3xl px-4 py-2 text-sm shadow-sm " +
+        "relative max-w-[72%] rounded-3xl px-4 py-2 text-xs md:text-sm shadow-sm " +
         (isClient
           ? "bg-white text-slate-900 border border-slate-200"
           : "bg-emerald-500 text-white");
@@ -276,7 +356,7 @@
         : "";
 
       bubble.innerHTML = `
-        <div class="whitespace-pre-wrap break-words">${contenido}</div>
+        <div class="whitespace-pre-wrap break-words leading-relaxed">${contenido}</div>
         <div class="text-[10px] mt-1 opacity-70 text-right">${hora}</div>
       `;
 
@@ -299,7 +379,7 @@
         shouldAutoScroll = distance < 120;
       }
 
-      const res = await fetch('/admin/api/chat');
+      const res = await fetch("/admin/api/chat");
       const data = await res.json();
 
       conversations = Array.isArray(data) ? data : [];
@@ -313,17 +393,17 @@
       renderChatList(searchEl.value || "");
       renderMessages();
     } catch (err) {
-      console.error('Error recargando conversaciones:', err);
+      console.error("Error recargando conversaciones:", err);
     }
   }
 
   // ====================== BÚSQUEDA ======================
-  searchEl.addEventListener("input", e => {
+  searchEl.addEventListener("input", (e) => {
     renderChatList(e.target.value);
   });
 
   // ====================== ENVÍO DESDE EL PANEL ======================
-  formEl.addEventListener("submit", async e => {
+  formEl.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = inputEl.value.trim();
     if (!text || !activeId) return;
@@ -348,17 +428,17 @@
     renderChatList(searchEl.value || "");
 
     try {
-      const resp = await fetch('/admin/api/chat/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const resp = await fetch("/admin/api/chat/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ to: phone, text }),
       });
 
       if (!resp.ok) {
-        console.error('Error al enviar mensaje desde el panel');
+        console.error("Error al enviar mensaje desde el panel");
       }
     } catch (err) {
-      console.error('Error de red al enviar mensaje:', err);
+      console.error("Error de red al enviar mensaje:", err);
     }
   });
 
@@ -367,14 +447,14 @@
     // estado inicial responsive
     if (isMobile()) {
       // en móvil arrancamos solo con la lista
-      sectionEl.classList.add('hidden');
-      asideEl.classList.remove('hidden');
+      sectionEl.classList.add("hidden");
+      asideEl.classList.remove("hidden");
     } else {
-      asideEl.classList.remove('hidden');
-      sectionEl.classList.remove('hidden');
+      asideEl.classList.remove("hidden");
+      sectionEl.classList.remove("hidden");
     }
 
-    reloadFromServer();               // carga inicial
+    reloadFromServer(); // carga inicial
     setInterval(reloadFromServer, 5000); // refresca cada 5 segundos
   });
 </script>
