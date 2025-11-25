@@ -14,10 +14,29 @@ const sharp = require('sharp');
 // Usamos la misma carpeta data que index.js
 const DATA_DIR = path.join(process.cwd(), 'data');
 const CONV_PATH = path.join(DATA_DIR, 'conversaciones.json');
-const ORD_INST_PATH = path.join(DATA_DIR, 'ordenes-instituciones.json');
-const ORD_PER_PATH = path.join(DATA_DIR, 'ordenes-personas.json');
 const CITAS_PATH = path.join(DATA_DIR, 'citas.json');
 
+// ============================================================================
+// 🔌 Conexión PostgreSQL (igual que en index.js)
+// ============================================================================
+require('dotenv').config();
+const { Pool } = require('pg');
+
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+// Helper para SELECT
+async function dbSelect(query, params = []) {
+  const { rows } = await db.query(query, params);
+  return rows;
+}
+
+// Helper para ejecutar INSERT/UPDATE/DELETE
+async function dbExec(query, params = []) {
+  await db.query(query, params);
+}
 
 // Carpeta de uploads para OCR
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
@@ -34,6 +53,9 @@ const upload = multer({
   },
 });
 
+// ============================================================================
+// Helpers para archivos JSON (conversaciones, citas)
+// ============================================================================
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -90,10 +112,10 @@ function derivePagoEstado(record) {
   if (stored === 'pagado') return 'Pagado';
   if (stored === 'abono') return 'Abono';
   if (stored === 'pendiente') return 'Pendiente';
-
   // Si no hay texto guardado, calculamos por números como respaldo
   return computePagoEstado(record.precio, record.abono);
 }
+
 // Intenta obtener el abono desde cualquier campo que tenga la palabra "abono"
 function getAbonoFromBody(datos) {
   if (!datos) return 0;
@@ -213,7 +235,7 @@ function mountAdmin(app) {
       title: 'Herramientas IA',
       desc: 'Subir listas de estudiantes y convertirlas a texto limpio automáticamente.',
     },
-        {
+    {
       href: '/admin/citas',
       icon: '📅',
       title: 'Citas',
@@ -238,9 +260,9 @@ function mountAdmin(app) {
   });
 
   // ---------------------------------------------------------------------------
-  // ÓRDENES Y LIBROS (con filtros avanzados)
+  // ÓRDENES Y LIBROS (con filtros avanzados) — PostgreSQL
   // ---------------------------------------------------------------------------
-  router.get('/ordenes', requireAuth, (req, res) => {
+  router.get('/ordenes', requireAuth, async (req, res) => {
     const tab = req.query.tab === 'personas' ? 'personas' : 'instituciones';
 
     // Filtros recibidos del formulario
@@ -251,8 +273,19 @@ function mountAdmin(app) {
     const filtroEnt = (req.query.entrega || '').trim();
     const filtroPago = (req.query.pago || '').trim();
 
-    const ordenesInstitucionesAll = readJson(ORD_INST_PATH, []);
-    const ordenesPersonasAll = readJson(ORD_PER_PATH, []);
+    let ordenesInstitucionesAll = [];
+    let ordenesPersonasAll = [];
+
+    try {
+      ordenesInstitucionesAll = await dbSelect(
+        'SELECT * FROM ordenes_instituciones ORDER BY id DESC'
+      );
+      ordenesPersonasAll = await dbSelect(
+        'SELECT * FROM ordenes_personas ORDER BY id DESC'
+      );
+    } catch (e) {
+      console.error('❌ Error cargando órdenes desde PostgreSQL:', e);
+    }
 
     function pasaFiltrosGenerales(o) {
       // Fecha de toma
@@ -332,7 +365,7 @@ function mountAdmin(app) {
   });
 
   // ---------------------------------------------------------------------------
-  // NUEVA ORDEN — INSTITUCIÓN
+  // NUEVA ORDEN — INSTITUCIÓN (PostgreSQL)
   // ---------------------------------------------------------------------------
   router.get('/ordenes/nueva-institucion', requireAuth, (req, res) => {
     res.render('ordenes-nueva', {
@@ -340,64 +373,67 @@ function mountAdmin(app) {
     });
   });
 
- router.post(
-  '/ordenes/nueva-institucion',
-  requireAuth,
-  express.urlencoded({ extended: true }),
-  (req, res) => {
-    const datos = req.body || {};
-    const lista = readJson(ORD_INST_PATH, []);
+  router.post(
+    '/ordenes/nueva-institucion',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    async (req, res) => {
+      const datos = req.body || {};
 
-    const precioNum   = Number(datos.precio) || 0;
-    let   abonoNum    = Number(datos.abono_inicial || 0);
-    let   pagoEstado  = datos.pago_estado || 'Pendiente';
+      const precioNum = Number(datos.precio) || 0;
+      let abonoNum = Number(datos.abono_inicial || 0);
+      let pagoEstado = datos.pago_estado || 'Pendiente';
 
-    // Ajustamos coherencia entre precio / abono / estado
-    if (pagoEstado === 'Pagado' && precioNum > 0) {
-      abonoNum = precioNum;
-    } else {
-      // Si no está en Pagado, calculamos según números
-      pagoEstado = computePagoEstado(precioNum, abonoNum);
+      // Ajuste de coherencia
+      if (pagoEstado === 'Pagado' && precioNum > 0) {
+        abonoNum = precioNum;
+      } else {
+        pagoEstado = computePagoEstado(precioNum, abonoNum);
+      }
+
+      try {
+        await dbExec(
+          `
+          INSERT INTO ordenes_instituciones (
+            nombre, institucion, seccion, paquete,
+            toma_principal, collage1, collage2, collage3,
+            fecha_toma, fecha_entrega, telefono,
+            entrega, urgencia,
+            precio, abono, pago_estado
+          )
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        `,
+          [
+            datos.nombre || '',
+            datos.institucion || '',
+            datos.seccion || '',
+            datos.paquete || '',
+            Number(datos.toma_principal || 0),
+            Number(datos.collage1 || 0),
+            Number(datos.collage2 || 0),
+            Number(datos.collage3 || 0),
+            datos.fecha_toma || null,
+            datos.fecha_entrega || null,
+            datos.telefono || '',
+            datos.entrega || 'Pendiente',
+            datos.urgencia || 'Normal',
+            precioNum,
+            abonoNum,
+            pagoEstado,
+          ]
+        );
+
+        console.log('💾 Nueva orden de institución guardada en PostgreSQL');
+      } catch (err) {
+        console.error('❌ Error guardando orden institución en PostgreSQL:', err);
+      }
+
+      res.redirect('/admin/ordenes?tab=instituciones');
     }
-
-    const nuevaOrden = {
-      id: Date.now(),
-
-      // 🔹 NUEVO: nombre del alumno/contacto
-      nombre: datos.nombre || '',
-
-      institucion: datos.institucion || '',
-      seccion: datos.seccion || '',
-      paquete: datos.paquete || '',
-      toma_principal: Number(datos.toma_principal || 0),
-      collage1: Number(datos.collage1 || 0),
-      collage2: Number(datos.collage2 || 0),
-
-      // 🔹 NUEVO: Collage 3
-      collage3: Number(datos.collage3 || 0),
-
-      fecha_toma: datos.fecha_toma || '',
-      fecha_entrega: datos.fecha_entrega || '', 
-      telefono: datos.telefono || '',
-      entrega: datos.entrega || 'Pendiente',
-      urgencia: datos.urgencia || 'Normal',
-
-      // Pago
-      precio: precioNum,
-      abono: abonoNum,
-      pago_estado: pagoEstado,
-    };
-
-    lista.push(nuevaOrden);
-    writeJson(ORD_INST_PATH, lista);
-
-    res.redirect('/admin/ordenes?tab=instituciones');
-  }
-);
-
+  );
 
   // ---------------------------------------------------------------------------
-  // NUEVA ORDEN — PERSONA
+  // NUEVA ORDEN — PERSONA (PostgreSQL)
   // ---------------------------------------------------------------------------
   router.get('/ordenes/nueva-persona', requireAuth, (req, res) => {
     res.render('ordenes-nueva-persona.ejs', {
@@ -405,12 +441,13 @@ function mountAdmin(app) {
     });
   });
 
-    router.post(
+  router.post(
     '/ordenes/nueva-persona',
     requireAuth,
     express.urlencoded({ extended: true }),
-    (req, res) => {
+    async (req, res) => {
       const datos = req.body || {};
+
       const {
         nombre,
         numero_orden,
@@ -424,291 +461,412 @@ function mountAdmin(app) {
         pago_estado,
       } = datos;
 
-      const lista = readJson(ORD_PER_PATH, []);
-
       const precioNum = Number(precio) || 0;
-      let abonoNum = getAbonoFromBody(datos);   // 👈 AQUÍ usamos el helper
+      let abonoNum = getAbonoFromBody(datos);
       let pagoEstado = pago_estado || 'Pendiente';
 
-      // Si marca "Pagado", el abono pasa a ser igual al precio
       if (pagoEstado === 'Pagado' && precioNum > 0) {
         abonoNum = precioNum;
       }
 
-      // Si hay abono pero menor al precio → "Abono"
       if (abonoNum > 0 && abonoNum < precioNum && pagoEstado !== 'Pagado') {
         pagoEstado = 'Abono';
       }
 
-      // Si abono 0 y estado "Abono" → lo regresamos a "Pendiente"
       if (abonoNum === 0 && pagoEstado === 'Abono') {
         pagoEstado = 'Pendiente';
       }
 
-      lista.push({
-        nombre: nombre || '',
-        numero_orden: numero_orden || '',
-        numero_toma: numero_toma || '',
-        fecha_toma: fecha_toma || '',
-        fecha_entrega: fecha_entrega || '',
-        urgencia: urgencia || 'Normal',
-        precio: precioNum,
-        telefono: telefono || '',
-        entrega: estado_entrega || 'Pendiente',
+      try {
+        await dbExec(
+          `
+          INSERT INTO ordenes_personas (
+            nombre,
+            numero_orden,
+            numero_toma,
+            fecha_toma,
+            fecha_entrega,
+            urgencia,
+            precio,
+            telefono,
+            entrega,
+            abono,
+            pago_estado
+          )
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        `,
+          [
+            nombre || '',
+            numero_orden || '',
+            numero_toma || '',
+            fecha_toma || null,
+            fecha_entrega || null,
+            urgencia || 'Normal',
+            precioNum,
+            telefono || '',
+            estado_entrega || 'Pendiente',
+            abonoNum,
+            pagoEstado,
+          ]
+        );
 
-        abono: abonoNum,
-        pago_estado: pagoEstado,
-      });
-
-      writeJson(ORD_PER_PATH, lista);
-      res.redirect('/admin/ordenes?tab=personas');
-    }
-  );
-
-
-
-  // ---------------------------------------------------------------------------
-  // EDITAR ORDEN — INSTITUCIÓN
-  // ---------------------------------------------------------------------------
-  router.get('/ordenes/institucion/:idx/editar', requireAuth, (req, res) => {
-    const idx = parseInt(req.params.idx, 10);
-    const lista = readJson(ORD_INST_PATH, []);
-
-    if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
-      return res.redirect('/admin/ordenes?tab=instituciones');
-    }
-
-    const orden = lista[idx];
-
-    res.render('ordenes-editar-institucion.ejs', {
-      title: 'Editar orden — institución',
-      idx,
-      orden,
-    });
-  });
-
-router.post(
-  '/ordenes/institucion/:idx/editar',
-  requireAuth,
-  express.urlencoded({ extended: true }),
-  (req, res) => {
-    const idx = parseInt(req.params.idx, 10);
-    const lista = readJson(ORD_INST_PATH, []);
-
-    if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
-      return res.redirect('/admin/ordenes?tab=instituciones');
-    }
-
-    const datos = req.body || {};
-    const precioNum = Number(datos.precio) || 0;
-    const abonoNum  = Number(datos.abono) || 0;
-
-    const pagoEstado = computePagoEstado(precioNum, abonoNum);
-
-    lista[idx] = {
-      ...lista[idx],
-
-      nombre: datos.nombre || '',       // 🔹 nuevo
-      institucion: datos.institucion || '',
-      seccion: datos.seccion || '',
-      paquete: datos.paquete || '',
-      toma_principal: Number(datos.toma_principal || 0),
-      collage1: Number(datos.collage1 || 0),
-      collage2: Number(datos.collage2 || 0),
-      collage3: Number(datos.collage3 || 0), // 🔹 nuevo
-      fecha_toma: datos.fecha_toma || '',
-      fecha_entrega: datos.fecha_entrega || '',
-      telefono: datos.telefono || '',
-      entrega: datos.entrega || 'Pendiente',
-      urgencia: datos.urgencia || 'Normal',
-
-      precio: precioNum,
-      abono: abonoNum,
-      pago_estado: pagoEstado,
-    };
-
-    writeJson(ORD_INST_PATH, lista);
-    res.redirect('/admin/ordenes?tab=instituciones');
-  }
-);
-
-
-  // ---------------------------------------------------------------------------
-  // EDITAR ORDEN — PERSONA
-  // ---------------------------------------------------------------------------
-  router.get('/ordenes/persona/:idx/editar', requireAuth, (req, res) => {
-    const idx = parseInt(req.params.idx, 10);
-    const lista = readJson(ORD_PER_PATH, []);
-
-    if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
-      return res.redirect('/admin/ordenes?tab=personas');
-    }
-
-    const orden = lista[idx];
-
-    res.render('ordenes-editar-persona.ejs', {
-      title: 'Editar orden — persona',
-      idx,
-      orden,
-    });
-  });
-
-    router.post(
-    '/ordenes/persona/:idx/editar',
-    requireAuth,
-    express.urlencoded({ extended: true }),
-    (req, res) => {
-      const idx = parseInt(req.params.idx, 10);
-      const lista = readJson(ORD_PER_PATH, []);
-
-      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
-        return res.redirect('/admin/ordenes?tab=personas');
+        console.log('💾 Nueva orden persona guardada en PostgreSQL');
+      } catch (err) {
+        console.error('❌ Error guardando orden PERSONA en PostgreSQL:', err);
       }
 
-      const datos = req.body || {};
-      const {
-        nombre,
-        numero_orden,
-        numero_toma,
-        fecha_toma,
-        fecha_entrega,
-        urgencia,
-        precio,
-        telefono,
-        estado_entrega,
-      } = datos;
-
-      const precioNum = Number(precio) || 0;
-      const abonoNum  = getAbonoFromBody(datos);   // 👈 AQUÍ
-
-      // Estado de pago SOLO por números
-      const pagoEstado = computePagoEstado(precioNum, abonoNum);
-
-      lista[idx] = {
-        ...lista[idx],
-        nombre: nombre || '',
-        numero_orden: numero_orden || '',
-        numero_toma: numero_toma || '',
-        fecha_toma: fecha_toma || '',
-        fecha_entrega: fecha_entrega || '',
-        urgencia: urgencia || 'Normal',
-        precio: precioNum,
-        telefono: telefono || '',
-        entrega: estado_entrega || 'Pendiente',
-
-        abono: abonoNum,
-        pago_estado: pagoEstado,
-      };
-
-      writeJson(ORD_PER_PATH, lista);
       res.redirect('/admin/ordenes?tab=personas');
     }
   );
 
-
   // ---------------------------------------------------------------------------
-  // ELIMINAR ORDEN — INSTITUCIÓN
+  // EDITAR ORDEN — INSTITUCIÓN (PostgreSQL)
   // ---------------------------------------------------------------------------
-  router.post(
-    '/ordenes/institucion/:idx/eliminar',
+  router.get(
+    '/ordenes/institucion/:id/editar',
     requireAuth,
-    express.urlencoded({ extended: true }),
-    (req, res) => {
-      const idx = parseInt(req.params.idx, 10);
-      let lista = readJson(ORD_INST_PATH, []);
+    async (req, res) => {
+      const id = Number(req.params.id);
 
-      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+      if (!id || id <= 0) {
         return res.redirect('/admin/ordenes?tab=instituciones');
       }
 
-      lista.splice(idx, 1);
-      writeJson(ORD_INST_PATH, lista);
+      try {
+        const rows = await dbSelect(
+          'SELECT * FROM ordenes_instituciones WHERE id = $1',
+          [id]
+        );
+
+        if (!rows.length) {
+          return res.redirect('/admin/ordenes?tab=instituciones');
+        }
+
+        const orden = rows[0];
+
+        res.render('ordenes-editar-institucion.ejs', {
+          title: 'Editar orden — institución',
+          orden,
+          id,
+        });
+      } catch (err) {
+        console.error('❌ Error cargando orden institución:', err);
+        return res.redirect('/admin/ordenes?tab=instituciones');
+      }
+    }
+  );
+
+  router.post(
+    '/ordenes/institucion/:id/editar',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    async (req, res) => {
+      const id = Number(req.params.id);
+      const datos = req.body || {};
+
+      if (!id || id <= 0) {
+        return res.redirect('/admin/ordenes?tab=instituciones');
+      }
+
+      const precioNum = Number(datos.precio) || 0;
+      const abonoNum = Number(datos.abono) || 0;
+      const pagoEstado = computePagoEstado(precioNum, abonoNum);
+
+      try {
+        await dbExec(
+          `
+          UPDATE ordenes_instituciones
+          SET
+            nombre = $1,
+            institucion = $2,
+            seccion = $3,
+            paquete = $4,
+            toma_principal = $5,
+            collage1 = $6,
+            collage2 = $7,
+            collage3 = $8,
+            fecha_toma = $9,
+            fecha_entrega = $10,
+            telefono = $11,
+            entrega = $12,
+            urgencia = $13,
+            precio = $14,
+            abono = $15,
+            pago_estado = $16
+          WHERE id = $17
+        `,
+          [
+            datos.nombre || '',
+            datos.institucion || '',
+            datos.seccion || '',
+            datos.paquete || '',
+            Number(datos.toma_principal || 0),
+            Number(datos.collage1 || 0),
+            Number(datos.collage2 || 0),
+            Number(datos.collage3 || 0),
+            datos.fecha_toma || null,
+            datos.fecha_entrega || null,
+            datos.telefono || '',
+            datos.entrega || 'Pendiente',
+            datos.urgencia || 'Normal',
+            precioNum,
+            abonoNum,
+            pagoEstado,
+            id,
+          ]
+        );
+
+        console.log('💾 Orden institución actualizada en PostgreSQL');
+      } catch (err) {
+        console.error('❌ Error actualizando orden institución:', err);
+      }
 
       res.redirect('/admin/ordenes?tab=instituciones');
     }
   );
 
   // ---------------------------------------------------------------------------
-  // ELIMINAR ORDEN — PERSONA
+  // EDITAR ORDEN — PERSONA (PostgreSQL)
   // ---------------------------------------------------------------------------
+  router.get(
+    '/ordenes/persona/:id/editar',
+    requireAuth,
+    async (req, res) => {
+      try {
+        const id = Number(req.params.id);
+
+        if (!id || id <= 0) {
+          return res.redirect('/admin/ordenes?tab=personas');
+        }
+
+        const rows = await dbSelect(
+          'SELECT * FROM ordenes_personas WHERE id = $1',
+          [id]
+        );
+
+        if (!rows.length) {
+          return res.redirect('/admin/ordenes?tab=personas');
+        }
+
+        const orden = rows[0];
+
+        res.render('ordenes-editar-persona', {
+          title: 'Editar orden — persona',
+          idx: id,
+          orden,
+        });
+      } catch (err) {
+        console.error('❌ Error GET editar persona:', err);
+        res.redirect('/admin/ordenes?tab=personas');
+      }
+    }
+  );
+
   router.post(
-    '/ordenes/persona/:idx/eliminar',
+    '/ordenes/persona/:id/editar',
     requireAuth,
     express.urlencoded({ extended: true }),
-    (req, res) => {
-      const idx = parseInt(req.params.idx, 10);
-      let lista = readJson(ORD_PER_PATH, []);
+    async (req, res) => {
+      try {
+        const id = Number(req.params.id);
+        const datos = req.body || {};
 
-      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+        if (!id || id <= 0) {
+          return res.redirect('/admin/ordenes?tab=personas');
+        }
+
+        const precioNum = Number(datos.precio) || 0;
+        const abonoNum = Number(datos.abono) || 0;
+        const pagoEstado = computePagoEstado(precioNum, abonoNum);
+
+        await dbExec(
+          `
+          UPDATE ordenes_personas
+          SET
+            nombre = $1,
+            numero_orden = $2,
+            numero_toma = $3,
+            fecha_toma = $4,
+            fecha_entrega = $5,
+            urgencia = $6,
+            precio = $7,
+            abono = $8,
+            telefono = $9,
+            entrega = $10,
+            pago_estado = $11
+          WHERE id = $12
+        `,
+          [
+            datos.nombre || '',
+            datos.numero_orden || '',
+            datos.numero_toma || '',
+            datos.fecha_toma || null,
+            datos.fecha_entrega || null,
+            datos.urgencia || 'Normal',
+            precioNum,
+            abonoNum,
+            datos.telefono || '',
+            datos.estado_entrega || 'Pendiente',
+            pagoEstado,
+            id,
+          ]
+        );
+
+        res.redirect('/admin/ordenes?tab=personas');
+      } catch (err) {
+        console.error('❌ Error POST editar persona:', err);
+        res.redirect('/admin/ordenes?tab=personas');
+      }
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // ELIMINAR ORDEN — INSTITUCIÓN (PostgreSQL)
+  // ---------------------------------------------------------------------------
+  router.post(
+    '/ordenes/institucion/:id/eliminar',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    async (req, res) => {
+      const id = Number(req.params.id);
+
+      if (!id || id <= 0) {
+        return res.redirect('/admin/ordenes?tab=instituciones');
+      }
+
+      try {
+        await dbExec('DELETE FROM ordenes_instituciones WHERE id = $1', [id]);
+      } catch (err) {
+        console.error('❌ Error eliminando orden institución:', err);
+      }
+
+      res.redirect('/admin/ordenes?tab=instituciones');
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // ELIMINAR ORDEN — PERSONA (PostgreSQL)
+  // ---------------------------------------------------------------------------
+  router.post(
+    '/ordenes/persona/:id/eliminar',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    async (req, res) => {
+      const id = Number(req.params.id);
+
+      if (!id || id <= 0) {
         return res.redirect('/admin/ordenes?tab=personas');
       }
 
-      lista.splice(idx, 1);
-      writeJson(ORD_PER_PATH, lista);
+      try {
+        await dbExec('DELETE FROM ordenes_personas WHERE id = $1', [id]);
+      } catch (err) {
+        console.error('❌ Error eliminando orden persona:', err);
+      }
 
       res.redirect('/admin/ordenes?tab=personas');
     }
   );
 
   // ---------------------------------------------------------------------------
-  // DETALLE ORDEN — INSTITUCIÓN
+  // DETALLE ORDEN — INSTITUCIÓN (PostgreSQL)
   // ---------------------------------------------------------------------------
-  router.get('/ordenes/institucion/:idx', requireAuth, (req, res) => {
-    const idx = parseInt(req.params.idx, 10);
-    const lista = readJson(ORD_INST_PATH, []);
+  router.get(
+    '/ordenes/institucion/:id',
+    requireAuth,
+    async (req, res) => {
+      const id = Number(req.params.id);
 
-    if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
-      return res.redirect('/admin/ordenes?tab=instituciones');
+      if (!id || id <= 0) {
+        return res.redirect('/admin/ordenes?tab=instituciones');
+      }
+
+      try {
+        const rows = await dbSelect(
+          'SELECT * FROM ordenes_instituciones WHERE id = $1',
+          [id]
+        );
+
+        if (!rows.length) {
+          return res.redirect('/admin/ordenes?tab=instituciones');
+        }
+
+        const orden = rows[0];
+
+        res.render('orden-detalle', {
+          title: 'Detalle de orden — institución',
+          tipo: 'institucion',
+          idx: id,
+          orden,
+        });
+      } catch (err) {
+        console.error('❌ Error detalle institución:', err);
+        res.redirect('/admin/ordenes?tab=instituciones');
+      }
     }
-
-    const orden = lista[idx];
-
-    res.render('orden-detalle', {
-      title: 'Detalle de orden — institución',
-      tipo: 'institucion',
-      idx,
-      orden,
-    });
-  });
+  );
 
   // ---------------------------------------------------------------------------
-  // DETALLE ORDEN — PERSONA
+  // DETALLE ORDEN — PERSONA (PostgreSQL)
   // ---------------------------------------------------------------------------
-  router.get('/ordenes/persona/:idx', requireAuth, (req, res) => {
-    const idx = parseInt(req.params.idx, 10);
-    const lista = readJson(ORD_PER_PATH, []);
+  router.get(
+    '/ordenes/persona/:id',
+    requireAuth,
+    async (req, res) => {
+      const id = Number(req.params.id);
 
-    if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
-      return res.redirect('/admin/ordenes?tab=personas');
+      if (!id || id <= 0) {
+        return res.redirect('/admin/ordenes?tab=personas');
+      }
+
+      try {
+        const rows = await dbSelect(
+          'SELECT * FROM ordenes_personas WHERE id = $1',
+          [id]
+        );
+
+        if (!rows.length) {
+          return res.redirect('/admin/ordenes?tab=personas');
+        }
+
+        const orden = rows[0];
+
+        res.render('orden-detalle', {
+          title: 'Detalle de orden — persona',
+          tipo: 'persona',
+          idx: id,
+          orden,
+        });
+      } catch (err) {
+        console.error('❌ Error detalle persona:', err);
+        res.redirect('/admin/ordenes?tab=personas');
+      }
     }
-
-    const orden = lista[idx];
-
-    res.render('orden-detalle', {
-      title: 'Detalle de orden — persona',
-      tipo: 'persona',
-      idx,
-      orden,
-    });
-  });
+  );
 
   // ---------------------------------------------------------------------------
-  // CAMBIAR ESTADO DE ENTREGA — PERSONAS
+  // CAMBIAR ESTADO DE ENTREGA — PERSONAS (PostgreSQL)
   // ---------------------------------------------------------------------------
   router.post(
     '/ordenes/persona/entrega',
     requireAuth,
     express.urlencoded({ extended: true }),
-    (req, res) => {
-      const idx = parseInt(req.body.idx, 10);
+    async (req, res) => {
+      const id = Number(req.body.id);
       const nuevoEstado =
         req.body.estado === 'Entregado' ? 'Entregado' : 'Pendiente';
 
-      const lista = readJson(ORD_PER_PATH, []);
+      if (!id || id <= 0) {
+        return res.redirect('/admin/ordenes?tab=personas');
+      }
 
-      if (Array.isArray(lista) && idx >= 0 && idx < lista.length) {
-        lista[idx].entrega = nuevoEstado;
-        writeJson(ORD_PER_PATH, lista);
+      try {
+        await dbExec(
+          'UPDATE ordenes_personas SET entrega = $1 WHERE id = $2',
+          [nuevoEstado, id]
+        );
+      } catch (err) {
+        console.error('❌ Error cambio entrega persona:', err);
       }
 
       res.redirect('/admin/ordenes?tab=personas');
@@ -716,22 +874,28 @@ router.post(
   );
 
   // ---------------------------------------------------------------------------
-  // CAMBIAR ESTADO DE ENTREGA — INSTITUCIONES
+  // CAMBIAR ESTADO DE ENTREGA — INSTITUCIONES (PostgreSQL)
   // ---------------------------------------------------------------------------
   router.post(
     '/ordenes/institucion/entrega',
     requireAuth,
     express.urlencoded({ extended: true }),
-    (req, res) => {
-      const { idx, estado } = req.body;
-      const i = parseInt(idx, 10);
-      const nuevoEstado = estado === 'Entregado' ? 'Entregado' : 'Pendiente';
+    async (req, res) => {
+      const id = Number(req.body.id);
+      const nuevoEstado =
+        req.body.estado === 'Entregado' ? 'Entregado' : 'Pendiente';
 
-      const lista = readJson(ORD_INST_PATH, []);
+      if (!id || id <= 0) {
+        return res.redirect('/admin/ordenes?tab=instituciones');
+      }
 
-      if (Array.isArray(lista) && i >= 0 && i < lista.length) {
-        lista[i].entrega = nuevoEstado;
-        writeJson(ORD_INST_PATH, lista);
+      try {
+        await dbExec(
+          'UPDATE ordenes_instituciones SET entrega = $1 WHERE id = $2',
+          [nuevoEstado, id]
+        );
+      } catch (err) {
+        console.error('❌ Error cambio entrega institución:', err);
       }
 
       res.redirect('/admin/ordenes?tab=instituciones');
@@ -739,187 +903,359 @@ router.post(
   );
 
   // ---------------------------------------------------------------------------
-  // ABONAR / MARCAR PAGADO — PERSONAS
+  // ABONAR / MARCAR PAGADO — PERSONAS (PostgreSQL)
   // ---------------------------------------------------------------------------
   router.post(
-    '/ordenes/persona/:idx/abonar',
+    '/ordenes/persona/:id/abonar',
     requireAuth,
     express.urlencoded({ extended: true }),
-    (req, res) => {
-      const idx = parseInt(req.params.idx, 10);
+    async (req, res) => {
+      const id = Number(req.params.id);
       const monto = Number(req.body.monto) || 0;
-      const lista = readJson(ORD_PER_PATH, []);
 
-      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length || monto <= 0) {
+      if (!id || id <= 0 || monto <= 0) {
         return res.redirect('/admin/ordenes?tab=personas');
       }
 
-      const item = lista[idx];
-      const precio = Number(item.precio) || 0;
-      const abonoActual = Number(item.abono) || 0;
-      let nuevoAbono = abonoActual + monto;
+      try {
+        const rows = await dbSelect(
+          'SELECT * FROM ordenes_personas WHERE id = $1',
+          [id]
+        );
 
-      if (nuevoAbono > precio) nuevoAbono = precio;
+        if (!rows.length) {
+          return res.redirect('/admin/ordenes?tab=personas');
+        }
 
-      item.abono = nuevoAbono;
-      item.pago_estado = computePagoEstado(precio, nuevoAbono);
+        const item = rows[0];
+        const precio = Number(item.precio) || 0;
+        const abonoActual = Number(item.abono) || 0;
+        let nuevoAbono = abonoActual + monto;
 
-      writeJson(ORD_PER_PATH, lista);
+        if (nuevoAbono > precio) nuevoAbono = precio;
+
+        const pagoEstado = computePagoEstado(precio, nuevoAbono);
+
+        await dbExec(
+          'UPDATE ordenes_personas SET abono = $1, pago_estado = $2 WHERE id = $3',
+          [nuevoAbono, pagoEstado, id]
+        );
+      } catch (err) {
+        console.error('❌ Error abonar persona:', err);
+      }
+
       res.redirect('/admin/ordenes?tab=personas');
     }
   );
 
   router.post(
-    '/ordenes/persona/:idx/marcar-pagado',
+    '/ordenes/persona/:id/marcar-pagado',
     requireAuth,
     express.urlencoded({ extended: true }),
-    (req, res) => {
-      const idx = parseInt(req.params.idx, 10);
-      const lista = readJson(ORD_PER_PATH, []);
+    async (req, res) => {
+      const id = Number(req.params.id);
 
-      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+      if (!id || id <= 0) {
         return res.redirect('/admin/ordenes?tab=personas');
       }
 
-      const item = lista[idx];
-      const precio = Number(item.precio) || 0;
+      try {
+        const rows = await dbSelect(
+          'SELECT precio FROM ordenes_personas WHERE id = $1',
+          [id]
+        );
 
-      item.abono = precio;
-      item.pago_estado = 'Pagado';
+        if (!rows.length) {
+          return res.redirect('/admin/ordenes?tab=personas');
+        }
 
-      writeJson(ORD_PER_PATH, lista);
+        const precio = Number(rows[0].precio) || 0;
+
+        await dbExec(
+          'UPDATE ordenes_personas SET abono = $1, pago_estado = $2 WHERE id = $3',
+          [precio, 'Pagado', id]
+        );
+      } catch (err) {
+        console.error('❌ Error marcar pagado persona:', err);
+      }
+
       res.redirect('/admin/ordenes?tab=personas');
     }
   );
 
   // ---------------------------------------------------------------------------
-  // ABONAR / MARCAR PAGADO — INSTITUCIONES
+  // ABONAR / MARCAR PAGADO — INSTITUCIONES (PostgreSQL)
   // ---------------------------------------------------------------------------
   router.post(
-    '/ordenes/institucion/:idx/abonar',
+    '/ordenes/institucion/:id/abonar',
     requireAuth,
     express.urlencoded({ extended: true }),
-    (req, res) => {
-      const idx = parseInt(req.params.idx, 10);
+    async (req, res) => {
+      const id = Number(req.params.id);
       const monto = Number(req.body.monto) || 0;
-      const lista = readJson(ORD_INST_PATH, []);
 
-      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length || monto <= 0) {
+      if (!id || id <= 0 || monto <= 0) {
         return res.redirect('/admin/ordenes?tab=instituciones');
       }
 
-      const item = lista[idx];
-      const precio = Number(item.precio) || 0;
-      const abonoActual = Number(item.abono) || 0;
-      let nuevoAbono = abonoActual + monto;
+      try {
+        const rows = await dbSelect(
+          'SELECT * FROM ordenes_instituciones WHERE id = $1',
+          [id]
+        );
 
-      if (nuevoAbono > precio) nuevoAbono = precio;
+        if (!rows.length) {
+          return res.redirect('/admin/ordenes?tab=instituciones');
+        }
 
-      item.abono = nuevoAbono;
-      item.pago_estado = computePagoEstado(precio, nuevoAbono);
+        const item = rows[0];
+        const precio = Number(item.precio) || 0;
+        const abonoActual = Number(item.abono) || 0;
+        let nuevoAbono = abonoActual + monto;
 
-      writeJson(ORD_INST_PATH, lista);
+        if (nuevoAbono > precio) nuevoAbono = precio;
+
+        const pagoEstado = computePagoEstado(precio, nuevoAbono);
+
+        await dbExec(
+          'UPDATE ordenes_instituciones SET abono = $1, pago_estado = $2 WHERE id = $3',
+          [nuevoAbono, pagoEstado, id]
+        );
+      } catch (err) {
+        console.error('❌ Error abonar institución:', err);
+      }
+
       res.redirect('/admin/ordenes?tab=instituciones');
     }
   );
 
   router.post(
-    '/ordenes/institucion/:idx/marcar-pagado',
+    '/ordenes/institucion/:id/marcar-pagado',
     requireAuth,
     express.urlencoded({ extended: true }),
-    (req, res) => {
-      const idx = parseInt(req.params.idx, 10);
-      const lista = readJson(ORD_INST_PATH, []);
+    async (req, res) => {
+      const id = Number(req.params.id);
 
-      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+      if (!id || id <= 0) {
         return res.redirect('/admin/ordenes?tab=instituciones');
       }
 
-      const item = lista[idx];
-      const precio = Number(item.precio) || 0;
+      try {
+        const rows = await dbSelect(
+          'SELECT precio FROM ordenes_instituciones WHERE id = $1',
+          [id]
+        );
 
-      item.abono = precio;
-      item.pago_estado = 'Pagado';
+        if (!rows.length) {
+          return res.redirect('/admin/ordenes?tab=instituciones');
+        }
 
-      writeJson(ORD_INST_PATH, lista);
+        const precio = Number(rows[0].precio) || 0;
+
+        await dbExec(
+          'UPDATE ordenes_instituciones SET abono = $1, pago_estado = $2 WHERE id = $3',
+          [precio, 'Pagado', id]
+        );
+      } catch (err) {
+        console.error('❌ Error marcar pagado institución:', err);
+      }
+
       res.redirect('/admin/ordenes?tab=instituciones');
     }
   );
 
   // ---------------------------------------------------------------------------
-  // RECIBO — PERSONA (HTML imprimible media carta)
+  // RECIBO — PERSONA (HTML imprimible media carta) — PostgreSQL
   // ---------------------------------------------------------------------------
   router.get(
-    '/ordenes/persona/:idx/recibo',
+    '/ordenes/persona/:id/recibo',
     requireAuth,
-    (req, res) => {
-      const idx = parseInt(req.params.idx, 10);
-      const lista = readJson(ORD_PER_PATH, []);
+    async (req, res) => {
+      const id = Number(req.params.id);
 
-      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+      if (!id || id <= 0) {
         return res.redirect('/admin/ordenes?tab=personas');
       }
 
-      const orden = lista[idx];
-      const precio = Number(orden.precio || 0);
-      const abono = Number(orden.abono || 0);
-      const saldo = Math.max(precio - abono, 0);
-      const pagoEstado = derivePagoEstado(orden);
+      try {
+        const rows = await dbSelect(
+          'SELECT * FROM ordenes_personas WHERE id = $1',
+          [id]
+        );
 
-      res.render('orden-recibo.ejs', {
-        title: 'Recibo — persona',
-        tipo: 'persona',
-        idx,
-        orden,
-        precio,
-        abono,
-        saldo,
-        pagoEstado,
-      });
+        if (!rows.length) {
+          return res.redirect('/admin/ordenes?tab=personas');
+        }
+
+        const orden = rows[0];
+        const precio = Number(orden.precio || 0);
+        const abono = Number(orden.abono || 0);
+        const saldo = Math.max(precio - abono, 0);
+        const pagoEstado = derivePagoEstado(orden);
+
+        res.render('orden-recibo.ejs', {
+          title: 'Recibo — persona',
+          tipo: 'persona',
+          idx: id,
+          orden,
+          precio,
+          abono,
+          saldo,
+          pagoEstado,
+        });
+      } catch (err) {
+        console.error('❌ Error recibo persona:', err);
+        res.redirect('/admin/ordenes?tab=personas');
+      }
     }
   );
 
   // ---------------------------------------------------------------------------
-  // RECIBO — INSTITUCIÓN (HTML imprimible media carta)
+  // RECIBO — INSTITUCIÓN (HTML imprimible media carta) — PostgreSQL
   // ---------------------------------------------------------------------------
   router.get(
-    '/ordenes/institucion/:idx/recibo',
+    '/ordenes/institucion/:id/recibo',
     requireAuth,
-    (req, res) => {
-      const idx = parseInt(req.params.idx, 10);
-      const lista = readJson(ORD_INST_PATH, []);
+    async (req, res) => {
+      const id = Number(req.params.id);
 
-      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+      if (!id || id <= 0) {
         return res.redirect('/admin/ordenes?tab=instituciones');
       }
 
-      const orden = lista[idx];
-      const precio = Number(orden.precio || 0);
-      const abono = Number(orden.abono || 0);
-      const saldo = Math.max(precio - abono, 0);
-      const pagoEstado = derivePagoEstado(orden);
+      try {
+        const rows = await dbSelect(
+          'SELECT * FROM ordenes_instituciones WHERE id = $1',
+          [id]
+        );
 
-      res.render('orden-recibo.ejs', {
-        title: 'Recibo — institución',
-        tipo: 'institucion',
-        idx,
-        orden,
-        precio,
-        abono,
-        saldo,
-        pagoEstado,
-      });
+        if (!rows.length) {
+          return res.redirect('/admin/ordenes?tab=instituciones');
+        }
+
+        const orden = rows[0];
+        const precio = Number(orden.precio || 0);
+        const abono = Number(orden.abono || 0);
+        const saldo = Math.max(precio - abono, 0);
+        const pagoEstado = derivePagoEstado(orden);
+
+        res.render('orden-recibo.ejs', {
+          title: 'Recibo — institución',
+          tipo: 'institucion',
+          idx: id,
+          orden,
+          precio,
+          abono,
+          saldo,
+          pagoEstado,
+        });
+      } catch (err) {
+        console.error('❌ Error recibo institución:', err);
+        res.redirect('/admin/ordenes?tab=instituciones');
+      }
     }
   );
 
   // ---------------------------------------------------------------------------
-  // PANEL DE CITAS
+  // TICKET 80 mm — PERSONA (PostgreSQL)
+  // ---------------------------------------------------------------------------
+  router.get(
+    '/ordenes/persona/:id/ticket',
+    requireAuth,
+    async (req, res) => {
+      const id = Number(req.params.id);
+
+      if (!id || id <= 0) {
+        return res.redirect('/admin/ordenes?tab=personas');
+      }
+
+      try {
+        const rows = await dbSelect(
+          'SELECT * FROM ordenes_personas WHERE id = $1',
+          [id]
+        );
+
+        if (!rows.length) {
+          return res.redirect('/admin/ordenes?tab=personas');
+        }
+
+        const orden = rows[0];
+        const precio = Number(orden.precio || 0);
+        const abono = Number(orden.abono || 0);
+        const saldo = Math.max(precio - abono, 0);
+        const pagoEstado = derivePagoEstado(orden);
+
+        res.render('orden-ticket.ejs', {
+          title: 'Ticket — persona',
+          tipo: 'persona',
+          idx: id,
+          orden,
+          precio,
+          abono,
+          saldo,
+          pagoEstado,
+        });
+      } catch (err) {
+        console.error('❌ Error ticket persona:', err);
+        res.redirect('/admin/ordenes?tab=personas');
+      }
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // TICKET 80 mm — INSTITUCIÓN (PostgreSQL)
+  // ---------------------------------------------------------------------------
+  router.get(
+    '/ordenes/institucion/:id/ticket',
+    requireAuth,
+    async (req, res) => {
+      const id = Number(req.params.id);
+
+      if (!id || id <= 0) {
+        return res.redirect('/admin/ordenes?tab=instituciones');
+      }
+
+      try {
+        const rows = await dbSelect(
+          'SELECT * FROM ordenes_instituciones WHERE id = $1',
+          [id]
+        );
+
+        if (!rows.length) {
+          return res.redirect('/admin/ordenes?tab=instituciones');
+        }
+
+        const orden = rows[0];
+        const precio = Number(orden.precio || 0);
+        const abono = Number(orden.abono || 0);
+        const saldo = Math.max(precio - abono, 0);
+        const pagoEstado = derivePagoEstado(orden);
+
+        res.render('orden-ticket.ejs', {
+          title: 'Ticket — institución',
+          tipo: 'institucion',
+          idx: id,
+          orden,
+          precio,
+          abono,
+          saldo,
+          pagoEstado,
+        });
+      } catch (err) {
+        console.error('❌ Error ticket institución:', err);
+        res.redirect('/admin/ordenes?tab=instituciones');
+      }
+    }
+  );
+
+  // ---------------------------------------------------------------------------
+  // PANEL DE CITAS (sigue con JSON)
   // ---------------------------------------------------------------------------
   router.get('/citas', requireAuth, (req, res) => {
     const fechaDesde = (req.query.fecha_desde || '').trim();
     const fechaHasta = (req.query.fecha_hasta || '').trim();
-    const busqueda   = (req.query.q || '').trim().toLowerCase();
-    const estadoFil  = (req.query.estado || '').trim().toLowerCase();
+    const busqueda = (req.query.q || '').trim().toLowerCase();
+    const estadoFil = (req.query.estado || '').trim().toLowerCase();
 
     const lista = readJson(CITAS_PATH, []);
 
@@ -935,12 +1271,7 @@ router.post(
 
       // Búsqueda por cliente / sesión / teléfono
       if (busqueda) {
-        const texto = [
-          c.cliente,
-          c.sesion,
-          c.telefono,
-          c.notas,
-        ]
+        const texto = [c.cliente, c.sesion, c.telefono, c.notas]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
@@ -993,7 +1324,7 @@ router.post(
         fecha: fecha || '', // formato datetime-local (YYYY-MM-DDTHH:mm)
         notas: notas || '',
         estado: 'Pendiente',
-        origen: 'manual',   // luego podemos poner google-calendar
+        origen: 'manual', // luego podemos poner google-calendar
       };
 
       lista.push(nuevaCita);
@@ -1029,7 +1360,7 @@ router.post(
     }
   );
 
-    // Eliminar una cita
+  // Eliminar una cita
   router.post(
     '/citas/:idx/eliminar',
     requireAuth,
@@ -1050,148 +1381,76 @@ router.post(
     }
   );
 
-
-
   // ---------------------------------------------------------------------------
-// TICKET 80 mm — PERSONA
-// ---------------------------------------------------------------------------
-router.get(
-  '/ordenes/persona/:idx/ticket',
-  requireAuth,
-  (req, res) => {
-    const idx = parseInt(req.params.idx, 10);
-    const lista = readJson(ORD_PER_PATH, []);
-
-    if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
-      return res.redirect('/admin/ordenes?tab=personas');
-    }
-
-    const orden = lista[idx];
-    const precio = Number(orden.precio || 0);
-    const abono  = Number(orden.abono  || 0);
-    const saldo  = Math.max(precio - abono, 0);
-    const pagoEstado = derivePagoEstado(orden);
-
-    res.render('orden-ticket.ejs', {
-      title: 'Ticket — persona',
-      tipo: 'persona',
-      idx,
-      orden,
-      precio,
-      abono,
-      saldo,
-      pagoEstado,
-    });
-  }
-);
-
-// ---------------------------------------------------------------------------
-// TICKET 80 mm — INSTITUCIÓN
-// ---------------------------------------------------------------------------
-router.get(
-  '/ordenes/institucion/:idx/ticket',
-  requireAuth,
-  (req, res) => {
-    const idx = parseInt(req.params.idx, 10);
-    const lista = readJson(ORD_INST_PATH, []);
-
-    if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
-      return res.redirect('/admin/ordenes?tab=instituciones');
-    }
-
-    const orden = lista[idx];
-    const precio = Number(orden.precio || 0);
-    const abono  = Number(orden.abono  || 0);
-    const saldo  = Math.max(precio - abono, 0);
-    const pagoEstado = derivePagoEstado(orden);
-
-    res.render('orden-ticket.ejs', {
-      title: 'Ticket — institución',
-      tipo: 'institucion',
-      idx,
-      orden,
-      precio,
-      abono,
-      saldo,
-      pagoEstado,
-    });
-  }
-);
-
-
- // ---------------------------------------------------------------------------
-// HERRAMIENTAS OCR
-// ---------------------------------------------------------------------------
-router.get('/herramientas', requireAuth, (req, res) => {
-  // Si ya tienes texto del OCR desde un POST, aquí podrías pasarlo en "ocrText"
-  res.render('herramientas-ocr', {
-    title: 'Herramientas OCR',
-    ocrText: '', // por ahora vacío; luego lo llenamos desde tu backend de OCR
-  });
-});
-
-// Procesar la imagen con OCR (Tesseract + preprocesado con sharp)
-router.post(
-  '/herramientas/ocr',
-  requireAuth,
-  upload.single('imagen_lista'),
-  async (req, res) => {
-    if (!req.file) {
-      return res.render('herramientas-ocr', {
-        title: 'Herramientas OCR',
-        ocrText: 'Error: no se recibió ninguna imagen.',
-      });
-    }
-
-    const imagenPath = req.file.path;
-    const preprocesadaPath = imagenPath + '-pre.png';
-    let textoDelOcr = '';
-
-    try {
-      // 1️⃣ Preprocesar la imagen: agrandar, blanco y negro, más contraste
-      await sharp(imagenPath)
-        .resize({ width: 1800, withoutEnlargement: false }) // la agrandamos a ~1800 px de ancho
-        .grayscale()
-        .normalize()               // mejora contraste
-        .toFile(preprocesadaPath); // guardamos imagen procesada
-
-      // 2️⃣ Pasar la imagen procesada a Tesseract
-      const result = await Tesseract.recognize(
-        preprocesadaPath,
-        'spa+eng', // español + algo de inglés/números
-        {
-          logger: m => console.log('[OCR]', m), // opcional, progreso en consola
-        }
-      );
-
-      textoDelOcr = (result.data && result.data.text) ? result.data.text : '';
-
-      // Limpieza básica de saltos de línea
-      textoDelOcr = textoDelOcr
-        .replace(/\r\n/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
-
-    } catch (err) {
-      console.error('❌ Error en OCR:', err);
-      textoDelOcr = 'Ocurrió un error al procesar la imagen con OCR.\n' +
-                    'Revisa la consola del servidor para más detalles.';
-    } finally {
-      // Borramos archivos temporales
-      try { fs.unlinkSync(imagenPath); } catch (e) {}
-      try { fs.unlinkSync(preprocesadaPath); } catch (e) {}
-    }
-
+  // HERRAMIENTAS OCR
+  // ---------------------------------------------------------------------------
+  router.get('/herramientas', requireAuth, (req, res) => {
+    // Si ya tienes texto del OCR desde un POST, aquí podrías pasarlo en "ocrText"
     res.render('herramientas-ocr', {
       title: 'Herramientas OCR',
-      ocrText: textoDelOcr || '(El OCR no devolvió texto)',
+      ocrText: '', // por ahora vacío; luego lo llenamos desde tu backend de OCR
     });
-  }
-);
+  });
 
+  // Procesar la imagen con OCR (Tesseract + preprocesado con sharp)
+  router.post(
+    '/herramientas/ocr',
+    requireAuth,
+    upload.single('imagen_lista'),
+    async (req, res) => {
+      if (!req.file) {
+        return res.render('herramientas-ocr', {
+          title: 'Herramientas OCR',
+          ocrText: 'Error: no se recibió ninguna imagen.',
+        });
+      }
 
+      const imagenPath = req.file.path;
+      const preprocesadaPath = imagenPath + '-pre.png';
+      let textoDelOcr = '';
 
+      try {
+        // 1️⃣ Preprocesar la imagen: agrandar, blanco y negro, más contraste
+        await sharp(imagenPath)
+          .resize({ width: 1800, withoutEnlargement: false }) // la agrandamos a ~1800 px de ancho
+          .grayscale()
+          .normalize() // mejora contraste
+          .toFile(preprocesadaPath); // guardamos imagen procesada
 
+        // 2️⃣ Pasar la imagen procesada a Tesseract
+        const result = await Tesseract.recognize(preprocesadaPath, 'spa+eng', {
+          logger: (m) => console.log('[OCR]', m), // opcional, progreso en consola
+        });
+
+        textoDelOcr =
+          result.data && result.data.text ? result.data.text : '';
+
+        // Limpieza básica de saltos de línea
+        textoDelOcr = textoDelOcr
+          .replace(/\r\n/g, '\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+      } catch (err) {
+        console.error('❌ Error en OCR:', err);
+        textoDelOcr =
+          'Ocurrió un error al procesar la imagen con OCR.\n' +
+          'Revisa la consola del servidor para más detalles.';
+      } finally {
+        // Borramos archivos temporales
+        try {
+          fs.unlinkSync(imagenPath);
+        } catch (e) {}
+        try {
+          fs.unlinkSync(preprocesadaPath);
+        } catch (e) {}
+      }
+
+      res.render('herramientas-ocr', {
+        title: 'Herramientas OCR',
+        ocrText: textoDelOcr || '(El OCR no devolvió texto)',
+      });
+    }
+  );
 
   // ---------------------------------------------------------------------------
   // LOGOUT

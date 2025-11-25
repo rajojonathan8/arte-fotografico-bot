@@ -1,5 +1,15 @@
 <%- include('_head', { title }) %>
 
+<%
+  function asDateInput(value) {
+    if (!value) return '';
+    const d = (value instanceof Date) ? value : new Date(value);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10); // YYYY-MM-DD
+  }
+%>
+
+
 <header class="p-4 bg-white shadow">
   <div class="max-w-4xl mx-auto flex items-center justify-between">
     <h1 class="text-xl font-semibold">Editar orden — persona</h1>
@@ -47,13 +57,15 @@
       <div>
         <label class="block text-sm mb-1">Fecha toma</label>
         <input type="date" name="fecha_toma" class="w-full border rounded-lg px-3 py-2"
-               value="<%= (orden.fecha_toma || '').slice(0,10) %>">
+       value="<%= asDateInput(orden.fecha_toma) %>">
+
       </div>
 
       <div>
         <label class="block text-sm mb-1">Fecha entrega</label>
         <input type="date" name="fecha_entrega" class="w-full border rounded-lg px-3 py-2"
-               value="<%= (orden.fecha_entrega || '').slice(0,10) %>">
+       value="<%= asDateInput(orden.fecha_entrega) %>">
+
       </div>
 
       <div>

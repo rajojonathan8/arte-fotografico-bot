@@ -1,4 +1,12 @@
 <%- include('_head', { title }) %>
+<%
+  function fechaCorta(f) {
+    if (!f) return '';
+    const d = new Date(f);
+    if (isNaN(d)) return '';
+    return d.toISOString().slice(0,10); // YYYY-MM-DD
+  }
+%>
 
 <header class="p-4 bg-white shadow">
   <div class="max-w-6xl mx-auto flex items-center justify-between">
@@ -250,8 +258,8 @@
                   <td class="px-3 py-2 text-center"><%= o.collage1 %></td>
                   <td class="px-3 py-2 text-center"><%= o.collage2 %></td>
                   <td class="px-3 py-2 text-center"><%= o.collage3 || 0 %></td>
-                  <td class="px-3 py-2"><%= o.fecha_toma %></td>
-                  <td class="px-3 py-2"><%= o.fecha_entrega || '' %></td> <!-- ⬅️ NUEVA -->
+                  <td class="px-3 py-2"><%= fechaCorta(o.fecha_toma) %></td>
+<td class="px-3 py-2"><%= fechaCorta(o.fecha_entrega) %></td>
                   <td class="px-3 py-2"><%= o.telefono %></td>
                   <td class="px-3 py-2 text-right">$<%= precio.toFixed(2) %></td>
                   <td class="px-3 py-2 text-right">$<%= abono.toFixed(2) %></td>
@@ -298,18 +306,18 @@
                   <td class="px-3 py-2 text-center">
                     <div class="flex flex-col gap-1 items-start text-xs">
                       <div class="flex gap-2">
-                        <a href="/admin/ordenes/institucion/<%= idx %>"
+                        <a href="/admin/ordenes/institucion/<%= o.id  %>"
                            class="text-slate-600 hover:underline">
                           Ver
                         </a>
-                        <a href="/admin/ordenes/institucion/<%= idx %>/editar"
+                        <a href="/admin/ordenes/institucion/<%= o.id  %>/editar"
                            class="text-emerald-700 hover:underline">
                           Editar
                         </a>
 
                        
                         <form
-                          action="/admin/ordenes/institucion/<%= idx %>/eliminar"
+                          action="/admin/ordenes/institucion/<%= o.id  %>/eliminar"
                           method="POST"
                           onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de institución?');"
                           class="inline">
@@ -318,9 +326,9 @@
                             Eliminar
                           </button>
                         </form>
-                        <a href="/admin/ordenes/institucion/<%= idx %>/ticket" target="_blank">Ticket 80mm</a>
+                        <a href="/admin/ordenes/institucion/<%= o.id  %>/ticket" target="_blank">Ticket 80mm</a>
 
-                          <a href="/admin/ordenes/institucion/<%= idx %>/recibo"
+                          <a href="/admin/ordenes/institucion/<%= o.id  %>/recibo"
        target="_blank"
        class="text-xs text-blue-600 hover:underline">
       Recibo
@@ -336,7 +344,7 @@
                              if(!monto) return;
                              var f = document.createElement('form');
                              f.method = 'POST';
-                             f.action = '/admin/ordenes/institucion/<%= idx %>/abonar';
+                             f.action = '/admin/ordenes/institucion/<%= o.id %>/abonar';
                              var input = document.createElement('input');
                              input.type = 'hidden';
                              input.name = 'monto';
@@ -350,7 +358,7 @@
 
                         <!-- Marcar pagado -->
                         <form
-                          action="/admin/ordenes/institucion/<%= idx %>/marcar-pagado"
+                          action="/admin/ordenes/institucion/<%= o.id  %>/marcar-pagado"
                           method="POST"
                           class="inline"
                           onsubmit="return confirm('¿Marcar como pagado el total de esta orden?');">
@@ -470,8 +478,9 @@
                   <td class="px-3 py-2"><%= o.nombre %></td>
                   <td class="px-3 py-2"><%= o.numero_orden || o.n_orden %></td>
                   <td class="px-3 py-2 text-center"><%= o.numero_toma || o.n_toma %></td>
-                  <td class="px-3 py-2"><%= o.fecha_toma %></td>
-                  <td class="px-3 py-2"><%= o.fecha_entrega %></td>
+                  <td class="px-3 py-2"><%= fechaCorta(o.fecha_toma) %></td>
+<td class="px-3 py-2"><%= fechaCorta(o.fecha_entrega) %></td>
+
                   <td class="px-3 py-2 text-center">
                     <% const urgPers = o.urgencia || 'Normal'; %>
                     <% if (urgPers === 'Urgente' || urgPers === 'Muy urgente') { %>
@@ -524,17 +533,17 @@
                   <td class="px-3 py-2 text-center">
                     <div class="flex flex-col gap-1 items-start text-xs">
                       <div class="flex gap-2">
-                        <a href="/admin/ordenes/persona/<%= idx %>"
+                        <a href="/admin/ordenes/persona/<%= o.id  %>"
                            class="text-slate-600 hover:underline">
                           Ver
                         </a>
-                        <a href="/admin/ordenes/persona/<%= idx %>/editar"
+                        <a href="/admin/ordenes/persona/<%= o.id  %>/editar"
                            class="text-emerald-700 hover:underline">
                           Editar
                         </a>
                    
                         <form
-                          action="/admin/ordenes/persona/<%= idx %>/eliminar"
+                          action="/admin/ordenes/persona/<%= o.id  %>/eliminar"
                           method="POST"
                           onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de persona?');"
                           class="inline">
@@ -543,9 +552,9 @@
                             Eliminar
                           </button>
                         </form>
-                        <a href="/admin/ordenes/persona/<%= idx %>/ticket" target="_blank">Ticket 80mm</a>
+                        <a href="/admin/ordenes/persona/<%= o.id  %>/ticket" target="_blank">Ticket 80mm</a>
 
-                             <a href="/admin/ordenes/persona/<%= idx %>/recibo"
+                             <a href="/admin/ordenes/persona/<%= o.id  %>/recibo"
        target="_blank"
        class="text-xs text-blue-600 hover:underline">
       Recibo
@@ -561,7 +570,7 @@
                              if(!monto) return;
                              var f = document.createElement('form');
                              f.method = 'POST';
-                             f.action = '/admin/ordenes/persona/<%= idx %>/abonar';
+                             f.action = '/admin/ordenes/persona/<%= o.id  %>/abonar';
                              var input = document.createElement('input');
                              input.type = 'hidden';
                              input.name = 'monto';
@@ -575,7 +584,7 @@
 
                         <!-- Marcar pagado -->
                         <form
-                          action="/admin/ordenes/persona/<%= idx %>/marcar-pagado"
+                          action="/admin/ordenes/persona/<%= o.id  %>/marcar-pagado"
                           method="POST"
                           class="inline"
                           onsubmit="return confirm('¿Marcar como pagado el total de esta orden?');">

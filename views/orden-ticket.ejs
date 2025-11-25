@@ -146,13 +146,22 @@
       </a>
     </div>
   </div>
+  <%
+  function formatFecha(value) {
+    if (!value) return '';
+    const d = (value instanceof Date) ? value : new Date(value);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10); // YYYY-MM-DD
+  }
+%>
 
   <%
     const precioLocal = Number(precio ?? orden.precio ?? 0) || 0;
     const abonoLocal  = Number(abono  ?? orden.abono  ?? 0) || 0;
     const saldoLocal  = Math.max(precioLocal - abonoLocal, 0);
-    const fechaToma   = (orden.fecha_toma || '').slice(0,10);
-    const fechaEnt    = (orden.fecha_entrega || '').slice(0,10);
+    const fechaToma   = formatFecha(orden.fecha_toma);
+const fechaEnt    = formatFecha(orden.fecha_entrega);
+
   %>
 
   <div class="ticket-wrapper">
@@ -167,7 +176,7 @@
         <div class="small">
           Calle Masferrer, Av. Morazán 2a Av. Norte #1-2<br />
           Sonsonate, El Salvador<br />
-          Tel: 2429-1030 / 61782099 / 7815-6115 
+          Tel: 2429-1030/7815-6115/6178-2099 
         </div>
       </div>
 

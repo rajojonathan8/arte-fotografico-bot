@@ -239,6 +239,16 @@
     }
   </style>
 </head>
+
+<%
+  function formatFecha(value) {
+    if (!value) return '';
+    const d = (value instanceof Date) ? value : new Date(value);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10); // YYYY-MM-DD
+  }
+%>
+
 <body>
   <div class="no-print">
     <div>
@@ -262,8 +272,8 @@
     const precioLocal = Number(precio ?? orden.precio ?? 0) || 0;
     const abonoLocal  = Number(abono  ?? orden.abono  ?? 0) || 0;
     const saldoLocal  = Math.max(precioLocal - abonoLocal, 0);
-    const fechaToma   = (orden.fecha_toma || '').slice(0,10);
-    const fechaEnt    = (orden.fecha_entrega || '').slice(0,10);
+     const fechaToma   = formatFecha(orden.fecha_toma);
+  const fechaEnt    = formatFecha(orden.fecha_entrega);
 
     function numeroRecibo() {
       if (tipo === 'persona') return orden.numero_orden || (1000 + (idx || 0));
