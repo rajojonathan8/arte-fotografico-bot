@@ -288,54 +288,68 @@ function mountAdmin(app) {
     }
 
     function pasaFiltrosGenerales(o) {
-      // Fecha de toma
-      if (fechaDesde || fechaHasta) {
-        const f = (o.fecha_toma || '').slice(0, 10);
-        if (!f) return false;
-        if (fechaDesde && f < fechaDesde) return false;
-        if (fechaHasta && f > fechaHasta) return false;
+  // Fecha de toma
+  if (fechaDesde || fechaHasta) {
+    // Convertimos a string de forma segura
+    let f = '';
+    const raw = o.fecha_toma;
+
+    if (raw) {
+      if (raw instanceof Date) {
+        // Si viene como Date, lo pasamos a ISO y cortamos
+        f = raw.toISOString().slice(0, 10); // YYYY-MM-DD
+      } else {
+        // Si viene como string u otro tipo, lo forzamos a string
+        f = String(raw).slice(0, 10);
       }
-
-      // Texto libre
-      if (busqueda) {
-        const texto = [
-          o.institucion,
-          o.seccion,
-          o.paquete,
-          o.nombre,
-          o.telefono,
-          o.numero_orden,
-          o.n_orden,
-          o.numero_toma,
-          o.n_toma,
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-
-        if (!texto.includes(busqueda)) return false;
-      }
-
-      // Urgencia
-      if (filtroUrg) {
-        const u = (o.urgencia || 'Normal').toLowerCase();
-        if (u !== filtroUrg.toLowerCase()) return false;
-      }
-
-      // Entrega
-      if (filtroEnt) {
-        const e = (o.entrega || o.estado_entrega || 'Pendiente').toLowerCase();
-        if (e !== filtroEnt.toLowerCase()) return false;
-      }
-
-      // Pago (solo aplica si el registro tiene precio/abono)
-      if (filtroPago) {
-        const p = derivePagoEstado(o).toLowerCase();
-        if (p !== filtroPago.toLowerCase()) return false;
-      }
-
-      return true;
     }
+
+    if (!f) return false;
+    if (fechaDesde && f < fechaDesde) return false;
+    if (fechaHasta && f > fechaHasta) return false;
+  }
+
+  // Texto libre
+  if (busqueda) {
+    const texto = [
+      o.institucion,
+      o.seccion,
+      o.paquete,
+      o.nombre,
+      o.telefono,
+      o.numero_orden,
+      o.n_orden,
+      o.numero_toma,
+      o.n_toma,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    if (!texto.includes(busqueda)) return false;
+  }
+
+  // Urgencia
+  if (filtroUrg) {
+    const u = (o.urgencia || 'Normal').toLowerCase();
+    if (u !== filtroUrg.toLowerCase()) return false;
+  }
+
+  // Entrega
+  if (filtroEnt) {
+    const e = (o.entrega || o.estado_entrega || 'Pendiente').toLowerCase();
+    if (e !== filtroEnt.toLowerCase()) return false;
+  }
+
+  // Pago
+  if (filtroPago) {
+    const p = derivePagoEstado(o).toLowerCase();
+    if (p !== filtroPago.toLowerCase()) return false;
+  }
+
+  return true;
+}
+
 
     const ordenesInstituciones = (ordenesInstitucionesAll || []).filter(
       pasaFiltrosGenerales
