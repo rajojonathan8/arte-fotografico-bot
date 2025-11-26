@@ -1,4 +1,12 @@
 <%- include('_head', { title }) %>
+<%
+  function fechaCorta(value) {
+    if (!value) return '';
+    const d = (value instanceof Date) ? value : new Date(value);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10); // 2025-11-26
+  }
+%>
 
 <header class="p-4 bg-white shadow">
   <div class="max-w-4xl mx-auto flex items-center justify-between">
@@ -15,9 +23,8 @@
       <p><strong>Nombre:</strong> <%= orden.nombre %></p>
       <p><strong>N° orden:</strong> <%= orden.numero_orden %></p>
       <p><strong>N° toma:</strong> <%= orden.numero_toma %></p>
-      <p><strong>Fecha toma:</strong> <%= orden.fecha_toma %></p>
-      <p><strong>Fecha entrega:</strong> <%= orden.fecha_entrega || '' %></p>
-      <p><strong>Fecha entrega:</strong> <%= orden.fecha_entrega %></p>
+      <p><strong>Fecha toma:</strong> <%= fechaCorta(orden.fecha_toma) %></p>
+      <p><strong>Fecha entrega:</strong> <%= fechaCorta(orden.fecha_entrega) || '' %></p>
       <p><strong>Urgencia:</strong> <%= orden.urgencia %></p>
       <p><strong>Teléfono:</strong> <%= orden.telefono %></p>
       <p><strong>Entrega:</strong> <%= orden.entrega %></p>
@@ -28,7 +35,7 @@
       <p><strong>Toma principal:</strong> <%= orden.toma_principal %></p>
       <p><strong>Collage 1:</strong> <%= orden.collage1 %></p>
       <p><strong>Collage 2:</strong> <%= orden.collage2 %></p>
-      <p><strong>Fecha toma:</strong> <%= orden.fecha_toma %></p>
+      <p><strong>Fecha toma:</strong> <%= fechaCorta(orden.fecha_toma) %></p>
       <p><strong>Teléfono:</strong> <%= orden.telefono %></p>
       <p><strong>Entrega:</strong> <%= orden.entrega %></p>
       <p><strong>Urgencia:</strong> <%= orden.urgencia %></p>

@@ -1,30 +1,179 @@
-<%- include('_head', { title: 'Dashboard' }) %>
-<header class="p-4 bg-white shadow">
-  <div class="max-w-6xl mx-auto flex items-center justify-between">
-    <h1 class="text-xl font-semibold">Panel — Arte Fotográfico</h1>
+<%- include('_head', { title }) %>
 
-    <!-- 🔹 Antes era un form POST; ahora usamos un link GET que coincide con router.get('/logout') -->
-    <a
-      href="/admin/logout"
-      class="text-sm text-slate-600 hover:text-slate-900"
-    >
-      Salir
-    </a>
-  </div>
-</header>
+<main class="max-w-6xl mx-auto p-4 space-y-6">
 
-<main class="max-w-6xl mx-auto p-4">
-  <h1 class="text-2xl font-bold mb-6">Panel Arte Fotográfico</h1>
+  <!-- Título -->
+  <header class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight text-white">
+        Panel de administración
+      </h1>
+      <p class="text-sm text-slate-400">
+        Resumen rápido de órdenes, pagos, citas y accesos al panel.
+      </p>
+    </div>
+  </header>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <% (cards || []).forEach(c => { %>
-      <a href="<%= c.href %>" class="block rounded-2xl bg-white p-5 shadow hover:shadow-md transition">
-        <div class="text-3xl mb-3"><%= c.icon %></div>
-        <div class="text-lg font-semibold"><%= c.title %></div>
-        <p class="text-sm text-slate-600 mt-1"><%= c.desc %></p>
+  <!-- ================= PANELes RÁPIDOS (arriba) ================= -->
+  <section class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <% (cards || []).forEach(function(card) { %>
+      <a
+        href="<%= card.href %>"
+        class="flex items-start gap-3 bg-slate-900/60 border border-slate-700 rounded-2xl px-4 py-3 hover:border-emerald-500/70 hover:bg-slate-900 transition"
+      >
+        <div class="w-9 h-9 rounded-2xl bg-emerald-500/15 flex items-center justify-center text-xl">
+          <%= card.icon %>
+        </div>
+        <div class="flex-1">
+          <h2 class="text-sm font-semibold text-slate-100"><%= card.title %></h2>
+          <p class="text-xs text-slate-400"><%= card.desc %></p>
+        </div>
       </a>
     <% }) %>
-  </div>
+  </section>
+
+  <!-- ================= TARJETAS DE TOTALES ================= -->
+  <section class="grid md:grid-cols-4 gap-4">
+    <!-- Órdenes totales -->
+    <article class="bg-slate-900/70 border border-slate-700 rounded-2xl p-4">
+      <p class="text-xs font-semibold text-slate-400 uppercase">Órdenes totales</p>
+      <p class="mt-2 text-3xl font-bold text-slate-50"><%= totalOrdenes || 0 %></p>
+      <p class="mt-1 text-xs text-slate-400">
+        Personas: <%= totalPersonas || 0 %> · Instituciones: <%= totalInstituciones || 0 %>
+      </p>
+    </article>
+
+    <!-- Total facturado personas -->
+    <article class="bg-slate-900/70 border border-slate-700 rounded-2xl p-4">
+      <p class="text-xs font-semibold text-slate-400 uppercase">Total facturado (personas)</p>
+      <p class="mt-2 text-2xl font-bold text-emerald-400">
+        $<%= (resumenPersonas.totalPrecio || 0).toFixed(2) %>
+      </p>
+      <p class="mt-1 text-xs text-slate-400">
+        Abonado: $<%= (resumenPersonas.totalAbono || 0).toFixed(2) %> ·
+        Saldo: $<%= (resumenPersonas.totalSaldo || 0).toFixed(2) %>
+      </p>
+    </article>
+
+    <!-- Total facturado instituciones -->
+    <article class="bg-slate-900/70 border border-slate-700 rounded-2xl p-4">
+      <p class="text-xs font-semibold text-slate-400 uppercase">Total facturado (instituciones)</p>
+      <p class="mt-2 text-2xl font-bold text-emerald-400">
+        $<%= (resumenInstituciones.totalPrecio || 0).toFixed(2) %>
+      </p>
+      <p class="mt-1 text-xs text-slate-400">
+        Abonado: $<%= (resumenInstituciones.totalAbono || 0).toFixed(2) %> ·
+        Saldo: $<%= (resumenInstituciones.totalSaldo || 0).toFixed(2) %>
+      </p>
+    </article>
+
+    <!-- Citas -->
+    <article class="bg-slate-900/70 border border-slate-700 rounded-2xl p-4">
+      <p class="text-xs font-semibold text-slate-400 uppercase">Citas</p>
+      <p class="mt-2 text-2xl font-bold text-sky-400">
+        <%= (resumenCitas && resumenCitas.total) || 0 %>
+      </p>
+      <p class="mt-1 text-xs text-slate-400">
+        Hoy: <%= (resumenCitas && resumenCitas.hoy) || 0 %> ·
+        Pendientes: <%= (resumenCitas && resumenCitas.pendientes) || 0 %>
+      </p>
+    </article>
+  </section>
+
+  <!-- ================= RESUMEN DE PAGOS + PRÓXIMAS ENTREGAS ================= -->
+  <section class="grid md:grid-cols-2 gap-4">
+
+    <!-- Resumen de pagos global -->
+    <article class="bg-slate-900/70 border border-slate-700 rounded-2xl p-4 space-y-3">
+      <h2 class="text-sm font-semibold text-slate-100">
+        Resumen de pagos (personas + instituciones)
+      </h2>
+
+      <div class="space-y-2 text-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-slate-400">Facturado total</span>
+          <span class="font-semibold text-slate-50">
+            $<%= (resumenGlobal.facturadoTotal || 0).toFixed(2) %>
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-slate-400">Total abonado</span>
+          <span class="font-semibold text-emerald-400">
+            $<%= (resumenGlobal.abonadoTotal || 0).toFixed(2) %>
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-slate-400">Saldo pendiente</span>
+          <span class="font-semibold text-amber-400">
+            $<%= (resumenGlobal.saldoTotal || 0).toFixed(2) %>
+          </span>
+        </div>
+      </div>
+
+      <p class="mt-2 text-xs text-slate-500">
+        Para ver el detalle, entra al módulo de Órdenes y libros.
+      </p>
+    </article>
+
+    <!-- Próximas entregas (notificaciones) -->
+    <article class="bg-slate-900/70 border border-slate-700 rounded-2xl p-4">
+      <%
+        function fechaCorta(value) {
+          if (!value) return '';
+          const d = (value instanceof Date) ? value : new Date(value);
+          if (isNaN(d.getTime())) return '';
+          return d.toISOString().slice(0, 10);
+        }
+      %>
+
+      <h2 class="text-sm font-semibold text-slate-100 flex items-center justify-between">
+        Próximas entregas (3 días)
+        <span class="text-xs font-normal text-slate-400">
+          <%= (proximasEntregas && proximasEntregas.length) || 0 %> pendientes
+        </span>
+      </h2>
+
+      <% if (!proximasEntregas || proximasEntregas.length === 0) { %>
+        <p class="mt-3 text-xs text-slate-500">
+          No hay entregas programadas en los próximos 3 días.
+        </p>
+      <% } else { %>
+        <ul class="mt-3 space-y-2 text-sm">
+          <% proximasEntregas.forEach(function(o) { 
+               const tipo = o._tipo === 'institucion' ? 'Institución' : 'Persona';
+               const nombre = o.nombre || o.institucion || 'Sin nombre';
+               const saldoItem = Math.max(
+                 (Number(o.precio || 0) - Number(o.abono || 0)) || 0,
+                 0
+               );
+          %>
+            <li class="flex items-start justify-between rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2">
+              <div>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold
+                               <%= tipo === 'Institución' ? 'bg-sky-900/60 text-sky-300' : 'bg-emerald-900/60 text-emerald-300' %>">
+                  <%= tipo %>
+                </span>
+                <p class="mt-1 text-sm text-slate-100 truncate max-w-[200px]">
+                  <%= nombre %>
+                </p>
+              </div>
+              <div class="text-right">
+                <p class="text-xs text-slate-400">
+                  Entrega: <span class="font-semibold text-slate-100">
+                    <%= fechaCorta(o._fecha || o.fecha_entrega) %>
+                  </span>
+                </p>
+                <p class="text-xs text-slate-500">
+                  Saldo: $<%= saldoItem.toFixed(2) %>
+                </p>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </article>
+
+  </section>
 </main>
 
 <%- include('_foot') %>

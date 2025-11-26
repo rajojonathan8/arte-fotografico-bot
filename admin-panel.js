@@ -14,6 +14,8 @@ const sharp = require('sharp');
 // Usamos la misma carpeta data que index.js
 const DATA_DIR = path.join(process.cwd(), 'data');
 const CONV_PATH = path.join(DATA_DIR, 'conversaciones.json');
+const ORD_INST_PATH = path.join(DATA_DIR, 'ordenes-instituciones.json');
+const ORD_PER_PATH = path.join(DATA_DIR, 'ordenes-personas.json');
 const CITAS_PATH = path.join(DATA_DIR, 'citas.json');
 
 // ============================================================================
@@ -24,7 +26,7 @@ const { Pool } = require('pg');
 
 const db = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
 });
 
 // Helper para SELECT
@@ -52,10 +54,6 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10 MB
   },
 });
-
-// ============================================================================
-// Helpers para archivos JSON (conversaciones, citas)
-// ============================================================================
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -112,6 +110,7 @@ function derivePagoEstado(record) {
   if (stored === 'pagado') return 'Pagado';
   if (stored === 'abono') return 'Abono';
   if (stored === 'pendiente') return 'Pendiente';
+
   // Si no hay texto guardado, calculamos por números como respaldo
   return computePagoEstado(record.precio, record.abono);
 }
@@ -214,8 +213,9 @@ function mountAdmin(app) {
   });
 
   // ---------------------------------------------------------------------------
-  // DASHBOARD PRINCIPAL
+  // DASHBOARD PRINCIPAL /admin
   // ---------------------------------------------------------------------------
+
   const cards = [
     {
       href: '/admin/chat',
@@ -243,8 +243,124 @@ function mountAdmin(app) {
     },
   ];
 
-  router.get('/', requireAuth, (req, res) => {
-    res.render('admin', { cards });
+  router.get('/', requireAuth, async (req, res) => {
+    try {
+      // 🔹 Cargamos todas las órdenes desde PostgreSQL
+      const ordenesPersonasAll = await dbSelect(
+        'SELECT * FROM ordenes_personas ORDER BY fecha_entrega ASC NULLS LAST'
+      );
+      const ordenesInstitucionesAll = await dbSelect(
+        'SELECT * FROM ordenes_instituciones ORDER BY fecha_entrega ASC NULLS LAST'
+      );
+
+      const totalPersonas = ordenesPersonasAll.length;
+      const totalInstituciones = ordenesInstitucionesAll.length;
+      const totalOrdenes = totalPersonas + totalInstituciones;
+
+      const resumenPersonas = calcularResumen(ordenesPersonasAll);
+      const resumenInstituciones = calcularResumen(ordenesInstitucionesAll);
+
+      const facturadoTotal =
+        (resumenPersonas.totalPrecio || 0) +
+        (resumenInstituciones.totalPrecio || 0);
+      const abonadoTotal =
+        (resumenPersonas.totalAbono || 0) +
+        (resumenInstituciones.totalAbono || 0);
+      const saldoTotal =
+        (resumenPersonas.totalSaldo || 0) +
+        (resumenInstituciones.totalSaldo || 0);
+
+      const resumenGlobal = {
+        facturadoTotal,
+        abonadoTotal,
+        saldoTotal,
+      };
+
+      // 🔹 Citas desde JSON
+      const listaCitas = readJson(CITAS_PATH, []);
+      const hoyStr = new Date().toISOString().slice(0, 10);
+
+      const citasHoy = listaCitas.filter(
+        (c) => (c.fecha || '').slice(0, 10) === hoyStr
+      );
+      const citasPendientes = listaCitas.filter(
+        (c) => (c.estado || 'Pendiente') === 'Pendiente'
+      );
+
+      const resumenCitas = {
+        total: listaCitas.length,
+        hoy: citasHoy.length,
+        pendientes: citasPendientes.length,
+      };
+
+      // 🔹 Próximas entregas (siguientes 3 días)
+      const hoy = new Date();
+      const limite = new Date();
+      limite.setDate(hoy.getDate() + 3);
+
+      function normalizarFecha(fecha) {
+        if (!fecha) return null;
+        const d = new Date(fecha);
+        return isNaN(d.getTime()) ? null : d;
+      }
+
+      const proximasPersonas = (ordenesPersonasAll || [])
+        .map((o) => ({
+          ...o,
+          _fecha: normalizarFecha(o.fecha_entrega),
+          _tipo: 'persona',
+        }))
+        .filter((o) => o._fecha && o._fecha >= hoy && o._fecha <= limite);
+
+      const proximasInstituciones = (ordenesInstitucionesAll || [])
+        .map((o) => ({
+          ...o,
+          _fecha: normalizarFecha(o.fecha_entrega),
+          _tipo: 'institucion',
+        }))
+        .filter((o) => o._fecha && o._fecha >= hoy && o._fecha <= limite);
+
+      const proximasEntregas = [...proximasPersonas, ...proximasInstituciones]
+        .sort((a, b) => a._fecha - b._fecha)
+        .slice(0, 5);
+
+      res.render('admin', {
+        title: 'Panel de administración',
+        cards,
+        totalOrdenes,
+        totalPersonas,
+        totalInstituciones,
+        resumenPersonas,
+        resumenInstituciones,
+        resumenGlobal,
+        resumenCitas,
+        proximasEntregas,
+      });
+    } catch (err) {
+      console.error('❌ Error en dashboard /admin:', err);
+
+      // Fallback por si algo falla
+      res.render('admin', {
+        title: 'Panel de administración',
+        cards,
+        totalOrdenes: 0,
+        totalPersonas: 0,
+        totalInstituciones: 0,
+        resumenPersonas: calcularResumen([]),
+        resumenInstituciones: calcularResumen([]),
+        resumenGlobal: {
+          facturadoTotal: 0,
+          abonadoTotal: 0,
+          saldoTotal: 0,
+        },
+        resumenCitas: {
+          total: 0,
+          hoy: 0,
+          pendientes: 0,
+        },
+        proximasEntregas: [],
+      });
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -260,7 +376,7 @@ function mountAdmin(app) {
   });
 
   // ---------------------------------------------------------------------------
-  // ÓRDENES Y LIBROS (con filtros avanzados) — PostgreSQL
+  // ÓRDENES Y LIBROS (con filtros avanzados)
   // ---------------------------------------------------------------------------
   router.get('/ordenes', requireAuth, async (req, res) => {
     const tab = req.query.tab === 'personas' ? 'personas' : 'instituciones';
@@ -273,6 +389,7 @@ function mountAdmin(app) {
     const filtroEnt = (req.query.entrega || '').trim();
     const filtroPago = (req.query.pago || '').trim();
 
+    // 🔵 Cargar desde PostgreSQL
     let ordenesInstitucionesAll = [];
     let ordenesPersonasAll = [];
 
@@ -287,29 +404,36 @@ function mountAdmin(app) {
       console.error('❌ Error cargando órdenes desde PostgreSQL:', e);
     }
 
+function normalizarFechaFiltro(valor) {
+  if (!valor) return '';
+
+  // Si ya es Date (por venir de PostgreSQL)
+  if (valor instanceof Date) {
+    if (isNaN(valor.getTime())) return '';
+    return valor.toISOString().slice(0, 10); // YYYY-MM-DD
+  }
+
+  // Si viene como texto (por cosas viejas / JSON)
+  const d = new Date(valor);
+  if (isNaN(d.getTime())) {
+    // último intento: tomar los primeros 10 caracteres del valor como string
+    return String(valor).slice(0, 10);
+  }
+
+  return d.toISOString().slice(0, 10);
+}
+
     function pasaFiltrosGenerales(o) {
-  // Fecha de toma
+  // 🔹 Fecha de toma
   if (fechaDesde || fechaHasta) {
-    // Convertimos a string de forma segura
-    let f = '';
-    const raw = o.fecha_toma;
-
-    if (raw) {
-      if (raw instanceof Date) {
-        // Si viene como Date, lo pasamos a ISO y cortamos
-        f = raw.toISOString().slice(0, 10); // YYYY-MM-DD
-      } else {
-        // Si viene como string u otro tipo, lo forzamos a string
-        f = String(raw).slice(0, 10);
-      }
-    }
-
+    const f = normalizarFechaFiltro(o.fecha_toma);
     if (!f) return false;
+
     if (fechaDesde && f < fechaDesde) return false;
     if (fechaHasta && f > fechaHasta) return false;
   }
 
-  // Texto libre
+  // 🔹 Texto libre
   if (busqueda) {
     const texto = [
       o.institucion,
@@ -329,19 +453,19 @@ function mountAdmin(app) {
     if (!texto.includes(busqueda)) return false;
   }
 
-  // Urgencia
+  // 🔹 Urgencia
   if (filtroUrg) {
     const u = (o.urgencia || 'Normal').toLowerCase();
     if (u !== filtroUrg.toLowerCase()) return false;
   }
 
-  // Entrega
+  // 🔹 Entrega
   if (filtroEnt) {
     const e = (o.entrega || o.estado_entrega || 'Pendiente').toLowerCase();
     if (e !== filtroEnt.toLowerCase()) return false;
   }
 
-  // Pago
+  // 🔹 Pago
   if (filtroPago) {
     const p = derivePagoEstado(o).toLowerCase();
     if (p !== filtroPago.toLowerCase()) return false;
@@ -379,7 +503,7 @@ function mountAdmin(app) {
   });
 
   // ---------------------------------------------------------------------------
-  // NUEVA ORDEN — INSTITUCIÓN (PostgreSQL)
+  // NUEVA ORDEN — INSTITUCIÓN
   // ---------------------------------------------------------------------------
   router.get('/ordenes/nueva-institucion', requireAuth, (req, res) => {
     res.render('ordenes-nueva', {
@@ -408,14 +532,14 @@ function mountAdmin(app) {
       try {
         await dbExec(
           `
-          INSERT INTO ordenes_instituciones (
-            nombre, institucion, seccion, paquete,
-            toma_principal, collage1, collage2, collage3,
-            fecha_toma, fecha_entrega, telefono,
-            entrega, urgencia,
-            precio, abono, pago_estado
-          )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        INSERT INTO ordenes_instituciones (
+          nombre, institucion, seccion, paquete,
+          toma_principal, collage1, collage2, collage3,
+          fecha_toma, fecha_entrega, telefono,
+          entrega, urgencia,
+          precio, abono, pago_estado
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
         `,
           [
             datos.nombre || '',
@@ -439,7 +563,10 @@ function mountAdmin(app) {
 
         console.log('💾 Nueva orden de institución guardada en PostgreSQL');
       } catch (err) {
-        console.error('❌ Error guardando orden institución en PostgreSQL:', err);
+        console.error(
+          '❌ Error guardando orden institución en PostgreSQL:',
+          err
+        );
       }
 
       res.redirect('/admin/ordenes?tab=instituciones');
@@ -447,7 +574,7 @@ function mountAdmin(app) {
   );
 
   // ---------------------------------------------------------------------------
-  // NUEVA ORDEN — PERSONA (PostgreSQL)
+  // NUEVA ORDEN — PERSONA
   // ---------------------------------------------------------------------------
   router.get('/ordenes/nueva-persona', requireAuth, (req, res) => {
     res.render('ordenes-nueva-persona.ejs', {
@@ -494,20 +621,20 @@ function mountAdmin(app) {
       try {
         await dbExec(
           `
-          INSERT INTO ordenes_personas (
-            nombre,
-            numero_orden,
-            numero_toma,
-            fecha_toma,
-            fecha_entrega,
-            urgencia,
-            precio,
-            telefono,
-            entrega,
-            abono,
-            pago_estado
-          )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        INSERT INTO ordenes_personas (
+          nombre,
+          numero_orden,
+          numero_toma,
+          fecha_toma,
+          fecha_entrega,
+          urgencia,
+          precio,
+          telefono,
+          entrega,
+          abono,
+          pago_estado
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
         `,
           [
             nombre || '',
@@ -534,41 +661,46 @@ function mountAdmin(app) {
   );
 
   // ---------------------------------------------------------------------------
-  // EDITAR ORDEN — INSTITUCIÓN (PostgreSQL)
+  // EDITAR ORDEN — INSTITUCIÓN
   // ---------------------------------------------------------------------------
-  router.get(
-    '/ordenes/institucion/:id/editar',
-    requireAuth,
-    async (req, res) => {
-      const id = Number(req.params.id);
+  // ---------------------------------------------------------------------------
+// EDITAR ORDEN — INSTITUCIÓN
+// ---------------------------------------------------------------------------
+router.get(
+  '/ordenes/institucion/:id/editar',
+  requireAuth,
+  async (req, res) => {
+    const id = Number(req.params.id);
 
-      if (!id || id <= 0) {
-        return res.redirect('/admin/ordenes?tab=instituciones');
-      }
-
-      try {
-        const rows = await dbSelect(
-          'SELECT * FROM ordenes_instituciones WHERE id = $1',
-          [id]
-        );
-
-        if (!rows.length) {
-          return res.redirect('/admin/ordenes?tab=instituciones');
-        }
-
-        const orden = rows[0];
-
-        res.render('ordenes-editar-institucion.ejs', {
-          title: 'Editar orden — institución',
-          orden,
-          id,
-        });
-      } catch (err) {
-        console.error('❌ Error cargando orden institución:', err);
-        return res.redirect('/admin/ordenes?tab=instituciones');
-      }
+    if (!id || id <= 0) {
+      return res.redirect('/admin/ordenes?tab=instituciones');
     }
-  );
+
+    try {
+      const rows = await dbSelect(
+        'SELECT * FROM ordenes_instituciones WHERE id = $1',
+        [id]
+      );
+
+      if (!rows.length) {
+        return res.redirect('/admin/ordenes?tab=instituciones');
+      }
+
+      const orden = rows[0];
+
+      // 👇 usa la vista que ya tenías para instituciones
+      res.render('ordenes-editar-institucion.ejs', {
+        title: 'Editar orden — institución',
+        idx: id,   // la vista suele usar idx en la acción del form
+        orden,
+      });
+    } catch (err) {
+      console.error('❌ Error cargando orden institución:', err);
+      return res.redirect('/admin/ordenes?tab=instituciones');
+    }
+  }
+);
+
 
   router.post(
     '/ordenes/institucion/:id/editar',
@@ -589,25 +721,25 @@ function mountAdmin(app) {
       try {
         await dbExec(
           `
-          UPDATE ordenes_instituciones
-          SET
-            nombre = $1,
-            institucion = $2,
-            seccion = $3,
-            paquete = $4,
-            toma_principal = $5,
-            collage1 = $6,
-            collage2 = $7,
-            collage3 = $8,
-            fecha_toma = $9,
-            fecha_entrega = $10,
-            telefono = $11,
-            entrega = $12,
-            urgencia = $13,
-            precio = $14,
-            abono = $15,
-            pago_estado = $16
-          WHERE id = $17
+        UPDATE ordenes_instituciones
+        SET
+          nombre = $1,
+          institucion = $2,
+          seccion = $3,
+          paquete = $4,
+          toma_principal = $5,
+          collage1 = $6,
+          collage2 = $7,
+          collage3 = $8,
+          fecha_toma = $9,
+          fecha_entrega = $10,
+          telefono = $11,
+          entrega = $12,
+          urgencia = $13,
+          precio = $14,
+          abono = $15,
+          pago_estado = $16
+        WHERE id = $17
         `,
           [
             datos.nombre || '',
@@ -640,42 +772,37 @@ function mountAdmin(app) {
   );
 
   // ---------------------------------------------------------------------------
-  // EDITAR ORDEN — PERSONA (PostgreSQL)
+  // EDITAR ORDEN — PERSONA
   // ---------------------------------------------------------------------------
-  router.get(
-    '/ordenes/persona/:id/editar',
-    requireAuth,
-    async (req, res) => {
-      try {
-        const id = Number(req.params.id);
 
-        if (!id || id <= 0) {
-          return res.redirect('/admin/ordenes?tab=personas');
-        }
+  // GET - Editar persona
+  router.get('/ordenes/persona/:id/editar', requireAuth, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
 
-        const rows = await dbSelect(
-          'SELECT * FROM ordenes_personas WHERE id = $1',
-          [id]
-        );
+      const rows = await dbSelect(
+        'SELECT * FROM ordenes_personas WHERE id = $1',
+        [id]
+      );
 
-        if (!rows.length) {
-          return res.redirect('/admin/ordenes?tab=personas');
-        }
-
-        const orden = rows[0];
-
-        res.render('ordenes-editar-persona', {
-          title: 'Editar orden — persona',
-          idx: id,
-          orden,
-        });
-      } catch (err) {
-        console.error('❌ Error GET editar persona:', err);
-        res.redirect('/admin/ordenes?tab=personas');
+      if (!rows.length) {
+        return res.status(404).send('Orden no encontrada');
       }
-    }
-  );
 
+      const orden = rows[0];
+
+      res.render('ordenes-editar-persona', {
+        title: 'Editar orden — persona',
+        idx: id,
+        orden,
+      });
+    } catch (err) {
+      console.error('❌ Error GET editar persona:', err);
+      res.status(500).send('Error interno');
+    }
+  });
+
+  // POST - Guardar edición persona
   router.post(
     '/ordenes/persona/:id/editar',
     requireAuth,
@@ -683,59 +810,58 @@ function mountAdmin(app) {
     async (req, res) => {
       try {
         const id = Number(req.params.id);
-        const datos = req.body || {};
 
-        if (!id || id <= 0) {
-          return res.redirect('/admin/ordenes?tab=personas');
-        }
-
-        const precioNum = Number(datos.precio) || 0;
-        const abonoNum = Number(datos.abono) || 0;
-        const pagoEstado = computePagoEstado(precioNum, abonoNum);
+        const {
+          nombre,
+          numero_orden,
+          numero_toma,
+          fecha_toma,
+          fecha_entrega,
+          urgencia,
+          precio,
+          abono,
+          telefono,
+          estado_entrega,
+        } = req.body;
 
         await dbExec(
-          `
-          UPDATE ordenes_personas
-          SET
-            nombre = $1,
-            numero_orden = $2,
-            numero_toma = $3,
-            fecha_toma = $4,
-            fecha_entrega = $5,
-            urgencia = $6,
-            precio = $7,
-            abono = $8,
-            telefono = $9,
-            entrega = $10,
-            pago_estado = $11
-          WHERE id = $12
-        `,
+          `UPDATE ordenes_personas 
+       SET nombre=$1,
+           numero_orden=$2,
+           numero_toma=$3,
+           fecha_toma=$4,
+           fecha_entrega=$5,
+           urgencia=$6,
+           precio=$7,
+           abono=$8,
+           telefono=$9,
+           entrega=$10
+       WHERE id = $11`,
           [
-            datos.nombre || '',
-            datos.numero_orden || '',
-            datos.numero_toma || '',
-            datos.fecha_toma || null,
-            datos.fecha_entrega || null,
-            datos.urgencia || 'Normal',
-            precioNum,
-            abonoNum,
-            datos.telefono || '',
-            datos.estado_entrega || 'Pendiente',
-            pagoEstado,
+            nombre,
+            numero_orden,
+            numero_toma,
+            fecha_toma || null,
+            fecha_entrega || null,
+            urgencia,
+            Number(precio) || 0,
+            Number(abono) || 0,
+            telefono,
+            estado_entrega,
             id,
           ]
         );
 
-        res.redirect('/admin/ordenes?tab=personas');
+        res.redirect(`/admin/ordenes?tab=personas`);
       } catch (err) {
         console.error('❌ Error POST editar persona:', err);
-        res.redirect('/admin/ordenes?tab=personas');
+        res.status(500).send('Error interno');
       }
     }
   );
 
   // ---------------------------------------------------------------------------
-  // ELIMINAR ORDEN — INSTITUCIÓN (PostgreSQL)
+  // ELIMINAR ORDEN — INSTITUCIÓN
   // ---------------------------------------------------------------------------
   router.post(
     '/ordenes/institucion/:id/eliminar',
@@ -744,14 +870,10 @@ function mountAdmin(app) {
     async (req, res) => {
       const id = Number(req.params.id);
 
-      if (!id || id <= 0) {
-        return res.redirect('/admin/ordenes?tab=instituciones');
-      }
-
       try {
         await dbExec('DELETE FROM ordenes_instituciones WHERE id = $1', [id]);
-      } catch (err) {
-        console.error('❌ Error eliminando orden institución:', err);
+      } catch (e) {
+        console.error('❌ Error eliminando institucion:', e);
       }
 
       res.redirect('/admin/ordenes?tab=instituciones');
@@ -759,7 +881,7 @@ function mountAdmin(app) {
   );
 
   // ---------------------------------------------------------------------------
-  // ELIMINAR ORDEN — PERSONA (PostgreSQL)
+  // ELIMINAR ORDEN — PERSONA
   // ---------------------------------------------------------------------------
   router.post(
     '/ordenes/persona/:id/eliminar',
@@ -768,14 +890,10 @@ function mountAdmin(app) {
     async (req, res) => {
       const id = Number(req.params.id);
 
-      if (!id || id <= 0) {
-        return res.redirect('/admin/ordenes?tab=personas');
-      }
-
       try {
         await dbExec('DELETE FROM ordenes_personas WHERE id = $1', [id]);
-      } catch (err) {
-        console.error('❌ Error eliminando orden persona:', err);
+      } catch (e) {
+        console.error('❌ Error eliminando persona:', e);
       }
 
       res.redirect('/admin/ordenes?tab=personas');
@@ -783,17 +901,13 @@ function mountAdmin(app) {
   );
 
   // ---------------------------------------------------------------------------
-  // DETALLE ORDEN — INSTITUCIÓN (PostgreSQL)
+  // DETALLE ORDEN — INSTITUCIÓN
   // ---------------------------------------------------------------------------
   router.get(
     '/ordenes/institucion/:id',
     requireAuth,
     async (req, res) => {
       const id = Number(req.params.id);
-
-      if (!id || id <= 0) {
-        return res.redirect('/admin/ordenes?tab=instituciones');
-      }
 
       try {
         const rows = await dbSelect(
@@ -813,53 +927,57 @@ function mountAdmin(app) {
           idx: id,
           orden,
         });
-      } catch (err) {
-        console.error('❌ Error detalle institución:', err);
+      } catch (e) {
+        console.error('❌ Error detalle institucion:', e);
         res.redirect('/admin/ordenes?tab=instituciones');
       }
     }
   );
 
   // ---------------------------------------------------------------------------
-  // DETALLE ORDEN — PERSONA (PostgreSQL)
+  // DETALLE ORDEN — PERSONA
   // ---------------------------------------------------------------------------
-  router.get(
-    '/ordenes/persona/:id',
-    requireAuth,
-    async (req, res) => {
-      const id = Number(req.params.id);
+ // ---------------------------------------------------------------------------
+// DETALLE ORDEN — PERSONA (PostgreSQL)
+// ---------------------------------------------------------------------------
+router.get(
+  '/ordenes/persona/:id',
+  requireAuth,
+  async (req, res) => {
+    const id = Number(req.params.id);
 
-      if (!id || id <= 0) {
+    if (!id || id <= 0) {
+      return res.redirect('/admin/ordenes?tab=personas');
+    }
+
+    try {
+      const rows = await dbSelect(
+        'SELECT * FROM ordenes_personas WHERE id = $1',
+        [id]
+      );
+
+      if (!rows.length) {
         return res.redirect('/admin/ordenes?tab=personas');
       }
 
-      try {
-        const rows = await dbSelect(
-          'SELECT * FROM ordenes_personas WHERE id = $1',
-          [id]
-        );
+      const orden = rows[0];
 
-        if (!rows.length) {
-          return res.redirect('/admin/ordenes?tab=personas');
-        }
-
-        const orden = rows[0];
-
-        res.render('orden-detalle', {
-          title: 'Detalle de orden — persona',
-          tipo: 'persona',
-          idx: id,
-          orden,
-        });
-      } catch (err) {
-        console.error('❌ Error detalle persona:', err);
-        res.redirect('/admin/ordenes?tab=personas');
-      }
+      res.render('orden-detalle', {
+        title: 'Detalle de orden — persona',
+        tipo: 'persona',
+        idx: id,
+        orden,
+      });
+    } catch (err) {
+      console.error('❌ Error detalle persona:', err);
+      res.redirect('/admin/ordenes?tab=personas');
     }
-  );
+  }
+);
+
 
   // ---------------------------------------------------------------------------
-  // CAMBIAR ESTADO DE ENTREGA — PERSONAS (PostgreSQL)
+  // CAMBIAR ESTADO DE ENTREGA — PERSONAS
   // ---------------------------------------------------------------------------
   router.post(
     '/ordenes/persona/entrega',
@@ -870,17 +988,13 @@ function mountAdmin(app) {
       const nuevoEstado =
         req.body.estado === 'Entregado' ? 'Entregado' : 'Pendiente';
 
-      if (!id || id <= 0) {
-        return res.redirect('/admin/ordenes?tab=personas');
-      }
-
       try {
         await dbExec(
           'UPDATE ordenes_personas SET entrega = $1 WHERE id = $2',
           [nuevoEstado, id]
         );
-      } catch (err) {
-        console.error('❌ Error cambio entrega persona:', err);
+      } catch (e) {
+        console.error('❌ Error cambiando entrega persona:', e);
       }
 
       res.redirect('/admin/ordenes?tab=personas');
@@ -888,7 +1002,7 @@ function mountAdmin(app) {
   );
 
   // ---------------------------------------------------------------------------
-  // CAMBIAR ESTADO DE ENTREGA — INSTITUCIONES (PostgreSQL)
+  // CAMBIAR ESTADO DE ENTREGA — INSTITUCIONES
   // ---------------------------------------------------------------------------
   router.post(
     '/ordenes/institucion/entrega',
@@ -899,17 +1013,13 @@ function mountAdmin(app) {
       const nuevoEstado =
         req.body.estado === 'Entregado' ? 'Entregado' : 'Pendiente';
 
-      if (!id || id <= 0) {
-        return res.redirect('/admin/ordenes?tab=instituciones');
-      }
-
       try {
         await dbExec(
           'UPDATE ordenes_instituciones SET entrega = $1 WHERE id = $2',
           [nuevoEstado, id]
         );
-      } catch (err) {
-        console.error('❌ Error cambio entrega institución:', err);
+      } catch (e) {
+        console.error('❌ Error cambiando entrega institucion:', e);
       }
 
       res.redirect('/admin/ordenes?tab=instituciones');
@@ -917,7 +1027,7 @@ function mountAdmin(app) {
   );
 
   // ---------------------------------------------------------------------------
-  // ABONAR / MARCAR PAGADO — PERSONAS (PostgreSQL)
+  // ABONAR / MARCAR PAGADO — PERSONAS
   // ---------------------------------------------------------------------------
   router.post(
     '/ordenes/persona/:id/abonar',
@@ -927,7 +1037,7 @@ function mountAdmin(app) {
       const id = Number(req.params.id);
       const monto = Number(req.body.monto) || 0;
 
-      if (!id || id <= 0 || monto <= 0) {
+      if (monto <= 0) {
         return res.redirect('/admin/ordenes?tab=personas');
       }
 
@@ -936,7 +1046,6 @@ function mountAdmin(app) {
           'SELECT * FROM ordenes_personas WHERE id = $1',
           [id]
         );
-
         if (!rows.length) {
           return res.redirect('/admin/ordenes?tab=personas');
         }
@@ -945,7 +1054,6 @@ function mountAdmin(app) {
         const precio = Number(item.precio) || 0;
         const abonoActual = Number(item.abono) || 0;
         let nuevoAbono = abonoActual + monto;
-
         if (nuevoAbono > precio) nuevoAbono = precio;
 
         const pagoEstado = computePagoEstado(precio, nuevoAbono);
@@ -954,8 +1062,8 @@ function mountAdmin(app) {
           'UPDATE ordenes_personas SET abono = $1, pago_estado = $2 WHERE id = $3',
           [nuevoAbono, pagoEstado, id]
         );
-      } catch (err) {
-        console.error('❌ Error abonar persona:', err);
+      } catch (e) {
+        console.error('❌ Error abonar persona:', e);
       }
 
       res.redirect('/admin/ordenes?tab=personas');
@@ -969,28 +1077,24 @@ function mountAdmin(app) {
     async (req, res) => {
       const id = Number(req.params.id);
 
-      if (!id || id <= 0) {
-        return res.redirect('/admin/ordenes?tab=personas');
-      }
-
       try {
         const rows = await dbSelect(
-          'SELECT precio FROM ordenes_personas WHERE id = $1',
+          'SELECT * FROM ordenes_personas WHERE id = $1',
           [id]
         );
-
         if (!rows.length) {
           return res.redirect('/admin/ordenes?tab=personas');
         }
 
-        const precio = Number(rows[0].precio) || 0;
+        const item = rows[0];
+        const precio = Number(item.precio) || 0;
 
         await dbExec(
           'UPDATE ordenes_personas SET abono = $1, pago_estado = $2 WHERE id = $3',
           [precio, 'Pagado', id]
         );
-      } catch (err) {
-        console.error('❌ Error marcar pagado persona:', err);
+      } catch (e) {
+        console.error('❌ Error marcar pagado persona:', e);
       }
 
       res.redirect('/admin/ordenes?tab=personas');
@@ -998,7 +1102,7 @@ function mountAdmin(app) {
   );
 
   // ---------------------------------------------------------------------------
-  // ABONAR / MARCAR PAGADO — INSTITUCIONES (PostgreSQL)
+  // ABONAR / MARCAR PAGADO — INSTITUCIONES
   // ---------------------------------------------------------------------------
   router.post(
     '/ordenes/institucion/:id/abonar',
@@ -1008,7 +1112,7 @@ function mountAdmin(app) {
       const id = Number(req.params.id);
       const monto = Number(req.body.monto) || 0;
 
-      if (!id || id <= 0 || monto <= 0) {
+      if (monto <= 0) {
         return res.redirect('/admin/ordenes?tab=instituciones');
       }
 
@@ -1017,7 +1121,6 @@ function mountAdmin(app) {
           'SELECT * FROM ordenes_instituciones WHERE id = $1',
           [id]
         );
-
         if (!rows.length) {
           return res.redirect('/admin/ordenes?tab=instituciones');
         }
@@ -1026,7 +1129,6 @@ function mountAdmin(app) {
         const precio = Number(item.precio) || 0;
         const abonoActual = Number(item.abono) || 0;
         let nuevoAbono = abonoActual + monto;
-
         if (nuevoAbono > precio) nuevoAbono = precio;
 
         const pagoEstado = computePagoEstado(precio, nuevoAbono);
@@ -1035,8 +1137,8 @@ function mountAdmin(app) {
           'UPDATE ordenes_instituciones SET abono = $1, pago_estado = $2 WHERE id = $3',
           [nuevoAbono, pagoEstado, id]
         );
-      } catch (err) {
-        console.error('❌ Error abonar institución:', err);
+      } catch (e) {
+        console.error('❌ Error abonar institucion:', e);
       }
 
       res.redirect('/admin/ordenes?tab=instituciones');
@@ -1050,28 +1152,24 @@ function mountAdmin(app) {
     async (req, res) => {
       const id = Number(req.params.id);
 
-      if (!id || id <= 0) {
-        return res.redirect('/admin/ordenes?tab=instituciones');
-      }
-
       try {
         const rows = await dbSelect(
-          'SELECT precio FROM ordenes_instituciones WHERE id = $1',
+          'SELECT * FROM ordenes_instituciones WHERE id = $1',
           [id]
         );
-
         if (!rows.length) {
           return res.redirect('/admin/ordenes?tab=instituciones');
         }
 
-        const precio = Number(rows[0].precio) || 0;
+        const item = rows[0];
+        const precio = Number(item.precio) || 0;
 
         await dbExec(
           'UPDATE ordenes_instituciones SET abono = $1, pago_estado = $2 WHERE id = $3',
           [precio, 'Pagado', id]
         );
-      } catch (err) {
-        console.error('❌ Error marcar pagado institución:', err);
+      } catch (e) {
+        console.error('❌ Error marcar pagado institucion:', e);
       }
 
       res.redirect('/admin/ordenes?tab=instituciones');
@@ -1079,53 +1177,44 @@ function mountAdmin(app) {
   );
 
   // ---------------------------------------------------------------------------
-  // RECIBO — PERSONA (HTML imprimible media carta) — PostgreSQL
+  // RECIBO — PERSONA (HTML imprimible media carta)
   // ---------------------------------------------------------------------------
-  router.get(
-    '/ordenes/persona/:id/recibo',
-    requireAuth,
-    async (req, res) => {
-      const id = Number(req.params.id);
+  router.get('/ordenes/persona/:id/recibo', requireAuth, async (req, res) => {
+    const id = Number(req.params.id);
 
-      if (!id || id <= 0) {
+    try {
+      const rows = await dbSelect(
+        'SELECT * FROM ordenes_personas WHERE id = $1',
+        [id]
+      );
+      if (!rows.length) {
         return res.redirect('/admin/ordenes?tab=personas');
       }
 
-      try {
-        const rows = await dbSelect(
-          'SELECT * FROM ordenes_personas WHERE id = $1',
-          [id]
-        );
+      const orden = rows[0];
+      const precio = Number(orden.precio || 0);
+      const abono = Number(orden.abono || 0);
+      const saldo = Math.max(precio - abono, 0);
+      const pagoEstado = derivePagoEstado(orden);
 
-        if (!rows.length) {
-          return res.redirect('/admin/ordenes?tab=personas');
-        }
-
-        const orden = rows[0];
-        const precio = Number(orden.precio || 0);
-        const abono = Number(orden.abono || 0);
-        const saldo = Math.max(precio - abono, 0);
-        const pagoEstado = derivePagoEstado(orden);
-
-        res.render('orden-recibo.ejs', {
-          title: 'Recibo — persona',
-          tipo: 'persona',
-          idx: id,
-          orden,
-          precio,
-          abono,
-          saldo,
-          pagoEstado,
-        });
-      } catch (err) {
-        console.error('❌ Error recibo persona:', err);
-        res.redirect('/admin/ordenes?tab=personas');
-      }
+      res.render('orden-recibo.ejs', {
+        title: 'Recibo — persona',
+        tipo: 'persona',
+        idx: id,
+        orden,
+        precio,
+        abono,
+        saldo,
+        pagoEstado,
+      });
+    } catch (e) {
+      console.error('❌ Error recibo persona:', e);
+      res.redirect('/admin/ordenes?tab=personas');
     }
-  );
+  });
 
   // ---------------------------------------------------------------------------
-  // RECIBO — INSTITUCIÓN (HTML imprimible media carta) — PostgreSQL
+  // RECIBO — INSTITUCIÓN (HTML imprimible media carta)
   // ---------------------------------------------------------------------------
   router.get(
     '/ordenes/institucion/:id/recibo',
@@ -1133,16 +1222,11 @@ function mountAdmin(app) {
     async (req, res) => {
       const id = Number(req.params.id);
 
-      if (!id || id <= 0) {
-        return res.redirect('/admin/ordenes?tab=instituciones');
-      }
-
       try {
         const rows = await dbSelect(
           'SELECT * FROM ordenes_instituciones WHERE id = $1',
           [id]
         );
-
         if (!rows.length) {
           return res.redirect('/admin/ordenes?tab=instituciones');
         }
@@ -1163,61 +1247,52 @@ function mountAdmin(app) {
           saldo,
           pagoEstado,
         });
-      } catch (err) {
-        console.error('❌ Error recibo institución:', err);
+      } catch (e) {
+        console.error('❌ Error recibo institucion:', e);
         res.redirect('/admin/ordenes?tab=instituciones');
       }
     }
   );
 
   // ---------------------------------------------------------------------------
-  // TICKET 80 mm — PERSONA (PostgreSQL)
+  // TICKET 80 mm — PERSONA
   // ---------------------------------------------------------------------------
-  router.get(
-    '/ordenes/persona/:id/ticket',
-    requireAuth,
-    async (req, res) => {
-      const id = Number(req.params.id);
+  router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
+    const id = Number(req.params.id);
 
-      if (!id || id <= 0) {
+    try {
+      const rows = await dbSelect(
+        'SELECT * FROM ordenes_personas WHERE id = $1',
+        [id]
+      );
+      if (!rows.length) {
         return res.redirect('/admin/ordenes?tab=personas');
       }
 
-      try {
-        const rows = await dbSelect(
-          'SELECT * FROM ordenes_personas WHERE id = $1',
-          [id]
-        );
+      const orden = rows[0];
+      const precio = Number(orden.precio || 0);
+      const abono = Number(orden.abono || 0);
+      const saldo = Math.max(precio - abono, 0);
+      const pagoEstado = derivePagoEstado(orden);
 
-        if (!rows.length) {
-          return res.redirect('/admin/ordenes?tab=personas');
-        }
-
-        const orden = rows[0];
-        const precio = Number(orden.precio || 0);
-        const abono = Number(orden.abono || 0);
-        const saldo = Math.max(precio - abono, 0);
-        const pagoEstado = derivePagoEstado(orden);
-
-        res.render('orden-ticket.ejs', {
-          title: 'Ticket — persona',
-          tipo: 'persona',
-          idx: id,
-          orden,
-          precio,
-          abono,
-          saldo,
-          pagoEstado,
-        });
-      } catch (err) {
-        console.error('❌ Error ticket persona:', err);
-        res.redirect('/admin/ordenes?tab=personas');
-      }
+      res.render('orden-ticket.ejs', {
+        title: 'Ticket — persona',
+        tipo: 'persona',
+        idx: id,
+        orden,
+        precio,
+        abono,
+        saldo,
+        pagoEstado,
+      });
+    } catch (e) {
+      console.error('❌ Error ticket persona:', e);
+      res.redirect('/admin/ordenes?tab=personas');
     }
-  );
+  });
 
   // ---------------------------------------------------------------------------
-  // TICKET 80 mm — INSTITUCIÓN (PostgreSQL)
+  // TICKET 80 mm — INSTITUCIÓN
   // ---------------------------------------------------------------------------
   router.get(
     '/ordenes/institucion/:id/ticket',
@@ -1225,16 +1300,11 @@ function mountAdmin(app) {
     async (req, res) => {
       const id = Number(req.params.id);
 
-      if (!id || id <= 0) {
-        return res.redirect('/admin/ordenes?tab=instituciones');
-      }
-
       try {
         const rows = await dbSelect(
           'SELECT * FROM ordenes_instituciones WHERE id = $1',
           [id]
         );
-
         if (!rows.length) {
           return res.redirect('/admin/ordenes?tab=instituciones');
         }
@@ -1255,15 +1325,15 @@ function mountAdmin(app) {
           saldo,
           pagoEstado,
         });
-      } catch (err) {
-        console.error('❌ Error ticket institución:', err);
+      } catch (e) {
+        console.error('❌ Error ticket institucion:', e);
         res.redirect('/admin/ordenes?tab=instituciones');
       }
     }
   );
 
   // ---------------------------------------------------------------------------
-  // PANEL DE CITAS (sigue con JSON)
+  // PANEL DE CITAS
   // ---------------------------------------------------------------------------
   router.get('/citas', requireAuth, (req, res) => {
     const fechaDesde = (req.query.fecha_desde || '').trim();
@@ -1363,7 +1433,9 @@ function mountAdmin(app) {
         return res.redirect('/admin/citas');
       }
 
-      const nuevoEstado = ['Pendiente', 'Atendida', 'Cancelada'].includes(estado)
+      const nuevoEstado = ['Pendiente', 'Atendida', 'Cancelada'].includes(
+        estado
+      )
         ? estado
         : 'Pendiente';
 
@@ -1399,10 +1471,9 @@ function mountAdmin(app) {
   // HERRAMIENTAS OCR
   // ---------------------------------------------------------------------------
   router.get('/herramientas', requireAuth, (req, res) => {
-    // Si ya tienes texto del OCR desde un POST, aquí podrías pasarlo en "ocrText"
     res.render('herramientas-ocr', {
       title: 'Herramientas OCR',
-      ocrText: '', // por ahora vacío; luego lo llenamos desde tu backend de OCR
+      ocrText: '',
     });
   });
 
@@ -1424,22 +1495,18 @@ function mountAdmin(app) {
       let textoDelOcr = '';
 
       try {
-        // 1️⃣ Preprocesar la imagen: agrandar, blanco y negro, más contraste
         await sharp(imagenPath)
-          .resize({ width: 1800, withoutEnlargement: false }) // la agrandamos a ~1800 px de ancho
+          .resize({ width: 1800, withoutEnlargement: false })
           .grayscale()
-          .normalize() // mejora contraste
-          .toFile(preprocesadaPath); // guardamos imagen procesada
+          .normalize()
+          .toFile(preprocesadaPath);
 
-        // 2️⃣ Pasar la imagen procesada a Tesseract
         const result = await Tesseract.recognize(preprocesadaPath, 'spa+eng', {
-          logger: (m) => console.log('[OCR]', m), // opcional, progreso en consola
+          logger: (m) => console.log('[OCR]', m),
         });
 
-        textoDelOcr =
-          result.data && result.data.text ? result.data.text : '';
+        textoDelOcr = (result.data && result.data.text) ? result.data.text : '';
 
-        // Limpieza básica de saltos de línea
         textoDelOcr = textoDelOcr
           .replace(/\r\n/g, '\n')
           .replace(/\n{3,}/g, '\n\n')
@@ -1450,13 +1517,8 @@ function mountAdmin(app) {
           'Ocurrió un error al procesar la imagen con OCR.\n' +
           'Revisa la consola del servidor para más detalles.';
       } finally {
-        // Borramos archivos temporales
-        try {
-          fs.unlinkSync(imagenPath);
-        } catch (e) {}
-        try {
-          fs.unlinkSync(preprocesadaPath);
-        } catch (e) {}
+        try { fs.unlinkSync(imagenPath); } catch (e) {}
+        try { fs.unlinkSync(preprocesadaPath); } catch (e) {}
       }
 
       res.render('herramientas-ocr', {
