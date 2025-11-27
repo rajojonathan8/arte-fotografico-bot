@@ -44,6 +44,10 @@
       max-width: 170px;
       height: auto;
     }
+    .img-qr img {
+      max-width: 200px;
+      height: auto;
+    }
     /* CONTENEDOR TICKET 80 mm */
     .ticket-wrapper {
       width: 80mm;
@@ -295,7 +299,7 @@ const fechaEnt    = formatFecha(orden.fecha_entrega);
         * Todo abono o reservación de evento no es reembolsable.
       </div>
        <div class="vertical-note">
-              NOTA: FOTOS DISPONIBLES POR UN PERIODO DE 30 días.
+              NOTA: FOTOS DISPONIBLES POR UN PERIODO DE 30 DÍAS.
             </div>
       <hr />
 
@@ -310,7 +314,13 @@ const fechaEnt    = formatFecha(orden.fecha_entrega);
      
 
       <div class="center small mt-2">
-        ¡Gracias por su preferencia!
+        ¡Gracias por su preferencia! Escanea el código para chatear.<br />
+      </div>
+       <!-- CABECERA -->
+      <div class="center">
+        <div class="img-qr">
+            <img src="/admin-public/qr-code.png" alt="Arte Fotográfico">
+          </div>
       </div>
 
     </div>
