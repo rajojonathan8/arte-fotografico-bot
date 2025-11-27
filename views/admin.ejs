@@ -116,11 +116,12 @@
     </article>
 
     <!-- Próximas entregas (notificaciones) -->
+        <!-- Próximas entregas (notificaciones) -->
     <article class="bg-slate-900/70 border border-slate-700 rounded-2xl p-4">
       <%
         function fechaCorta(value) {
           if (!value) return '';
-          const d = (value instanceof Date) ? value : new Date(value);
+          var d = (value instanceof Date) ? value : new Date(value);
           if (isNaN(d.getTime())) return '';
           return d.toISOString().slice(0, 10);
         }
@@ -140,19 +141,38 @@
       <% } else { %>
         <ul class="mt-3 space-y-2 text-sm">
           <% proximasEntregas.forEach(function(o) { 
-               const tipo = o._tipo === 'institucion' ? 'Institución' : 'Persona';
-               const nombre = o.nombre || o.institucion || 'Sin nombre';
-               const saldoItem = Math.max(
+               var tipo = (o._tipo === 'institucion') ? 'Institución' : 'Persona';
+               var nombre = o.nombre || o.institucion || 'Sin nombre';
+               var saldoItem = Math.max(
                  (Number(o.precio || 0) - Number(o.abono || 0)) || 0,
                  0
                );
+
+               var urgencia = o.urgencia || 'Normal';
+
+               // clases para la etiqueta de tipo (persona / institución)
+               var tipoClass = (tipo === 'Institución')
+                 ? 'bg-sky-900/60 text-sky-300'
+                 : 'bg-emerald-900/60 text-emerald-300';
+
+               // clases para la etiqueta de urgencia
+               var urgClass = 'bg-slate-800 text-slate-200 border border-slate-600/70';
+               if (urgencia === 'Urgente') {
+                 urgClass = 'bg-amber-500/20 text-amber-200 border border-amber-400/70';
+               } else if (urgencia === 'Muy urgente') {
+                 urgClass = 'bg-red-500/20 text-red-200 border border-red-400/70';
+               }
           %>
             <li class="flex items-start justify-between rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2">
               <div>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold
-                               <%= tipo === 'Institución' ? 'bg-sky-900/60 text-sky-300' : 'bg-emerald-900/60 text-emerald-300' %>">
-                  <%= tipo %>
-                </span>
+                <div class="flex items-center gap-1">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold <%= tipoClass %>">
+                    <%= tipo %>
+                  </span>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold <%= urgClass %>">
+                    <%= urgencia %>
+                  </span>
+                </div>
                 <p class="mt-1 text-sm text-slate-100 truncate max-w-[200px]">
                   <%= nombre %>
                 </p>
@@ -172,6 +192,7 @@
         </ul>
       <% } %>
     </article>
+
 
   </section>
 </main>

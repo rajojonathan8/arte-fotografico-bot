@@ -294,35 +294,61 @@ function mountAdmin(app) {
       };
 
       // 🔹 Próximas entregas (siguientes 3 días)
-      const hoy = new Date();
-      const limite = new Date();
-      limite.setDate(hoy.getDate() + 3);
+        // ================== PRÓXIMAS ENTREGAS (3 días) ==================
+  const hoy = new Date();
+  const limite = new Date();
+  limite.setDate(hoy.getDate() + 3);
 
-      function normalizarFecha(fecha) {
-        if (!fecha) return null;
-        const d = new Date(fecha);
-        return isNaN(d.getTime()) ? null : d;
-      }
+  const hoyISO = hoy.toISOString().slice(0, 10);
+  const limISO = limite.toISOString().slice(0, 10);
 
-      const proximasPersonas = (ordenesPersonasAll || [])
-        .map((o) => ({
-          ...o,
-          _fecha: normalizarFecha(o.fecha_entrega),
-          _tipo: 'persona',
-        }))
-        .filter((o) => o._fecha && o._fecha >= hoy && o._fecha <= limite);
+  // Personas
+  const proximasPersonas = await dbSelect(
+    `SELECT id, nombre, fecha_entrega, precio, abono, urgencia
+     FROM ordenes_personas
+     WHERE fecha_entrega IS NOT NULL
+       AND fecha_entrega::date BETWEEN $1 AND $2
+       AND (entrega IS NULL OR entrega <> 'Entregado')
+     ORDER BY fecha_entrega ASC
+     LIMIT 20`,
+    [hoyISO, limISO]
+  );
 
-      const proximasInstituciones = (ordenesInstitucionesAll || [])
-        .map((o) => ({
-          ...o,
-          _fecha: normalizarFecha(o.fecha_entrega),
-          _tipo: 'institucion',
-        }))
-        .filter((o) => o._fecha && o._fecha >= hoy && o._fecha <= limite);
+  // Instituciones
+  const proximasInstituciones = await dbSelect(
+    `SELECT id, institucion, fecha_entrega, precio, abono, urgencia
+     FROM ordenes_instituciones
+     WHERE fecha_entrega IS NOT NULL
+       AND fecha_entrega::date BETWEEN $1 AND $2
+       AND (entrega IS NULL OR entrega <> 'Entregado')
+     ORDER BY fecha_entrega ASC
+     LIMIT 20`,
+    [hoyISO, limISO]
+  );
 
-      const proximasEntregas = [...proximasPersonas, ...proximasInstituciones]
-        .sort((a, b) => a._fecha - b._fecha)
-        .slice(0, 5);
+  const proximasEntregas = [
+    ...proximasPersonas.map(o => ({
+      tipo: 'persona',
+      id: o.id,
+      nombre: o.nombre,
+      fecha_entrega: o.fecha_entrega,
+      saldo: Math.max(Number(o.precio || 0) - Number(o.abono || 0), 0),
+      urgencia: o.urgencia || 'Normal',
+    })),
+    ...proximasInstituciones.map(o => ({
+      tipo: 'institucion',
+      id: o.id,
+      nombre: o.institucion,
+      fecha_entrega: o.fecha_entrega,
+      saldo: Math.max(Number(o.precio || 0) - Number(o.abono || 0), 0),
+      urgencia: o.urgencia || 'Normal',
+    })),
+  ].sort((a, b) => {
+    const da = new Date(a.fecha_entrega || a.fecha);
+    const dbb = new Date(b.fecha_entrega || b.fecha);
+    return da - dbb;
+  });
+
 
       res.render('admin', {
         title: 'Panel de administración',
