@@ -295,59 +295,63 @@ function mountAdmin(app) {
 
       // 🔹 Próximas entregas (siguientes 3 días)
         // ================== PRÓXIMAS ENTREGAS (3 días) ==================
-  const hoy = new Date();
-  const limite = new Date();
-  limite.setDate(hoy.getDate() + 3);
+      // ================== PRÓXIMAS ENTREGAS & ATRASADAS ==================
+    const hoy = new Date();
+    const hoyISO = hoy.toISOString().slice(0, 10); // YYYY-MM-DD
 
-  const hoyISO = hoy.toISOString().slice(0, 10);
-  const limISO = limite.toISOString().slice(0, 10);
+    const limite = new Date(hoy);
+    limite.setDate(limite.getDate() + 3);
+    const limiteISO = limite.toISOString().slice(0, 10);
 
-  // Personas
-  const proximasPersonas = await dbSelect(
-    `SELECT id, nombre, fecha_entrega, precio, abono, urgencia
-     FROM ordenes_personas
-     WHERE fecha_entrega IS NOT NULL
-       AND fecha_entrega::date BETWEEN $1 AND $2
-       AND (entrega IS NULL OR entrega <> 'Entregado')
-     ORDER BY fecha_entrega ASC
-     LIMIT 20`,
-    [hoyISO, limISO]
-  );
+    // Personas pendientes
+    const pendientesPersonas = await dbSelect(`
+      SELECT id, nombre, precio, abono, fecha_entrega, urgencia, entrega
+      FROM ordenes_personas
+      WHERE fecha_entrega IS NOT NULL
+        AND (entrega IS NULL OR entrega <> 'Entregado')
+    `);
 
-  // Instituciones
-  const proximasInstituciones = await dbSelect(
-    `SELECT id, institucion, fecha_entrega, precio, abono, urgencia
-     FROM ordenes_instituciones
-     WHERE fecha_entrega IS NOT NULL
-       AND fecha_entrega::date BETWEEN $1 AND $2
-       AND (entrega IS NULL OR entrega <> 'Entregado')
-     ORDER BY fecha_entrega ASC
-     LIMIT 20`,
-    [hoyISO, limISO]
-  );
+    // Instituciones pendientes
+    const pendientesInst = await dbSelect(`
+      SELECT id, institucion, precio, abono, fecha_entrega, urgencia, entrega
+      FROM ordenes_instituciones
+      WHERE fecha_entrega IS NOT NULL
+        AND (entrega IS NULL OR entrega <> 'Entregado')
+    `);
 
-  const proximasEntregas = [
-    ...proximasPersonas.map(o => ({
-      tipo: 'persona',
-      id: o.id,
-      nombre: o.nombre,
-      fecha_entrega: o.fecha_entrega,
-      saldo: Math.max(Number(o.precio || 0) - Number(o.abono || 0), 0),
-      urgencia: o.urgencia || 'Normal',
-    })),
-    ...proximasInstituciones.map(o => ({
-      tipo: 'institucion',
-      id: o.id,
-      nombre: o.institucion,
-      fecha_entrega: o.fecha_entrega,
-      saldo: Math.max(Number(o.precio || 0) - Number(o.abono || 0), 0),
-      urgencia: o.urgencia || 'Normal',
-    })),
-  ].sort((a, b) => {
-    const da = new Date(a.fecha_entrega || a.fecha);
-    const dbb = new Date(b.fecha_entrega || b.fecha);
-    return da - dbb;
-  });
+    // Unir todo en un solo arreglo con un campo _tipo
+    const todasPendientes = [
+      ...pendientesPersonas.map(o => ({ ...o, _tipo: 'persona' })),
+      ...pendientesInst.map(o => ({ ...o, _tipo: 'institucion' })),
+    ];
+
+    function soloFecha(value) {
+      if (!value) return null;
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return null;
+      return d.toISOString().slice(0, 10); // YYYY-MM-DD
+    }
+
+    const proximasEntregas = [];
+    const entregasAtrasadas = [];
+
+    for (const o of todasPendientes) {
+      const f = soloFecha(o.fecha_entrega);
+      if (!f) continue;
+
+      if (f < hoyISO) {
+        // Ya se venció
+        entregasAtrasadas.push({ ...o, _fecha: f });
+      } else if (f >= hoyISO && f <= limiteISO) {
+        // Próximos 3 días
+        proximasEntregas.push({ ...o, _fecha: f });
+      }
+    }
+
+    // Ordenar por fecha
+    proximasEntregas.sort((a, b) => a._fecha.localeCompare(b._fecha));
+    entregasAtrasadas.sort((a, b) => a._fecha.localeCompare(b._fecha));
+
 
 
       res.render('admin', {
@@ -361,6 +365,7 @@ function mountAdmin(app) {
         resumenGlobal,
         resumenCitas,
         proximasEntregas,
+        entregasAtrasadas,
       });
     } catch (err) {
       console.error('❌ Error en dashboard /admin:', err);
@@ -385,6 +390,7 @@ function mountAdmin(app) {
           pendientes: 0,
         },
         proximasEntregas: [],
+        entregasAtrasadas: [],
       });
     }
   });
