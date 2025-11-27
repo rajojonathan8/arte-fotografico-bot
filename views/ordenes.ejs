@@ -280,17 +280,26 @@
                     <% } %>
                   </td>
                   <td class="px-3 py-2 text-center">
-                    <% const estadoInst = o.entrega || o.estado_entrega || 'Pendiente'; %>
-                    <% if (estadoInst === 'Entregado') { %>
-                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-100 text-emerald-700">
-                        Entregado
-                      </span>
-                    <% } else { %>
-                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">
-                        Pendiente
-                      </span>
-                    <% } %>
-                  </td>
+  <%
+    const estadoInst = o.entrega || o.estado_entrega || 'Pendiente';
+    const siguienteEstadoInst = (estadoInst === 'Pendiente') ? 'Entregado' : 'Pendiente';
+  %>
+
+  <form method="POST" action="/admin/ordenes/institucion/entrega" class="inline">
+    <input type="hidden" name="id" value="<%= o.id %>">
+    <input type="hidden" name="estado" value="<%= siguienteEstadoInst %>">
+
+    <button
+      type="submit"
+      class="inline-flex px-3 py-1 rounded-full text-xs font-semibold
+             <%= estadoInst === 'Pendiente'
+                  ? 'bg-amber-400 text-slate-900'
+                  : 'bg-emerald-500 text-white' %>">
+      <%= estadoInst %>
+    </button>
+  </form>
+</td>
+
                   <td class="px-3 py-2 text-center">
                     <% const urgInst = o.urgencia || 'Normal'; %>
                     <% if (urgInst === 'Urgente' || urgInst === 'Muy urgente') { %>
@@ -518,18 +527,27 @@
                     <% } %>
                   </td>
                   <td class="px-3 py-2"><%= o.telefono %></td>
-                  <td class="px-3 py-2 text-center">
-                    <% const estadoPers = o.entrega || o.estado_entrega || 'Pendiente'; %>
-                    <% if (estadoPers === 'Entregado') { %>
-                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-500 text-white font-semibold">
-    Entregado
-  </span>
-                    <% } else { %>
-                     <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-400 text-slate-900 font-semibold">
-    Pendiente
-  </span>
-                    <% } %>
-                  </td>
+                 <td class="px-3 py-2 text-center">
+  <%
+    const estadoPers = o.entrega || o.estado_entrega || 'Pendiente';
+    const siguienteEstadoPers = (estadoPers === 'Pendiente') ? 'Entregado' : 'Pendiente';
+  %>
+
+  <form method="POST" action="/admin/ordenes/persona/entrega" class="inline">
+    <input type="hidden" name="id" value="<%= o.id %>">
+    <input type="hidden" name="estado" value="<%= siguienteEstadoPers %>">
+
+    <button
+      type="submit"
+      class="inline-flex px-3 py-1 rounded-full text-xs font-semibold
+             <%= estadoPers === 'Pendiente'
+                  ? 'bg-amber-400 text-slate-900'
+                  : 'bg-emerald-500 text-white' %>">
+      <%= estadoPers %>
+    </button>
+  </form>
+</td>
+
                   <td class="px-3 py-2 text-center">
                     <div class="flex flex-col gap-1 items-start text-xs">
                       <div class="flex gap-2">
