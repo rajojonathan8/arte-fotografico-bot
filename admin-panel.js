@@ -1560,6 +1560,185 @@ router.get(
     }
   );
 
+// ---------------------------------------------------------------------------
+// PANEL DEL EDITOR (solo entregas de hoy + urgentes)
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// PANEL DEL EDITOR (solo entregas de hoy + urgentes)
+// ---------------------------------------------------------------------------
+router.get('/editor', requireAuth, async (req, res) => {
+  try {
+    const hoy = new Date();
+    const hoyISO = hoy.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    // 🔹 Entregas de HOY (personas)
+    const entregasHoyPersonas = await dbSelect(
+      `
+      SELECT id, nombre, numero_orden, numero_toma,
+             fecha_toma, fecha_entrega, urgencia, entrega, impresos
+      FROM ordenes_personas
+      WHERE fecha_entrega::date = $1
+        AND (entrega IS NULL OR entrega <> 'Entregado')
+      ORDER BY urgencia DESC, id ASC
+      `,
+      [hoyISO]
+    );
+
+    // 🔹 Entregas de HOY (instituciones)
+    const entregasHoyInst = await dbSelect(
+      `
+      SELECT id, institucion, nombre, seccion, paquete,
+             fecha_toma, fecha_entrega, urgencia, entrega, impresos
+      FROM ordenes_instituciones
+      WHERE fecha_entrega::date = $1
+        AND (entrega IS NULL OR entrega <> 'Entregado')
+      ORDER BY urgencia DESC, id ASC
+      `,
+      [hoyISO]
+    );
+
+    // Unimos en un solo arreglo, marcando el tipo
+    const entregasHoy = [
+      ...entregasHoyPersonas.map(o => ({ ...o, _tipo: 'persona' })),
+      ...entregasHoyInst.map(o => ({ ...o, _tipo: 'institucion' })),
+    ];
+
+    // 🔹 Órdenes URGENTES / MUY URGENTES (pendientes)
+    const urgentesPersonas = await dbSelect(
+      `
+      SELECT id, nombre, numero_orden, numero_toma,
+             fecha_toma, fecha_entrega, urgencia, entrega, impresos
+      FROM ordenes_personas
+      WHERE (urgencia = 'Urgente' OR urgencia = 'Muy urgente')
+        AND (entrega IS NULL OR entrega <> 'Entregado')
+      ORDER BY fecha_entrega ASC NULLS LAST, id ASC
+      `
+    );
+
+    const urgentesInst = await dbSelect(
+      `
+      SELECT id, institucion, nombre, seccion, paquete,
+             fecha_toma, fecha_entrega, urgencia, entrega, impresos
+      FROM ordenes_instituciones
+      WHERE (urgencia = 'Urgente' OR urgencia = 'Muy urgente')
+        AND (entrega IS NULL OR entrega <> 'Entregado')
+      ORDER BY fecha_entrega ASC NULLS LAST, id ASC
+      `
+    );
+
+    const urgentes = [
+      ...urgentesPersonas.map(o => ({ ...o, _tipo: 'persona' })),
+      ...urgentesInst.map(o => ({ ...o, _tipo: 'institucion' })),
+    ];
+
+    res.render('editor', {
+      title: 'Panel del editor',
+      entregasHoy,
+      urgentes,
+    });
+  } catch (err) {
+    console.error('❌ Error en /admin/editor:', err);
+    res.render('editor', {
+      title: 'Panel del editor',
+      entregasHoy: [],
+      urgentes: [],
+    });
+  }
+});
+
+
+// ================================
+// MARCAR COMO IMPRESO (personas)
+// ================================
+router.post(
+  '/ordenes/persona/:id/marcar-impreso',
+  requireAuth,
+  express.urlencoded({ extended: true }),
+  async (req, res) => {
+    const id = Number(req.params.id);
+
+    if (!id || id <= 0) {
+      return res.redirect('/admin/editor');
+    }
+
+    try {
+      // OJO: en BD seguimos usando "Entregado"
+      // pero en el panel del editor lo mostraremos como "Impresos"
+      await dbExec(
+        'UPDATE ordenes_personas SET entrega = $1 WHERE id = $2',
+        ['Entregado', id]
+      );
+    } catch (err) {
+      console.error('❌ Error marcando impreso (persona):', err);
+    }
+
+    res.redirect('/admin/editor');
+  }
+);
+
+// ================================
+// MARCAR COMO IMPRESO (instituciones)
+// ================================
+router.post(
+  '/ordenes/institucion/:id/marcar-impreso',
+  requireAuth,
+  express.urlencoded({ extended: true }),
+  async (req, res) => {
+    const id = Number(req.params.id);
+
+    if (!id || id <= 0) {
+      return res.redirect('/admin/editor');
+    }
+
+    try {
+      await dbExec(
+        'UPDATE ordenes_instituciones SET entrega = $1 WHERE id = $2',
+        ['Entregado', id]
+      );
+    } catch (err) {
+      console.error('❌ Error marcando impreso (institución):', err);
+    }
+
+    res.redirect('/admin/editor');
+  }
+);
+
+// ---------------------------------------------------------------------------
+// MARCAR COMO IMPRESOS (solo editor)
+// ---------------------------------------------------------------------------
+router.post(
+  '/editor/impresos',
+  requireAuth,
+  express.urlencoded({ extended: true }),
+  async (req, res) => {
+    const id = Number(req.body.id);
+    const tipo = (req.body.tipo || '').toLowerCase(); // 'persona' o 'institucion'
+
+    if (!id || id <= 0 || !tipo) {
+      return res.redirect('/admin/editor');
+    }
+
+    try {
+      if (tipo === 'persona') {
+        await dbExec(
+          'UPDATE ordenes_personas SET impresos = true WHERE id = $1',
+          [id]
+        );
+      } else if (tipo === 'institucion') {
+        await dbExec(
+          'UPDATE ordenes_instituciones SET impresos = true WHERE id = $1',
+          [id]
+        );
+      }
+    } catch (e) {
+      console.error('❌ Error marcando como impresos:', e);
+    }
+
+    res.redirect('/admin/editor');
+  }
+);
+
+
   // ---------------------------------------------------------------------------
   // LOGOUT
   // ---------------------------------------------------------------------------

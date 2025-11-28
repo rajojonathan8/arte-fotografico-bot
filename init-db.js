@@ -83,7 +83,16 @@ async function main() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `;
+  // 5) 🔹 AÑADIR COLUMNA "impresos" SI NO EXISTE
+    const sqlAlterImpresosPersonas = `
+      ALTER TABLE ordenes_personas
+      ADD COLUMN IF NOT EXISTS impresos boolean DEFAULT false;
+    `;
 
+    const sqlAlterImpresosInstituciones = `
+      ALTER TABLE ordenes_instituciones
+      ADD COLUMN IF NOT EXISTS impresos boolean DEFAULT false;
+    `;
     await client.query(sqlConversaciones);
     console.log('🟢 Tabla "conversaciones" OK');
 
@@ -95,6 +104,11 @@ async function main() {
 
     await client.query(sqlCitas);
     console.log('🟢 Tabla "citas" OK');
+
+        // 👇 NUEVO: ejecutar los ALTER
+    await client.query(sqlAlterImpresosPersonas);
+    await client.query(sqlAlterImpresosInstituciones);
+    console.log('🟢 Columnas "impresos" OK');
 
     console.log('✅ init-db.js terminado sin errores');
   } catch (err) {
