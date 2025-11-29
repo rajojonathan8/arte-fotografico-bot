@@ -3,16 +3,55 @@
 <main class="max-w-6xl mx-auto p-4 space-y-6">
 
   <!-- Título -->
-  <header class="flex items-center justify-between">
-    <div>
-      <h1 class="text-2xl font-semibold tracking-tight text-white">
-        Panel de administración
-      </h1>
-      <p class="text-sm text-slate-400">
-        Resumen rápido de órdenes, pagos, citas y accesos al panel.
-      </p>
+ <header
+  class="sticky top-0 z-40 bg-[#050816]/95 backdrop-blur border-b border-[#1f2937]">
+  <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+
+    <!-- IZQUIERDA: Logo + título -->
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-2xl bg-emerald-500/15 flex items-center justify-center">
+        <span class="text-xl">📸</span>
+      </div>
+      <div>
+        <h1 class="text-sm md:text-base font-semibold tracking-tight text-slate-50">
+          Panel de administración · Arte Fotográfico
+        </h1>
+        <p class="text-[11px] md:text-xs text-slate-400">
+          Resumen rápido de órdenes, pagos, citas y accesos al panel.
+        </p>
+      </div>
     </div>
-  </header>
+
+    <!-- DERECHA: Acciones -->
+    <div class="flex items-center gap-2 md:gap-3">
+
+
+
+
+      <!-- Botón: Ir al panel del editor -->
+      <a
+        href="/admin/editor"
+        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full
+               text-[11px] md:text-xs bg-sky-500/90 text-white
+               hover:bg-sky-400 transition-colors">
+        <span class="text-xs">🖥️</span>
+        <span>Panel del editor</span>
+      </a>
+
+      <!-- Botón: Cerrar sesión -->
+     <form method="POST" action="/admin/login" class="inline">
+  <button
+    type="submit"
+    class="px-3 py-1.5 text-xs rounded-full bg-rose-500 text-white hover:bg-rose-600"
+  >
+    Cerrar sesión
+  </button>
+</form>
+
+    </div>
+  </div>
+</header>
+
 
   <!-- ================= PANELES RÁPIDOS (arriba) ================= -->
   <section class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
