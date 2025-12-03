@@ -276,13 +276,28 @@ function mountAdmin(app) {
         saldoTotal,
       };
 
-      // 🔹 Citas desde JSON
-      const listaCitas = readJson(CITAS_PATH, []);
-      const hoyStr = new Date().toISOString().slice(0, 10);
+         // 🔹 Citas desde PostgreSQL
+      let listaCitas = [];
+      try {
+        listaCitas = await dbSelect(
+          'SELECT * FROM citas ORDER BY fecha ASC NULLS LAST'
+        );
+      } catch (e) {
+        console.error('❌ Error cargando citas desde PostgreSQL:', e);
+        listaCitas = [];
+      }
 
-      const citasHoy = listaCitas.filter(
-        (c) => (c.fecha || '').slice(0, 10) === hoyStr
-      );
+      const hoyStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+      const citasHoy = listaCitas.filter((c) => {
+        // c.fecha viene como Date (TIMESTAMPTZ)
+        if (!c.fecha) return false;
+        const d = new Date(c.fecha);
+        if (isNaN(d.getTime())) return false;
+        const soloFecha = d.toISOString().slice(0, 10);
+        return soloFecha === hoyStr;
+      });
+
       const citasPendientes = listaCitas.filter(
         (c) => (c.estado || 'Pendiente') === 'Pendiente'
       );
@@ -292,6 +307,7 @@ function mountAdmin(app) {
         hoy: citasHoy.length,
         pendientes: citasPendientes.length,
       };
+
 
       // 🔹 Próximas entregas (siguientes 3 días)
         // ================== PRÓXIMAS ENTREGAS (3 días) ==================
@@ -1364,104 +1380,143 @@ router.get(
     }
   );
 
+    // ---------------------------------------------------------------------------
+  // PANEL DE CITAS (PostgreSQL)
   // ---------------------------------------------------------------------------
-  // PANEL DE CITAS
-  // ---------------------------------------------------------------------------
-  router.get('/citas', requireAuth, (req, res) => {
-    const fechaDesde = (req.query.fecha_desde || '').trim();
+  router.get('/citas', requireAuth, async (req, res) => {
+    const fechaDesde = (req.query.fecha_desde || '').trim(); // datetime-local
     const fechaHasta = (req.query.fecha_hasta || '').trim();
     const busqueda = (req.query.q || '').trim().toLowerCase();
     const estadoFil = (req.query.estado || '').trim().toLowerCase();
 
-    const lista = readJson(CITAS_PATH, []);
+    try {
+      // 1) Leer TODAS las citas desde PostgreSQL
+      const rows = await dbSelect(
+        'SELECT * FROM citas ORDER BY fecha ASC NULLS LAST'
+      );
 
-    // Filtrado
-    let citas = (lista || []).filter((c) => {
-      // Fecha
-      if (fechaDesde || fechaHasta) {
-        const f = (c.fecha || '').slice(0, 16); // ISO 2025-11-17T15:30
-        if (!f) return false;
-        if (fechaDesde && f < fechaDesde) return false;
-        if (fechaHasta && f > fechaHasta) return false;
-      }
+      // 2) Normalizar fecha a string "YYYY-MM-DDTHH:mm" para que el EJS funcione igual
+      let citas = (rows || []).map((c) => {
+        let fechaTexto = '';
+        if (c.fecha) {
+          const d = new Date(c.fecha);
+          if (!isNaN(d.getTime())) {
+            fechaTexto = d.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:mm"
+          }
+        }
 
-      // Búsqueda por cliente / sesión / teléfono
-      if (busqueda) {
-        const texto = [c.cliente, c.sesion, c.telefono, c.notas]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
+        return {
+          ...c,
+          fecha: fechaTexto, // ← lo que usa la vista
+        };
+      });
 
-        if (!texto.includes(busqueda)) return false;
-      }
+      // 3) Aplicar los mismos filtros que antes, pero sobre el array que viene de la BD
+      citas = citas.filter((c) => {
+        // ---- Filtro por fecha/hora ----
+        if (fechaDesde || fechaHasta) {
+          const f = (c.fecha || '').slice(0, 16);
+          if (!f) return false;
+          if (fechaDesde && f < fechaDesde) return false;
+          if (fechaHasta && f > fechaHasta) return false;
+        }
 
-      // Estado
-      if (estadoFil) {
-        const e = (c.estado || 'Pendiente').toLowerCase();
-        if (e !== estadoFil) return false;
-      }
+        // ---- Búsqueda por cliente / sesión / teléfono / notas ----
+        if (busqueda) {
+          const texto = [c.cliente, c.sesion, c.telefono, c.notas]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
 
-      return true;
-    });
+          if (!texto.includes(busqueda)) return false;
+        }
 
-    // Ordenar por fecha ascendente
-    citas.sort((a, b) => {
-      const fa = a.fecha || '';
-      const fb = b.fecha || '';
-      if (fa < fb) return -1;
-      if (fa > fb) return 1;
-      return 0;
-    });
+        // ---- Filtro por estado ----
+        if (estadoFil) {
+          const e = (c.estado || 'Pendiente').toLowerCase();
+          if (e !== estadoFil) return false;
+        }
 
-    res.render('citas.ejs', {
-      title: 'Citas',
-      citas,
-      fechaDesde,
-      fechaHasta,
-      busqueda,
-      estadoFil,
-    });
+        return true;
+      });
+
+      // 4) Ordenar por fecha ascendente (por si acaso)
+      citas.sort((a, b) => {
+        const fa = a.fecha || '';
+        const fb = b.fecha || '';
+        if (fa < fb) return -1;
+        if (fa > fb) return 1;
+        return 0;
+      });
+
+      // 5) Renderizar igual que antes
+      res.render('citas.ejs', {
+        title: 'Citas',
+        citas,
+        fechaDesde,
+        fechaHasta,
+        busqueda,
+        estadoFil,
+      });
+    } catch (err) {
+      console.error('❌ Error en /admin/citas (PostgreSQL):', err);
+
+      // Fallback simple por si falla la BD
+      res.render('citas.ejs', {
+        title: 'Citas',
+        citas: [],
+        fechaDesde,
+        fechaHasta,
+        busqueda,
+        estadoFil,
+      });
+    }
   });
 
-  // Crear nueva cita
+    // Crear nueva cita (PostgreSQL)
   router.post(
     '/citas/nueva',
     requireAuth,
     express.urlencoded({ extended: true }),
-    (req, res) => {
+    async (req, res) => {
       const { cliente, telefono, sesion, fecha, notas } = req.body || {};
-      const lista = readJson(CITAS_PATH, []);
 
-      const nuevaCita = {
-        id: Date.now(),
-        cliente: cliente || '',
-        telefono: telefono || '',
-        sesion: sesion || '',
-        fecha: fecha || '', // formato datetime-local (YYYY-MM-DDTHH:mm)
-        notas: notas || '',
-        estado: 'Pendiente',
-        origen: 'manual', // luego podemos poner google-calendar
-      };
+      try {
+        await dbExec(
+          `
+          INSERT INTO citas (cliente, telefono, sesion, fecha, notas, estado, origen)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `,
+          [
+            cliente || '',
+            telefono || '',
+            sesion || '',
+            fecha || null,      // PostgreSQL lo convierte a TIMESTAMPTZ
+            notas || '',
+            'Pendiente',
+            'manual',
+          ]
+        );
 
-      lista.push(nuevaCita);
-      writeJson(CITAS_PATH, lista);
+        console.log('💾 Nueva cita guardada en PostgreSQL');
+      } catch (err) {
+        console.error('❌ Error guardando cita en PostgreSQL:', err);
+      }
 
       res.redirect('/admin/citas');
     }
   );
 
-  // Cambiar estado de una cita
+  // Cambiar estado de una cita (PostgreSQL)
   router.post(
-    '/citas/:idx/estado',
+    '/citas/:id/estado',
     requireAuth,
     express.urlencoded({ extended: true }),
-    (req, res) => {
-      const idx = parseInt(req.params.idx, 10);
+    async (req, res) => {
+      const id = Number(req.params.id);
       const { estado } = req.body || {};
 
-      let lista = readJson(CITAS_PATH, []);
-
-      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+      if (!id || id <= 0) {
         return res.redirect('/admin/citas');
       }
 
@@ -1471,33 +1526,45 @@ router.get(
         ? estado
         : 'Pendiente';
 
-      lista[idx].estado = nuevoEstado;
-      writeJson(CITAS_PATH, lista);
+      try {
+        await dbExec(
+          `
+          UPDATE citas
+          SET estado = $1, updated_at = NOW()
+          WHERE id = $2
+        `,
+          [nuevoEstado, id]
+        );
+      } catch (err) {
+        console.error('❌ Error cambiando estado de cita en PostgreSQL:', err);
+      }
 
       res.redirect('/admin/citas');
     }
   );
 
-  // Eliminar una cita
+   // Eliminar una cita (PostgreSQL)
   router.post(
-    '/citas/:idx/eliminar',
+    '/citas/:id/eliminar',
     requireAuth,
     express.urlencoded({ extended: true }),
-    (req, res) => {
-      const idx = parseInt(req.params.idx, 10);
-      let lista = readJson(CITAS_PATH, []);
+    async (req, res) => {
+      const id = Number(req.params.id);
 
-      if (!Array.isArray(lista) || idx < 0 || idx >= lista.length) {
+      if (!id || id <= 0) {
         return res.redirect('/admin/citas');
       }
 
-      // Quitamos la cita del arreglo
-      lista.splice(idx, 1);
-      writeJson(CITAS_PATH, lista);
+      try {
+        await dbExec('DELETE FROM citas WHERE id = $1', [id]);
+      } catch (err) {
+        console.error('❌ Error eliminando cita en PostgreSQL:', err);
+      }
 
       res.redirect('/admin/citas');
     }
   );
+
 
   // ---------------------------------------------------------------------------
   // HERRAMIENTAS OCR

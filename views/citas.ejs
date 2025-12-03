@@ -169,7 +169,7 @@
             </tr>
           </thead>
           <tbody>
-            <% citas.forEach((cita, idx) => { %>
+            <% citas.forEach((cita) => { %>
               <tr class="hover:bg-slate-50">
                 <td class="px-2 py-1 border-b align-top">
                   <%= cita.fecha || '' %>
@@ -197,10 +197,10 @@
                 <td class="px-2 py-1 border-b align-top">
                   <%= cita.notas || '' %>
                 </td>
-                <td class="px-2 py-1 border-b align-top">
+                <td class="px-2 py-1 border-b align-top space-y-1">
                   <form
                     method="POST"
-                    action="/admin/citas/<%= idx %>/estado"
+                    action="/admin/citas/<%= cita.id %>/estado"
                     class="flex items-center gap-1"
                   >
                     <select
@@ -225,18 +225,18 @@
                     </button>
                   </form>
 
-                    <form
-      method="POST"
-      action="/admin/citas/<%= idx %>/eliminar"
-      onsubmit="return confirm('¿Seguro que deseas eliminar esta cita?');"
-    >
-      <button
-        type="submit"
-        class="px-2 py-0.5 rounded text-[11px] text-white bg-rose-600 hover:bg-rose-700"
-      >
-        Eliminar
-      </button>
-    </form>
+                  <form
+                    method="POST"
+                    action="/admin/citas/<%= cita.id %>/eliminar"
+                    onsubmit="return confirm('¿Seguro que deseas eliminar esta cita?');"
+                  >
+                    <button
+                      type="submit"
+                      class="px-2 py-0.5 rounded text-[11px] text-white bg-rose-600 hover:bg-rose-700"
+                    >
+                      Eliminar
+                    </button>
+                  </form>
                 </td>
               </tr>
             <% }) %>
