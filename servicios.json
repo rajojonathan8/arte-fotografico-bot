@@ -84,10 +84,10 @@
     "migratorios": [
       {
         "servicio": "VISA Americana",
-        "precio": 10.00,
+        "precio": 12.00,
         "duracion_min": 30,
         "tamano": "2x2 (50x50 mm)",
-        "tipo_foto": "Frente; fondo blanco",
+        "tipo_foto": "Frente; fondo blanco, impresas y digital",
         "cantidad_fotos": 4,
         "vestimenta_senoritas": "Formal o semi casual; evitar prendas blancas.",
         "vestimenta_caballeros": "Formal o semi casual; evitar prendas blancas.",
@@ -95,10 +95,10 @@
       },
       {
         "servicio": "VISA Canadiense",
-        "precio": 10.00,
+        "precio": 12.00,
         "duracion_min": 30,
         "tamano": "3.5x4.5 cm",
-        "tipo_foto": "Frente; fondo blanco",
+        "tipo_foto": "Frente; fondo blanco, impresas y digital",
         "cantidad_fotos": 4,
         "vestimenta_senoritas": "Formal o semi casual; evitar prendas blancas.",
         "vestimenta_caballeros": "Formal o semi casual; evitar prendas blancas.",
@@ -106,10 +106,10 @@
       },
       {
         "servicio": "VISA Mexicana",
-        "precio": 10.00,
+        "precio": 12.00,
         "duracion_min": 30,
         "tamano": "3.2x2.6 cm",
-        "tipo_foto": "Frente; fondo blanco",
+        "tipo_foto": "Frente; fondo blanco, impresas y digital",
         "cantidad_fotos": 4,
         "vestimenta_senoritas": "Formal o semi casual; evitar prendas blancas.",
         "vestimenta_caballeros": "Formal o semi casual; evitar prendas blancas.",

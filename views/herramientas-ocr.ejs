@@ -216,6 +216,94 @@
       </div>
     </div>
   </section>
+
+    <!-- ================================================================ -->
+  <!-- ============ BLOQUE 5: GUARDAR LISTA EN POSTGRESQL ============ -->
+  <!-- ================================================================ -->
+  <section class="border rounded-lg p-4 bg-white shadow-sm space-y-3">
+    <h2 class="font-semibold text-sm">5. Guardar lista en PostgreSQL</h2>
+    <p class="text-xs text-slate-500">
+      Aquí puedes guardar una lista completa de estudiantes para un evento
+      (facultad, carrera y grupo horario). Cada línea del área de texto se
+      guardará como un participante con su número de lista (1, 2, 3…).
+    </p>
+
+    <form
+      action="/admin/herramientas/lista-guardar"
+      method="POST"
+      class="space-y-3"
+    >
+      <div class="grid md:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-medium mb-1">Facultad</label>
+          <input
+            type="text"
+            name="facultad"
+            class="w-full px-3 py-2 border rounded text-sm"
+            placeholder="Ej.: FACULTAD DE INGENIERÍA Y CIENCIAS NATURALES"
+            required
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium mb-1">Carrera</label>
+          <input
+            type="text"
+            name="carrera"
+            class="w-full px-3 py-2 border rounded text-sm"
+            placeholder="Ej.: INGENIERÍA EN SISTEMAS COMPUTACIONALES"
+            required
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium mb-1">Grupo / horario</label>
+          <input
+            type="text"
+            name="grupo_horario"
+            class="w-full px-3 py-2 border rounded text-sm"
+            placeholder="Ej.: Quinto grupo de 1:30 a 2:10 p.m."
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <label class="block text-xs font-medium">
+            Lista de nombres (una persona por línea)
+          </label>
+          <button
+            type="button"
+            onclick="copiarResultadoALista()"
+            class="px-2 py-1 rounded border text-[11px] text-slate-700 hover:bg-slate-50"
+          >
+            ⬇️ Copiar desde “Resultado limpio”
+          </button>
+        </div>
+        <textarea
+          id="lista_nombres"
+          name="lista_nombres"
+          class="w-full h-56 border rounded px-3 py-2 text-xs font-mono whitespace-pre"
+          placeholder="Pega aquí los nombres, uno por línea, en el orden 1, 2, 3..."
+          required
+        ></textarea>
+      </div>
+
+      <button
+        type="submit"
+        class="px-4 py-2 rounded-lg text-xs text-white bg-emerald-600 hover:bg-emerald-700"
+      >
+        💾 Guardar lista en PostgreSQL
+      </button>
+    </form>
+
+    <p class="text-[11px] text-slate-400">
+      Nota: esta acción insertará una fila por cada línea no vacía. El número de
+      lista se asigna automáticamente (1, 2, 3...) según el orden de las líneas.
+    </p>
+  </section>
+
 </main>
 
 <script>
@@ -384,6 +472,22 @@
       alert('No se pudo copiar automáticamente. Puedes copiarlo manualmente.');
     }
   }
+
+    function copiarResultadoALista() {
+    const origen = document.getElementById('ocr_resultado');
+    const destino = document.getElementById('lista_nombres');
+    if (!origen || !destino) return;
+
+    const texto = (origen.value || '').trim();
+    if (!texto) {
+      alert('No hay resultado limpio para copiar. Primero genera el texto en 3B.');
+      return;
+    }
+
+    destino.value = texto;
+    destino.focus();
+  }
+
 </script>
 
 <%- include('_foot') %>

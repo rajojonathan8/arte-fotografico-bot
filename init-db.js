@@ -83,6 +83,22 @@ async function main() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `;
+
+        // 5) Tabla EVENTO_PARTICIPANTES (para listados de facultades / grupos)
+    const sqlEventoParticipantes = `
+      CREATE TABLE IF NOT EXISTS evento_participantes (
+        id SERIAL PRIMARY KEY,
+        facultad TEXT,
+        carrera TEXT,
+        grupo_horario TEXT,
+        numero_lista INTEGER,
+        nombre TEXT NOT NULL,
+        telefono TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `;
+
   // 5) 🔹 AÑADIR COLUMNA "impresos" SI NO EXISTE
     const sqlAlterImpresosPersonas = `
       ALTER TABLE ordenes_personas
@@ -104,6 +120,10 @@ async function main() {
 
     await client.query(sqlCitas);
     console.log('🟢 Tabla "citas" OK');
+
+        await client.query(sqlEventoParticipantes);
+    console.log('🟢 Tabla "evento_participantes" OK');
+
 
         // 👇 NUEVO: ejecutar los ALTER
     await client.query(sqlAlterImpresosPersonas);

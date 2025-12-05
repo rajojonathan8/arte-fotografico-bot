@@ -1,0 +1,197 @@
+<%- include('_head', { title }) %>
+
+<main class="max-w-6xl mx-auto p-4 space-y-6">
+  <h1 class="text-2xl font-semibold mb-2">Teléfonos de participantes</h1>
+  <p class="text-sm text-slate-600">
+    Busca un grupo por facultad, carrera y horario, y guarda el número de teléfono
+    de cada participante. Estos datos quedan almacenados en <code>evento_participantes</code>.
+  </p>
+
+  <!-- FILTROS -->
+  <section class="border rounded-lg p-4 bg-white shadow-sm space-y-3">
+    <h2 class="font-semibold text-sm">1. Filtrar grupo</h2>
+        <form method="GET" action="/admin/evento/telefonos" class="grid md:grid-cols-5 gap-3">
+      <div>
+        <label class="block text-xs font-medium mb-1">Facultad</label>
+        <input
+          type="text"
+          name="facultad"
+          value="<%= facultad || '' %>"
+          class="w-full px-3 py-2 border rounded text-sm"
+          placeholder="Ej.: CIENCIAS JURÍDICAS"
+        />
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1">Carrera</label>
+        <input
+          type="text"
+          name="carrera"
+          value="<%= carrera || '' %>"
+          class="w-full px-3 py-2 border rounded text-sm"
+          placeholder="Ej.: CONTADURÍA PÚBLICA"
+        />
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1">Grupo / horario</label>
+        <input
+          type="text"
+          name="grupo_horario"
+          value="<%= grupo_horario || '' %>"
+          class="w-full px-3 py-2 border rounded text-sm"
+          placeholder="Ej.: Segundo grupo de 9:30 a 10:10 a.m."
+        />
+      </div>
+      <div>
+        <label class="block text-xs font-medium mb-1">Buscar por nombre</label>
+        <input
+          type="text"
+          name="nombre"
+          value="<%= nombre || '' %>"
+          class="w-full px-3 py-2 border rounded text-sm"
+          placeholder="Ej.: Hernández, Carlos..."
+        />
+      </div>
+      <div class="flex items-end gap-2">
+        <button
+          type="submit"
+          class="w-full px-4 py-2 rounded-lg text-sm text-white bg-indigo-600 hover:bg-indigo-700"
+        >
+          🔍 Buscar
+        </button>
+      </div>
+    </form>
+    <form
+      method="GET"
+      action="/admin/evento/telefonos/export"
+      class="flex flex-wrap items-center gap-2 text-[11px] mt-2"
+    >
+      <input type="hidden" name="facultad" value="<%= facultad || '' %>" />
+      <input type="hidden" name="carrera" value="<%= carrera || '' %>" />
+      <input type="hidden" name="grupo_horario" value="<%= grupo_horario || '' %>" />
+      <input type="hidden" name="nombre" value="<%= nombre || '' %>" />
+
+      <button
+        type="submit"
+        class="px-3 py-1.5 rounded border text-slate-700 hover:bg-slate-50"
+      >
+        📥 Exportar a Excel (CSV)
+      </button>
+
+      <span class="text-slate-400">
+        Se exportan solo los resultados filtrados.
+      </span>
+    </form>
+
+        <form
+      method="POST"
+      action="/admin/evento/telefonos/eliminar-grupo"
+      class="flex flex-wrap items-center gap-2 text-[11px] mt-2"
+      onsubmit="return confirm('⚠️ Esto eliminará a TODOS los participantes que coincidan con los filtros actuales (facultad/carrera/grupo/nombre). ¿Seguro?');"
+    >
+      <input type="hidden" name="facultad" value="<%= facultad || '' %>" />
+      <input type="hidden" name="carrera" value="<%= carrera || '' %>" />
+      <input type="hidden" name="grupo_horario" value="<%= grupo_horario || '' %>" />
+      <input type="hidden" name="nombre" value="<%= nombre || '' %>" />
+
+      <button
+        type="submit"
+        class="px-3 py-1.5 rounded border text-red-700 hover:bg-red-50"
+      >
+        🗑 Eliminar participantes filtrados
+      </button>
+
+      <span class="text-slate-400">
+        Usar con cuidado. Se borran todos los registros que coincidan con los filtros.
+      </span>
+    </form>
+
+
+
+    <p class="text-[11px] text-slate-400">
+      Puedes escribir solo una parte del texto (ej. "CIENCIAS JURÍDICAS" o "SISTEMAS").
+    </p>
+  </section>
+
+  <!-- LISTA DE PARTICIPANTES -->
+  <section class="border rounded-lg p-4 bg-white shadow-sm space-y-3">
+    <h2 class="font-semibold text-sm">2. Participantes del grupo</h2>
+
+    <% if (!participantes || participantes.length === 0) { %>
+      <p class="text-sm text-slate-500">
+        No se encontraron participantes con esos filtros. Primero guarda la lista desde
+        el bloque 5 de "Herramientas OCR" o ajusta los filtros.
+      </p>
+    <% } else { %>
+      <p class="text-xs text-slate-500 mb-2">
+        <strong><%= participantes[0].facultad %></strong><br />
+        <%= participantes[0].carrera %><br />
+        <em><%= participantes[0].grupo_horario %></em><br />
+        Total: <%= participantes.length %> participantes
+      </p>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-xs">
+          <thead>
+            <tr class="bg-slate-100 text-slate-700">
+              <th class="px-2 py-1 text-left">#</th>
+              <th class="px-2 py-1 text-left">Nombre</th>
+              <th class="px-2 py-1 text-left">Teléfono</th>
+              <th class="px-2 py-1 text-left">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% participantes.forEach((p) => { %>
+              <tr class="border-b last:border-0">
+                <td class="px-2 py-1 align-middle">
+                  <%= p.numero_lista %>
+                </td>
+                <td class="px-2 py-1 align-middle">
+                  <%= p.nombre %>
+                </td>
+                <td class="px-2 py-1 align-middle">
+  <form
+    method="POST"
+    action="/admin/evento/telefono/<%= p.id %>"
+    class="flex items-center gap-2"
+  >
+    <input
+      type="text"
+      name="telefono"
+      value="<%= p.telefono || '' %>"
+      class="px-2 py-1 border rounded text-xs w-32"
+      placeholder="Ej.: 7123-4567"
+    />
+</td>
+<td class="px-2 py-1 align-middle">
+    <div class="flex gap-1">
+      <button
+        type="submit"
+        name="accion"
+        value="guardar"
+        class="px-3 py-1 rounded-lg text-[11px] text-white bg-emerald-600 hover:bg-emerald-700"
+      >
+        💾 Guardar
+      </button>
+      <button
+        type="submit"
+        name="accion"
+        value="eliminar"
+        class="px-3 py-1 rounded-lg text-[11px] text-white bg-red-600 hover:bg-red-700"
+        onclick="return confirm('¿Seguro que quieres eliminar a este participante?');"
+      >
+        🗑 Eliminar
+      </button>
+    </div>
+  </form>
+</td>
+
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+</main>
+
+<%- include('_foot') %>

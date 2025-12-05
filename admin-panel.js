@@ -1627,6 +1627,311 @@ router.get(
     }
   );
 
+    // ---------------------------------------------------------------------------
+  // GUARDAR LISTA DE NOMBRES EN POSTGRESQL (evento_participantes)
+  // ---------------------------------------------------------------------------
+  router.post(
+    '/herramientas/lista-guardar',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    async (req, res) => {
+      const { facultad, carrera, grupo_horario, lista_nombres } = req.body || {};
+
+      const fac = (facultad || '').trim();
+      const car = (carrera || '').trim();
+      const grupo = (grupo_horario || '').trim();
+      const texto = (lista_nombres || '').trim();
+
+      if (!fac || !car || !grupo || !texto) {
+        console.error('❌ Datos incompletos al guardar lista de participantes');
+        return res.redirect('/admin/herramientas');
+      }
+
+      const lineas = texto.split(/\r?\n/);
+      let numero = 0;
+
+      try {
+        for (let linea of lineas) {
+          const nombre = (linea || '').trim();
+          if (!nombre) continue;
+
+          numero += 1;
+
+          await dbExec(
+            `
+            INSERT INTO evento_participantes
+              (facultad, carrera, grupo_horario, numero_lista, nombre)
+            VALUES ($1, $2, $3, $4, $5)
+          `,
+            [fac, car, grupo, numero, nombre]
+          );
+        }
+
+        console.log(
+          `💾 Lista guardada en evento_participantes: ${fac} / ${car} / ${grupo} -> ${numero} registros`
+        );
+      } catch (err) {
+        console.error('❌ Error guardando lista en evento_participantes:', err);
+      }
+
+      res.redirect('/admin/herramientas');
+    }
+  );
+  // ---------------------------------------------------------------------------
+  // PANEL PARA TELÉFONOS DE EVENTO (evento_participantes)
+  // ---------------------------------------------------------------------------
+    router.get('/evento/telefonos', requireAuth, async (req, res) => {
+    const facultad = (req.query.facultad || '').trim();
+    const carrera = (req.query.carrera || '').trim();
+    const grupo = (req.query.grupo_horario || '').trim();
+    const nombre = (req.query.nombre || '').trim();
+
+    let participantes = [];
+
+    try {
+      let where = [];
+      let params = [];
+
+      if (facultad) {
+        params.push(`%${facultad}%`);
+        where.push(`facultad ILIKE $${params.length}`);
+      }
+
+      if (carrera) {
+        params.push(`%${carrera}%`);
+        where.push(`carrera ILIKE $${params.length}`);
+      }
+
+      if (grupo) {
+        params.push(`%${grupo}%`);
+        where.push(`grupo_horario ILIKE $${params.length}`);
+      }
+
+      if (nombre) {
+        params.push(`%${nombre}%`);
+        where.push(`nombre ILIKE $${params.length}`);
+      }
+
+      let sql = `
+        SELECT id, facultad, carrera, grupo_horario,
+               numero_lista, nombre, telefono
+        FROM evento_participantes
+      `;
+
+      if (where.length > 0) {
+        sql += ' WHERE ' + where.join(' AND ');
+      }
+
+      sql += `
+        ORDER BY facultad, carrera, grupo_horario, numero_lista ASC
+      `;
+
+      participantes = await dbSelect(sql, params);
+    } catch (err) {
+      console.error('❌ Error cargando evento_participantes:', err);
+      participantes = [];
+    }
+
+    res.render('evento-telefonos', {
+      title: 'Teléfonos de participantes',
+      facultad,
+      carrera,
+      grupo_horario: grupo,
+      nombre,
+      participantes,
+    });
+  });
+  // ---------------------------------------------------------------------------
+  // EXPORTAR PARTICIPANTES A EXCEL (CSV)
+  // ---------------------------------------------------------------------------
+  router.get('/evento/telefonos/export', requireAuth, async (req, res) => {
+    const facultad = (req.query.facultad || '').trim();
+    const carrera = (req.query.carrera || '').trim();
+    const grupo = (req.query.grupo_horario || '').trim();
+    const nombre = (req.query.nombre || '').trim();
+
+    try {
+      let where = [];
+      let params = [];
+
+      if (facultad) {
+        params.push(`%${facultad}%`);
+        where.push(`facultad ILIKE $${params.length}`);
+      }
+
+      if (carrera) {
+        params.push(`%${carrera}%`);
+        where.push(`carrera ILIKE $${params.length}`);
+      }
+
+      if (grupo) {
+        params.push(`%${grupo}%`);
+        where.push(`grupo_horario ILIKE $${params.length}`);
+      }
+
+      if (nombre) {
+        params.push(`%${nombre}%`);
+        where.push(`nombre ILIKE $${params.length}`);
+      }
+
+      let sql = `
+        SELECT facultad, carrera, grupo_horario,
+               numero_lista, nombre, telefono
+        FROM evento_participantes
+      `;
+
+      if (where.length > 0) {
+        sql += ' WHERE ' + where.join(' AND ');
+      }
+
+      sql += `
+        ORDER BY facultad, carrera, grupo_horario, numero_lista ASC
+      `;
+
+      const rows = await dbSelect(sql, params);
+
+      // Construir CSV
+      let csv = 'Facultad,Carrera,Grupo,NumeroLista,Nombre,Telefono\n';
+
+      for (const r of rows) {
+        // Limpiar comas y saltos de línea
+        const fac = (r.facultad || '').replace(/"/g, '""');
+        const car = (r.carrera || '').replace(/"/g, '""');
+        const grp = (r.grupo_horario || '').replace(/"/g, '""');
+        const num = r.numero_lista || '';
+        const nom = (r.nombre || '').replace(/"/g, '""');
+        const tel = (r.telefono || '').replace(/"/g, '""');
+
+        csv += `"${fac}","${car}","${grp}",${num},"${nom}","${tel}"\n`;
+      }
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename="evento_participantes.csv"'
+      );
+      res.send(csv);
+    } catch (err) {
+      console.error('❌ Error exportando CSV de evento_participantes:', err);
+      res.status(500).send('Error al exportar CSV');
+    }
+  });
+
+
+  // Guardar / actualizar teléfono de un participante
+  // Guardar / actualizar teléfono de un participante o eliminarlo
+router.post(
+  '/evento/telefono/:id',
+  requireAuth,
+  express.urlencoded({ extended: true }),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const telefono = (req.body.telefono || '').trim();
+    const accion = (req.body.accion || 'guardar').toLowerCase();
+
+    if (!id || id <= 0) {
+      return res.redirect('/admin/evento/telefonos');
+    }
+
+    try {
+      if (accion === 'eliminar') {
+        await dbExec(
+          'DELETE FROM evento_participantes WHERE id = $1',
+          [id]
+        );
+        console.log(`🗑 Participante ${id} eliminado de evento_participantes`);
+      } else {
+        await dbExec(
+          `
+          UPDATE evento_participantes
+          SET telefono = $1, updated_at = NOW()
+          WHERE id = $2
+        `,
+          [telefono, id]
+        );
+      }
+    } catch (err) {
+      console.error('❌ Error en /evento/telefono/:id (guardar/eliminar):', err);
+    }
+
+    // Siempre regresamos a la pantalla de teléfonos
+    res.redirect('/admin/evento/telefonos');
+  }
+);
+
+
+    // ---------------------------------------------------------------------------
+  // ELIMINAR PARTICIPANTES FILTRADOS (por facultad/carrera/grupo/nombre)
+  // ---------------------------------------------------------------------------
+  router.post(
+    '/evento/telefonos/eliminar-grupo',
+    requireAuth,
+    express.urlencoded({ extended: true }),
+    async (req, res) => {
+      const facultad = (req.body.facultad || '').trim();
+      const carrera = (req.body.carrera || '').trim();
+      const grupo = (req.body.grupo_horario || '').trim();
+      const nombre = (req.body.nombre || '').trim();
+
+      try {
+        let where = [];
+        let params = [];
+
+        if (facultad) {
+          params.push(`%${facultad}%`);
+          where.push(`facultad ILIKE $${params.length}`);
+        }
+
+        if (carrera) {
+          params.push(`%${carrera}%`);
+          where.push(`carrera ILIKE $${params.length}`);
+        }
+
+        if (grupo) {
+          params.push(`%${grupo}%`);
+          where.push(`grupo_horario ILIKE $${params.length}`);
+        }
+
+        if (nombre) {
+          params.push(`%${nombre}%`);
+          where.push(`nombre ILIKE $${params.length}`);
+        }
+
+        if (where.length === 0) {
+          console.warn('⚠️ Intento de eliminar grupo sin filtros, cancelado.');
+          return res.redirect('/admin/evento/telefonos');
+        }
+
+        let sql = 'DELETE FROM evento_participantes';
+
+        if (where.length > 0) {
+          sql += ' WHERE ' + where.join(' AND ');
+        }
+
+        await dbExec(sql, params);
+        console.log('🗑 Participantes eliminados con filtros:', {
+          facultad,
+          carrera,
+          grupo,
+          nombre,
+        });
+      } catch (err) {
+        console.error('❌ Error eliminando grupo en evento_participantes:', err);
+      }
+
+      // Redirigir manteniendo los filtros (para que veas que ya no hay nada)
+      const query = new URLSearchParams({
+        facultad,
+        carrera,
+        grupo_horario: grupo,
+        nombre,
+      }).toString();
+
+      res.redirect('/admin/evento/telefonos?' + query);
+    }
+  );
+
+
 // ---------------------------------------------------------------------------
 // PANEL DEL EDITOR (solo entregas de hoy + urgentes)
 // ---------------------------------------------------------------------------
