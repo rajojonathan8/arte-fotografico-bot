@@ -241,6 +241,13 @@ function mountAdmin(app) {
       title: 'Citas',
       desc: 'Ver, filtrar y actualizar el estado de las citas.',
     },
+    {
+  href: '/admin/evento/telefonos',
+  icon: '📱',
+  title: 'Teléfonos evento',
+  desc: 'Ver, filtrar y administrar teléfonos de los participantes.',
+},
+
   ];
 
   router.get('/', requireAuth, async (req, res) => {
