@@ -375,6 +375,34 @@ function mountAdmin(app) {
     proximasEntregas.sort((a, b) => a._fecha.localeCompare(b._fecha));
     entregasAtrasadas.sort((a, b) => a._fecha.localeCompare(b._fecha));
 
+     // 🔹 Resumen del evento (participantes / teléfonos)
+      let resumenEvento = {
+        total_participantes: 0,
+        con_telefono: 0,
+        sin_telefono: 0,
+        facultades: 0,
+        carreras: 0,
+        grupos: 0,
+      };
+
+      try {
+        const rowsEvento = await dbSelect(`
+          SELECT
+            COUNT(*) AS total_participantes,
+            COUNT(*) FILTER (WHERE telefono IS NOT NULL AND telefono <> '') AS con_telefono,
+            COUNT(*) FILTER (WHERE telefono IS NULL OR telefono = '') AS sin_telefono,
+            COUNT(DISTINCT facultad) AS facultades,
+            COUNT(DISTINCT carrera) AS carreras,
+            COUNT(DISTINCT grupo_horario) AS grupos
+          FROM evento_participantes
+        `);
+
+        if (rowsEvento.length) {
+          resumenEvento = rowsEvento[0];
+        }
+      } catch (e) {
+        console.error('❌ Error cargando resumenEvento:', e);
+      }
 
 
       res.render('admin', {
@@ -389,6 +417,7 @@ function mountAdmin(app) {
         resumenCitas,
         proximasEntregas,
         entregasAtrasadas,
+        resumenEvento, 
       });
     } catch (err) {
       console.error('❌ Error en dashboard /admin:', err);
@@ -414,6 +443,14 @@ function mountAdmin(app) {
         },
         proximasEntregas: [],
         entregasAtrasadas: [],
+         resumenEvento: {
+          total_participantes: 0,
+          con_telefono: 0,
+          sin_telefono: 0,
+          facultades: 0,
+          carreras: 0,
+          grupos: 0,
+        },
       });
     }
   });
