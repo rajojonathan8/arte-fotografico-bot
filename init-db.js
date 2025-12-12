@@ -143,6 +143,17 @@ async function main() {
       );
     `;
       
+const sqlAlterEventoAtendidoPersonas = `
+  ALTER TABLE ordenes_personas
+  ADD COLUMN IF NOT EXISTS evento TEXT,
+  ADD COLUMN IF NOT EXISTS atendido_por TEXT;
+`;
+// ✅ NUEVO: columnas evento y atendido_por (solo si no existen)
+const sqlAlterEventoAtendido = `
+  ALTER TABLE ordenes_personas
+  ADD COLUMN IF NOT EXISTS evento TEXT,
+  ADD COLUMN IF NOT EXISTS atendido_por TEXT;
+`;
 
     await client.query(sqlConversaciones);
     console.log('🟢 Tabla "conversaciones" OK');
@@ -159,6 +170,8 @@ async function main() {
 
     await client.query(sqlOrdenesPersonasDetalle);
     console.log('🟢 Tabla "ordenes_personas_detalle" OK');
+
+
 
     // Ya lo tenías:
     await client.query(sqlAlterImpresosPersonas);
@@ -179,7 +192,11 @@ async function main() {
     await client.query(sqlAlterEventoPersonas);
     await client.query(sqlAlterAtendidoPorPersonas);
     console.log('🟢 Columnas "evento" y "atendido_por" OK');
+    await client.query(sqlAlterEventoAtendidoPersonas);
+console.log('🟢 Columnas evento / atendido_por en ordenes_personas OK');
 
+await client.query(sqlAlterEventoAtendido);
+console.log('🟢 Columnas evento / atendido_por OK');
 
         await client.query(sqlEventoParticipantes);
     console.log('🟢 Tabla "evento_participantes" OK');

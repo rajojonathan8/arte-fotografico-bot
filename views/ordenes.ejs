@@ -450,7 +450,9 @@
           <thead class="bg-slate-50 text-slate-600">
             <tr>
               <th class="px-3 py-2 text-left">Nombre</th>
+              <th class="px-3 py-2 text-left">Evento</th>
               <th class="px-3 py-2 text-left">Orden</th>
+              <th class="px-3 py-2 text-left">Atendido por</th>              
               <th class="px-3 py-2 text-center">N° toma</th>
               <th class="px-3 py-2 text-left">Fecha toma</th>
               <th class="px-3 py-2 text-left">Fecha entrega</th>
@@ -485,7 +487,9 @@
               %>
                 <tr class="hover:bg-slate-50">
                   <td class="px-3 py-2"><%= o.nombre %></td>
+                  <td class="px-3 py-2"><%= o.evento || '-' %></td>
                   <td class="px-3 py-2"><%= o.numero_orden || o.n_orden %></td>
+                  <td class="px-3 py-2"><%= o.atendido_por || '-' %></td>
                   <td class="px-3 py-2 text-center"><%= o.numero_toma || o.n_toma %></td>
                   <td class="px-3 py-2"><%= fechaCorta(o.fecha_toma) %></td>
 <td class="px-3 py-2"><%= fechaCorta(o.fecha_entrega) %></td>

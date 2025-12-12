@@ -42,18 +42,36 @@
           />
         </div>
 
-        <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1">
-            N° orden
-          </label>
-          <input
-            type="text"
-            name="numero_orden"
-            value="<%= orden.numero_orden || '' %>"
-            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
-          />
-        </div>
+        
       </div>
+      <div class="grid md:grid-cols-2 gap-4">
+  <div>
+    <label class="block text-xs font-medium text-slate-300 mb-1">
+      Evento <span class="text-slate-500">(opcional)</span>
+    </label>
+    <input
+      type="text"
+      name="evento"
+      value="<%= orden.evento || '' %>"
+      class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+      placeholder="Ej: Graduación CCA"
+    />
+  </div>
+
+  <div>
+    <label class="block text-xs font-medium text-slate-300 mb-1">
+      Atendido por <span class="text-slate-500">(opcional)</span>
+    </label>
+    <input
+      type="text"
+      name="atendido_por"
+      value="<%= orden.atendido_por || '' %>"
+      class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+      placeholder="Ej: Rajo"
+    />
+  </div>
+</div>
+
 
       <div class="grid md:grid-cols-2 gap-4">
         <div>

@@ -718,7 +718,6 @@ function normalizarFechaFiltro(valor) {
 
     const {
       nombre,
-      numero_orden,
       numero_toma,
       fecha_toma,
       fecha_entrega,
@@ -774,7 +773,7 @@ function normalizarFechaFiltro(valor) {
 
       const { rows } = await db.query(insertCabecera, [
         nombre || '',
-        numero_orden || '',
+        '',
         numero_toma || '',
         fecha_toma || null,
         fecha_entrega || null,
@@ -874,47 +873,35 @@ router.get(
 
       try {
         await dbExec(
-          `
-        UPDATE ordenes_instituciones
-        SET
-          nombre = $1,
-          institucion = $2,
-          seccion = $3,
-          paquete = $4,
-          toma_principal = $5,
-          collage1 = $6,
-          collage2 = $7,
-          collage3 = $8,
-          fecha_toma = $9,
-          fecha_entrega = $10,
-          telefono = $11,
-          entrega = $12,
-          urgencia = $13,
-          precio = $14,
-          abono = $15,
-          pago_estado = $16
-        WHERE id = $17
-        `,
-          [
-            datos.nombre || '',
-            datos.institucion || '',
-            datos.seccion || '',
-            datos.paquete || '',
-            Number(datos.toma_principal || 0),
-            Number(datos.collage1 || 0),
-            Number(datos.collage2 || 0),
-            Number(datos.collage3 || 0),
-            datos.fecha_toma || null,
-            datos.fecha_entrega || null,
-            datos.telefono || '',
-            datos.entrega || 'Pendiente',
-            datos.urgencia || 'Normal',
-            precioNum,
-            abonoNum,
-            pagoEstado,
-            id,
-          ]
-        );
+  `UPDATE ordenes_personas 
+   SET nombre=$1,
+       numero_toma=$2,
+       fecha_toma=$3,
+       fecha_entrega=$4,
+       urgencia=$5,
+       precio=$6,
+       abono=$7,
+       telefono=$8,
+       entrega=$9,
+       evento=$10,
+       atendido_por=$11,
+       updated_at = NOW()
+   WHERE id = $12`,
+  [
+    req.body.nombre || '',
+    req.body.numero_toma || '',
+    req.body.fecha_toma || null,
+    req.body.fecha_entrega || null,
+    req.body.urgencia || 'Normal',
+    Number(req.body.precio) || 0,
+    Number(req.body.abono) || 0,
+    req.body.telefono || '',
+    req.body.estado_entrega || 'Pendiente',
+    req.body.evento || '',
+    req.body.atendido_por || '',
+    id,
+  ]
+);
 
         console.log('💾 Orden institución actualizada en PostgreSQL');
       } catch (err) {
