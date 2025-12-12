@@ -433,7 +433,6 @@
     const totalSpan = document.getElementById('total-items');
     if (totalSpan) totalSpan.textContent = total.toFixed(2);
 
-    // Sincronizar con precio total si está vacío o 0
     const precioInput = document.getElementById('precio-total-input');
     if (precioInput && (!precioInput.value || Number(precioInput.value) === 0)) {
       if (total > 0) {
@@ -505,10 +504,8 @@
     recalcularTotal();
   }
 
-  // Recalcular al cargar la página (por si vienen valores del servidor)
-  window.addEventListener('DOMContentLoaded', () => {
-    recalcularTotal();
-  });
+  document.addEventListener('DOMContentLoaded', recalcularTotal);
 </script>
+
 
 <%- include('_foot') %>

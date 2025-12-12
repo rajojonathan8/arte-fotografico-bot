@@ -135,6 +135,41 @@ function getAbonoFromBody(datos) {
 
   return abonoNum;
 }
+// Lee los items del body (sirve para nueva-persona y editar-persona)
+function parseItemsFromBody(datos) {
+  // Soporta nombres con y sin [] (items_cantidad[] o items_cantidad)
+  function normArray(baseKey) {
+    if (Array.isArray(datos[baseKey + '[]'])) return datos[baseKey + '[]'];
+    if (datos[baseKey + '[]'] !== undefined)  return [datos[baseKey + '[]']];
+    if (Array.isArray(datos[baseKey]))        return datos[baseKey];
+    if (datos[baseKey] !== undefined)         return [datos[baseKey]];
+    return [];
+  }
+
+  const cantidades    = normArray('items_cantidad');
+  const descripciones = normArray('items_descripcion');
+  const preciosUnit   = normArray('items_precio_unitario');
+
+  let totalItems = 0;
+  const items = [];
+
+  const len = Math.max(cantidades.length, descripciones.length, preciosUnit.length);
+
+  for (let i = 0; i < len; i++) {
+    const cant = Number(cantidades[i]) || 0;
+    const desc = (descripciones[i] || '').trim();
+    const pu   = Number(preciosUnit[i]) || 0;
+
+    if (cant <= 0 || !desc) continue;
+
+    const subtotal = cant * pu;
+    totalItems += subtotal;
+
+    items.push({ cant, desc, pu, subtotal });
+  }
+
+  return { items, totalItems };
+}
 
 // Resumen de pagos (para la cajita de totales)
 function calcularResumen(lista) {
@@ -675,146 +710,109 @@ function normalizarFechaFiltro(valor) {
   });
 
       router.post(
-    '/ordenes/nueva-persona',
-    requireAuth,
-    express.urlencoded({ extended: true }),
-    async (req, res) => {
-      const datos = req.body || {};
+  '/ordenes/nueva-persona',
+  requireAuth,
+  express.urlencoded({ extended: true }),
+  async (req, res) => {
+    const datos = req.body || {};
 
-      const {
-        nombre,
-        numero_orden,
-        numero_toma,
-        fecha_toma,
-        fecha_entrega,
-        urgencia,
-        precio, // opcional, si lo dejas vacío usamos la suma de los detalles
-        telefono,
-        estado_entrega,
-        pago_estado,
-        evento,
-        atendido_por,
-      } = datos;
+    const {
+      nombre,
+      numero_orden,
+      numero_toma,
+      fecha_toma,
+      fecha_entrega,
+      urgencia,
+      precio,
+      telefono,
+      estado_entrega,
+      pago_estado,
+      evento,
+      atendido_por,
+    } = datos;
 
-      // 1) Leer arrays del formulario (detalles tipo factura)
-      let itemsCant = datos.items_cantidad || [];
-      let itemsDesc = datos.items_descripcion || [];
-      let itemsPU   = datos.items_precio_unitario || [];
+    // 1) Ítems del body
+    const { items, totalItems } = parseItemsFromBody(datos);
 
-      if (!Array.isArray(itemsCant)) itemsCant = [itemsCant];
-      if (!Array.isArray(itemsDesc)) itemsDesc = [itemsDesc];
-      if (!Array.isArray(itemsPU))   itemsPU   = [itemsPU];
+    // 2) Precio / abono / estado de pago
+    let precioNum = Number(precio) || 0;
+    let abonoNum  = getAbonoFromBody(datos);
+    let pagoEstado = pago_estado || 'Pendiente';
 
-      const detalles = [];
-      let totalDetalle = 0;
-
-      for (let i = 0; i < itemsDesc.length; i++) {
-        const desc = (itemsDesc[i] || '').trim();
-        const cant = Number(itemsCant[i]) || 0;
-        const pu   = Number(itemsPU[i])   || 0;
-
-        if (!desc || cant <= 0) continue;
-
-        const sub = cant * pu;
-        totalDetalle += sub;
-
-        detalles.push({
-          descripcion: desc,
-          cantidad: cant,
-          precio_unitario: pu,
-          subtotal: sub,
-        });
-      }
-
-      // 2) Precio total: si NO escribes nada en "precio", usamos la suma de detalles
-      let precioNum = Number(precio) || 0;
-      if (precioNum <= 0 && totalDetalle > 0) {
-        precioNum = totalDetalle;
-      }
-
-      // 3) Abono + estado de pago (igual que antes)
-      let abonoNum = getAbonoFromBody(datos);
-      let estadoPagoFinal = pago_estado || 'Pendiente';
-
-      if (estadoPagoFinal === 'Pagado' && precioNum > 0) {
-        abonoNum = precioNum;
-      }
-
-      if (abonoNum > 0 && abonoNum < precioNum && estadoPagoFinal !== 'Pagado') {
-        estadoPagoFinal = 'Abono';
-      }
-
-      if (abonoNum === 0 && estadoPagoFinal === 'Abono') {
-        estadoPagoFinal = 'Pendiente';
-      }
-
-      try {
-        // 4) Insertar la orden y recuperar el id
-        const insertOrdenSql = `
-          INSERT INTO ordenes_personas (
-            nombre,
-            numero_orden,
-            numero_toma,
-            fecha_toma,
-            fecha_entrega,
-            urgencia,
-            precio,
-            telefono,
-            entrega,
-            abono,
-            pago_estado,
-            evento,
-            atendido_por
-          )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-          RETURNING id
-        `;
-
-        const { rows } = await db.query(insertOrdenSql, [
-          nombre || '',
-          numero_orden || '',
-          numero_toma || '',
-          fecha_toma || null,
-          fecha_entrega || null,
-          urgencia || 'Normal',
-          precioNum,
-          telefono || '',
-          estado_entrega || 'Pendiente',
-          abonoNum,
-          estadoPagoFinal,
-          evento || null,
-          atendido_por || null,
-        ]);
-
-        const ordenId = rows[0].id;
-
-        // 5) Insertar los detalles si hay
-        if (detalles.length) {
-          const insertDetSql = `
-            INSERT INTO ordenes_personas_detalle
-              (orden_persona_id, descripcion, cantidad, precio_unitario, subtotal)
-            VALUES ($1,$2,$3,$4,$5)
-          `;
-
-          for (const it of detalles) {
-            await dbExec(insertDetSql, [
-              ordenId,
-              it.descripcion,
-              it.cantidad,
-              it.precio_unitario,
-              it.subtotal,
-            ]);
-          }
-        }
-
-        console.log('💾 Nueva orden persona + detalles guardada en PostgreSQL');
-      } catch (err) {
-        console.error('❌ Error guardando orden PERSONA en PostgreSQL:', err);
-      }
-
-      res.redirect('/admin/ordenes?tab=personas');
+    // Si precio está en 0 y hay detalle, usamos el total de ítems
+    if (precioNum <= 0 && totalItems > 0) {
+      precioNum = totalItems;
     }
-  );
+
+    if (pagoEstado === 'Pagado' && precioNum > 0) {
+      abonoNum = precioNum;
+    } else {
+      pagoEstado = computePagoEstado(precioNum, abonoNum);
+    }
+
+    try {
+      // 3) Insertar cabecera y obtener id
+      const insertCabecera = `
+        INSERT INTO ordenes_personas (
+          nombre,
+          numero_orden,
+          numero_toma,
+          fecha_toma,
+          fecha_entrega,
+          urgencia,
+          precio,
+          telefono,
+          entrega,
+          abono,
+          pago_estado,
+          evento,
+          atendido_por
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        RETURNING id
+      `;
+
+      const { rows } = await db.query(insertCabecera, [
+        nombre || '',
+        numero_orden || '',
+        numero_toma || '',
+        fecha_toma || null,
+        fecha_entrega || null,
+        urgencia || 'Normal',
+        precioNum,
+        telefono || '',
+        estado_entrega || 'Pendiente',
+        abonoNum,
+        pagoEstado,
+        evento || '',
+        atendido_por || '',
+      ]);
+
+      const nuevaId = rows[0]?.id;
+
+      // 4) Insertar detalle si hay ítems
+      if (nuevaId && items.length) {
+        for (const it of items) {
+          await dbExec(
+            `
+            INSERT INTO ordenes_personas_detalle
+              (orden_persona_id, cantidad, descripcion, precio_unitario, subtotal)
+            VALUES ($1,$2,$3,$4,$5)
+            `,
+            [nuevaId, it.cant, it.desc, it.pu, it.subtotal]
+          );
+        }
+      }
+
+      console.log('💾 Nueva orden persona + detalle guardados en PostgreSQL');
+    } catch (err) {
+      console.error('❌ Error guardando orden PERSONA (cabecera/detalle):', err);
+    }
+
+    res.redirect('/admin/ordenes?tab=personas');
+  }
+);
+
 
   // ---------------------------------------------------------------------------
   // EDITAR ORDEN — INSTITUCIÓN
@@ -992,7 +990,7 @@ router.get('/ordenes/persona/:id/editar', requireAuth, async (req, res) => {
 
   // POST - Guardar edición persona
 // ---------------------------------------------------------------------------
-// EDITAR ORDEN — PERSONA (POST con ítems)
+// EDITAR ORDEN — PERSONA (cabecera + detalle)
 // ---------------------------------------------------------------------------
 router.post(
   '/ordenes/persona/:id/editar',
@@ -1014,7 +1012,7 @@ router.post(
         fecha_toma,
         fecha_entrega,
         urgencia,
-        precio,          // total manual (puede ir en 0)
+        precio,
         abono,
         telefono,
         estado_entrega,
@@ -1022,46 +1020,20 @@ router.post(
         atendido_por,
       } = datos;
 
-      // ---------- Normalizar arrays de ítems ----------
-      function normArray(body, key) {
-        const raw = body[key];
-        if (!raw) return [];
-        if (Array.isArray(raw)) return raw;
-        return [raw];
-      }
+      // 1) Leer ítems del form
+      const { items, totalItems } = parseItemsFromBody(datos);
 
-      const cantidades   = normArray(datos, 'items_cantidad[]');
-      const descripciones= normArray(datos, 'items_descripcion[]');
-      const preciosUnit  = normArray(datos, 'items_precio_unitario[]');
-
-      let totalItems = 0;
-      const itemsParaInsertar = [];
-
-      for (let i = 0; i < Math.max(cantidades.length, descripciones.length, preciosUnit.length); i++) {
-        const cant = Number(cantidades[i]) || 0;
-        const desc = (descripciones[i] || '').trim();
-        const pu   = Number(preciosUnit[i]) || 0;
-
-        if (cant <= 0 || !desc) continue;
-
-        const subtotal = cant * pu;
-        totalItems += subtotal;
-
-        itemsParaInsertar.push({ cant, desc, pu, subtotal });
-      }
-
-      // ---------- Precio y abono ----------
+      // 2) Precio / abono / estado de pago
       let precioNum = Number(precio) || 0;
       const abonoNum = Number(abono) || 0;
 
-      // Si el precio está en 0 y hay detalle, se usa el total de ítems
       if (precioNum <= 0 && totalItems > 0) {
         precioNum = totalItems;
       }
 
       const pagoEstado = computePagoEstado(precioNum, abonoNum);
 
-      // ---------- Actualizar orden principal ----------
+      // 3) Actualizar cabecera
       await dbExec(
         `UPDATE ordenes_personas 
          SET nombre       = $1,
@@ -1096,33 +1068,34 @@ router.post(
         ]
       );
 
-      // ---------- Reemplazar detalle ----------
-      // Borramos el detalle viejo
+      // 4) Reemplazar el detalle: borrar todo y volver a insertar
       await dbExec(
         'DELETE FROM ordenes_personas_detalle WHERE orden_persona_id = $1',
         [id]
       );
 
-      // Insertamos el detalle nuevo
-      for (const it of itemsParaInsertar) {
-        await dbExec(
-          `
-          INSERT INTO ordenes_personas_detalle
-            (orden_persona_id, cantidad, descripcion, precio_unitario, subtotal)
-          VALUES ($1, $2, $3, $4, $5)
-          `,
-          [id, it.cant, it.desc, it.pu, it.subtotal]
-        );
+      if (items.length) {
+        for (const it of items) {
+          await dbExec(
+            `
+            INSERT INTO ordenes_personas_detalle
+              (orden_persona_id, cantidad, descripcion, precio_unitario, subtotal)
+            VALUES ($1,$2,$3,$4,$5)
+            `,
+            [id, it.cant, it.desc, it.pu, it.subtotal]
+          );
+        }
       }
 
       console.log('💾 Orden persona actualizada (cabecera + detalle)');
       res.redirect('/admin/ordenes?tab=personas');
     } catch (err) {
-      console.error('❌ Error POST editar persona:', err);
+      console.error('❌ Error POST editar persona (cabecera/detalle):', err);
       res.status(500).send('Error interno');
     }
   }
 );
+
 
   // ---------------------------------------------------------------------------
   // ELIMINAR ORDEN — INSTITUCIÓN
