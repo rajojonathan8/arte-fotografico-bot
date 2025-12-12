@@ -109,6 +109,41 @@ async function main() {
       ALTER TABLE ordenes_instituciones
       ADD COLUMN IF NOT EXISTS impresos boolean DEFAULT false;
     `;
+      // 🔹 NUEVO: columnas extra para órdenes de personas
+    const sqlAlterEventoPersonas = `
+      ALTER TABLE ordenes_personas
+      ADD COLUMN IF NOT EXISTS evento TEXT;
+    `;
+
+    const sqlAlterAtendidoPorPersonas = `
+      ALTER TABLE ordenes_personas
+      ADD COLUMN IF NOT EXISTS atendido_por TEXT;
+    `;
+     // 5) 🔹 Columnas extra en ordenes_personas (evento / atendido_por)
+    const sqlAlterEvento = `
+      ALTER TABLE ordenes_personas
+      ADD COLUMN IF NOT EXISTS evento TEXT;
+    `;
+
+    const sqlAlterAtendidoPor = `
+      ALTER TABLE ordenes_personas
+      ADD COLUMN IF NOT EXISTS atendido_por TEXT;
+    `;
+
+    // 6) 🔹 Tabla de detalle tipo factura para personas
+    const sqlOrdenesPersonasDetalle = `
+      CREATE TABLE IF NOT EXISTS ordenes_personas_detalle (
+        id SERIAL PRIMARY KEY,
+        orden_persona_id INTEGER NOT NULL REFERENCES ordenes_personas(id) ON DELETE CASCADE,
+        descripcion TEXT NOT NULL,
+        cantidad INTEGER NOT NULL DEFAULT 1,
+        precio_unitario NUMERIC(10,2) NOT NULL DEFAULT 0,
+        subtotal NUMERIC(10,2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `;
+      
+
     await client.query(sqlConversaciones);
     console.log('🟢 Tabla "conversaciones" OK');
 
@@ -117,9 +152,34 @@ async function main() {
 
     await client.query(sqlOrdenesInstituciones);
     console.log('🟢 Tabla "ordenes_instituciones" OK');
+      // 👇 NUEVO
+    await client.query(sqlAlterEvento);
+    await client.query(sqlAlterAtendidoPor);
+    console.log('🟢 Columnas evento / atendido_por OK');
 
+    await client.query(sqlOrdenesPersonasDetalle);
+    console.log('🟢 Tabla "ordenes_personas_detalle" OK');
+
+    // Ya lo tenías:
+    await client.query(sqlAlterImpresosPersonas);
+    await client.query(sqlAlterImpresosInstituciones);
+    console.log('🟢 Columnas "impresos" OK');
     await client.query(sqlCitas);
     console.log('🟢 Tabla "citas" OK');
+        // 👇 NUEVO: ejecutar los ALTER
+    await client.query(sqlAlterImpresosPersonas);
+    await client.query(sqlAlterImpresosInstituciones);
+    console.log('🟢 Columnas "impresos" OK');
+
+        // 👇 NUEVO: ejecutar los ALTER
+    await client.query(sqlAlterImpresosPersonas);
+    await client.query(sqlAlterImpresosInstituciones);
+    console.log('🟢 Columnas "impresos" OK');
+
+    await client.query(sqlAlterEventoPersonas);
+    await client.query(sqlAlterAtendidoPorPersonas);
+    console.log('🟢 Columnas "evento" y "atendido_por" OK');
+
 
         await client.query(sqlEventoParticipantes);
     console.log('🟢 Tabla "evento_participantes" OK');

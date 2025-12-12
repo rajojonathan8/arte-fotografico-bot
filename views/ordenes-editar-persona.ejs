@@ -1,173 +1,514 @@
 <%- include('_head', { title }) %>
 
-<%
-  function asDateInput(value) {
-    if (!value) return '';
-    const d = (value instanceof Date) ? value : new Date(value);
-    if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10); // YYYY-MM-DD
-  }
-%>
-
-
-<header class="p-4 bg-white shadow">
-  <div class="max-w-4xl mx-auto flex items-center justify-between">
-    <h1 class="text-xl font-semibold">Editar orden — persona</h1>
-    <a href="/admin/ordenes?tab=personas" class="text-sm text-slate-600 hover:text-slate-900">← Volver</a>
-  </div>
-</header>
-
-<main class="max-w-4xl mx-auto p-4">
-  <form action="/admin/ordenes/persona/<%= idx %>/editar" method="POST"
-        class="bg-white rounded-2xl shadow p-4 space-y-4" id="formEditarPersona">
-
-    <% 
-      const precioNum = Number(orden.precio || 0);
-      const abonoNum  = Number(orden.abono  || 0);
-      const saldoNum  = Math.max(precioNum - abonoNum, 0);
-
-      let pagoEstadoLocal = orden.pago_estado || '';
-      if (!pagoEstadoLocal) {
-        if (precioNum <= 0 && abonoNum <= 0)      pagoEstadoLocal = 'Pendiente';
-        else if (abonoNum >= precioNum && precioNum > 0) pagoEstadoLocal = 'Pagado';
-        else if (abonoNum > 0 && abonoNum < precioNum)   pagoEstadoLocal = 'Abono';
-        else pagoEstadoLocal = 'Pendiente';
-      }
-    %>
-
-    <div class="grid md:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm mb-1">Nombre</label>
-        <input name="nombre" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.nombre %>" required>
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">N° orden</label>
-        <input name="numero_orden" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.numero_orden %>">
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">N° toma</label>
-        <input name="numero_toma" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.numero_toma %>">
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">Fecha toma</label>
-        <input type="date" name="fecha_toma" class="w-full border rounded-lg px-3 py-2"
-       value="<%= asDateInput(orden.fecha_toma) %>">
-
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">Fecha entrega</label>
-        <input type="date" name="fecha_entrega" class="w-full border rounded-lg px-3 py-2"
-       value="<%= asDateInput(orden.fecha_entrega) %>">
-
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">Urgencia</label>
-        <select name="urgencia" class="w-full border rounded-lg px-3 py-2">
-          <option value="Normal"  <%= orden.urgencia === 'Normal'  ? 'selected' : '' %>>Normal</option>
-          <option value="Urgente" <%= orden.urgencia === 'Urgente' ? 'selected' : '' %>>Urgente</option>
-          <option value="Muy urgente" <%= orden.urgencia === 'Muy urgente' ? 'selected' : '' %>>Muy urgente</option>
-        </select>
-      </div>
-
-      <!-- PRECIO -->
-      <div>
-        <label class="block text-sm mb-1">Precio</label>
-        <input type="number" step="0.01" min="0" name="precio"
-               id="inputPrecio"
-               class="w-full border rounded-lg px-3 py-2"
-               value="<%= precioNum.toFixed(2) %>">
-      </div>
-
-      <!-- ABONO (TOTAL) -->
-      <div>
-        <label class="block text-sm mb-1">Abonado (total)</label>
-        <input type="number" step="0.01" min="0" name="abono"
-               id="inputAbono"
-               class="w-full border rounded-lg px-3 py-2"
-               value="<%= abonoNum.toFixed(2) %>">
-        <p class="text-xs text-slate-500 mt-1">
-          Este es el total abonado (suma de pagos). Puedes corregirlo manualmente si lo necesitas.
-        </p>
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">Teléfono</label>
-        <input name="telefono" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.telefono %>">
-      </div>
-
-      <!-- ENTREGA -->
-      <div>
-        <label class="block text-sm mb-1">Entrega</label>
-        <select name="estado_entrega" class="w-full border rounded-lg px-3 py-2">
-          <option value="Pendiente" <%= orden.entrega !== 'Entregado' ? 'selected' : '' %>>Pendiente</option>
-          <option value="Entregado" <%= orden.entrega === 'Entregado' ? 'selected' : '' %>>Entregado</option>
-        </select>
-      </div>
-
-      <!-- ESTADO DE PAGO (solo visual: el back se recalcula por número) -->
-      <div>
-        <label class="block text-sm mb-1">Estado de pago</label>
-        <select name="pago_estado" class="w-full border rounded-lg px-3 py-2" disabled>
-          <option value="Pendiente" <%= pagoEstadoLocal === 'Pendiente' ? 'selected' : '' %>>Pendiente</option>
-          <option value="Abono"     <%= pagoEstadoLocal === 'Abono'     ? 'selected' : '' %>>Abono</option>
-          <option value="Pagado"    <%= pagoEstadoLocal === 'Pagado'    ? 'selected' : '' %>>Pagado</option>
-        </select>
-        <p class="text-xs text-slate-500 mt-1">
-          El estado se calcula automáticamente según Precio y Abonado.
-        </p>
-      </div>
-
-      <!-- SALDO SOLO LECTURA -->
-      <div>
-        <label class="block text-sm mb-1">Saldo (auto-calculado)</label>
-        <input type="text" id="inputSaldo" readonly
-               class="w-full border rounded-lg px-3 py-2 bg-slate-50"
-               value="$<%= saldoNum.toFixed(2) %>">
-      </div>
+<main class="max-w-5xl mx-auto p-4 space-y-6">
+  <header class="flex items-center justify-between gap-4">
+    <div>
+      <h1 class="text-xl font-semibold text-slate-100">
+        Editar orden — persona
+      </h1>
+      <p class="text-sm text-slate-400">
+        Ajusta los datos del cliente, el detalle de productos y el estado de pago.
+      </p>
     </div>
+    <a
+      href="/admin/ordenes?tab=personas"
+      class="text-xs md:text-sm text-slate-300 hover:text-white"
+    >
+      ← Volver
+    </a>
+  </header>
 
-    <div class="flex justify-end gap-2 pt-2">
-      <a href="/admin/ordenes?tab=personas"
-         class="px-4 py-2 rounded-lg border text-sm text-slate-600 hover:bg-slate-50">
+  <form
+    method="POST"
+    action="/admin/ordenes/persona/<%= idx %>/editar"
+    class="space-y-6"
+  >
+    <!-- ================= DATOS PRINCIPALES ================= -->
+    <section class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 space-y-4">
+      <h2 class="text-sm font-semibold text-slate-100">
+        Datos del cliente y la orden
+      </h2>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Nombre
+          </label>
+          <input
+            type="text"
+            name="nombre"
+            value="<%= orden.nombre || '' %>"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            N° orden
+          </label>
+          <input
+            type="text"
+            name="numero_orden"
+            value="<%= orden.numero_orden || '' %>"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            N° toma
+          </label>
+          <input
+            type="text"
+            name="numero_toma"
+            value="<%= orden.numero_toma || '' %>"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Urgencia
+          </label>
+          <select
+            name="urgencia"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+          >
+            <option value="Normal" <%= (orden.urgencia || 'Normal') === 'Normal' ? 'selected' : '' %>>Normal</option>
+            <option value="Urgente" <%= orden.urgencia === 'Urgente' ? 'selected' : '' %>>Urgente</option>
+            <option value="Muy urgente" <%= orden.urgencia === 'Muy urgente' ? 'selected' : '' %>>Muy urgente</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Fecha toma
+          </label>
+          <input
+            type="date"
+            name="fecha_toma"
+            value="<%= orden.fecha_toma ? orden.fecha_toma.toISOString().slice(0,10) : '' %>"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Fecha entrega
+          </label>
+          <input
+            type="date"
+            name="fecha_entrega"
+            value="<%= orden.fecha_entrega ? orden.fecha_entrega.toISOString().slice(0,10) : '' %>"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Evento
+          </label>
+          <input
+            type="text"
+            name="evento"
+            value="<%= orden.evento || '' %>"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Atendido por
+          </label>
+          <input
+            type="text"
+            name="atendido_por"
+            value="<%= orden.atendido_por || '' %>"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Teléfono
+          </label>
+          <input
+            type="text"
+            name="telefono"
+            value="<%= orden.telefono || '' %>"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= DETALLE DE ÍTEMS ================= -->
+    <section class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-sm font-semibold text-slate-100">
+          Detalle de productos / servicios
+        </h2>
+        <p class="text-[11px] text-slate-400">
+          Aquí se desglosa como factura: cantidad × precio unitario = subtotal.
+        </p>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-xs text-slate-100">
+          <thead class="bg-slate-800/80 text-slate-300">
+            <tr>
+              <th class="px-2 py-2 text-left w-16">Cant.</th>
+              <th class="px-2 py-2 text-left">Descripción</th>
+              <th class="px-2 py-2 text-right w-32">P. unitario</th>
+              <th class="px-2 py-2 text-right w-32">Subtotal</th>
+              <th class="px-2 py-2 text-center w-10"></th>
+            </tr>
+          </thead>
+          <tbody id="items-body" class="divide-y divide-slate-800">
+            <% if (detalles && detalles.length) { %>
+              <% detalles.forEach(function(d) { 
+                   const pu = Number(d.precio_unitario || 0);
+                   const sub = d.subtotal != null
+                     ? Number(d.subtotal)
+                     : (Number(d.cantidad || 0) * pu);
+              %>
+                <tr class="item-row">
+                  <td class="px-2 py-1">
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      name="items_cantidad[]"
+                      class="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1 text-xs text-slate-100 text-right"
+                      value="<%= d.cantidad || 0 %>"
+                      oninput="recalcularFila(this)"
+                    />
+                  </td>
+                  <td class="px-2 py-1">
+                    <input
+                      type="text"
+                      name="items_descripcion[]"
+                      class="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1 text-xs text-slate-100"
+                      value="<%= d.descripcion || '' %>"
+                    />
+                  </td>
+                  <td class="px-2 py-1">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      name="items_precio_unitario[]"
+                      class="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1 text-xs text-slate-100 text-right"
+                      value="<%= pu.toFixed(2) %>"
+                      oninput="recalcularFila(this)"
+                    />
+                  </td>
+                  <td class="px-2 py-1 text-right">
+                    <span class="subtotal-item"><%= sub.toFixed(2) %></span>
+                  </td>
+                  <td class="px-2 py-1 text-center">
+                    <button
+                      type="button"
+                      class="text-xs text-rose-400 hover:text-rose-300"
+                      onclick="eliminarFila(this)"
+                      title="Eliminar ítem"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              <% }) %>
+            <% } else { %>
+              <!-- Si no hay detalle, dejamos una fila vacía -->
+              <tr class="item-row">
+                <td class="px-2 py-1">
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    name="items_cantidad[]"
+                    class="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1 text-xs text-slate-100 text-right"
+                    value="1"
+                    oninput="recalcularFila(this)"
+                  />
+                </td>
+                <td class="px-2 py-1">
+                  <input
+                    type="text"
+                    name="items_descripcion[]"
+                    class="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1 text-xs text-slate-100"
+                    placeholder="Descripción del producto / servicio"
+                  />
+                </td>
+                <td class="px-2 py-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    name="items_precio_unitario[]"
+                    class="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1 text-xs text-slate-100 text-right"
+                    value="0.00"
+                    oninput="recalcularFila(this)"
+                  />
+                </td>
+                <td class="px-2 py-1 text-right">
+                  <span class="subtotal-item">0.00</span>
+                </td>
+                <td class="px-2 py-1 text-center">
+                  <button
+                    type="button"
+                    class="text-xs text-rose-400 hover:text-rose-300"
+                    onclick="eliminarFila(this)"
+                    title="Eliminar ítem"
+                  >
+                    ✕
+                  </button>
+                </td>
+              </tr>
+            <% } %>
+          </tbody>
+          <tfoot class="bg-slate-950/70">
+            <tr>
+              <td colspan="2" class="px-2 py-2">
+                <button
+                  type="button"
+                  onclick="agregarItem()"
+                  class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-600 text-white text-xs hover:bg-emerald-500"
+                >
+                  <span>＋</span> Agregar ítem
+                </button>
+              </td>
+              <td class="px-2 py-2 text-right text-[11px] text-slate-300">
+                Total calculado:
+              </td>
+              <td class="px-2 py-2 text-right font-semibold text-sm">
+                $ <span id="total-items"><%= (totalDetalle || 0).toFixed(2) %></span>
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <p class="text-[11px] text-slate-400">
+        Si dejas el <strong>precio total</strong> en 0, se usará este total calculado.
+      </p>
+    </section>
+
+    <!-- ================= PAGO Y ESTADOS ================= -->
+    <section class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 space-y-4">
+      <h2 class="text-sm font-semibold text-slate-100">
+        Pago y estado de la orden
+      </h2>
+
+      <div class="grid md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Precio total
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            name="precio"
+            id="precio-total-input"
+            value="<%= precio.toFixed(2) %>"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100 text-right focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          />
+          <p class="mt-1 text-[11px] text-slate-500">
+            Si está en 0, se usará el total calculado de los ítems.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Abonado (total)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            name="abono"
+            value="<%= abono.toFixed(2) %>"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100 text-right focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          />
+          <p class="mt-1 text-[11px] text-slate-500">
+            El estado de pago se ajusta automáticamente.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Estado de pago (auto)
+          </label>
+          <div class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100">
+            <%= pagoEstado || 'Pendiente' %>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Estado de entrega
+          </label>
+          <select
+            name="estado_entrega"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+          >
+            <option value="Pendiente" <%= (orden.entrega || 'Pendiente') === 'Pendiente' ? 'selected' : '' %>>
+              Pendiente
+            </option>
+            <option value="Entregado" <%= orden.entrega === 'Entregado' ? 'selected' : '' %>>
+              Entregado
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Saldo (auto-calculado)
+          </label>
+          <div class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100 text-right">
+            $ <%= saldo.toFixed(2) %>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BOTONES -->
+    <div class="flex items-center justify-end gap-3">
+      <a
+        href="/admin/ordenes?tab=personas"
+        class="px-4 py-2 rounded-full text-xs md:text-sm border border-slate-600 text-slate-200 hover:bg-slate-800"
+      >
         Cancelar
       </a>
-      <button type="submit"
-              class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">
+      <button
+        type="submit"
+        class="px-4 py-2 rounded-full text-xs md:text-sm bg-emerald-600 text-white hover:bg-emerald-500"
+      >
         Guardar cambios
       </button>
     </div>
   </form>
 </main>
 
+<!-- ================= JS para items ================= -->
 <script>
-  // Recalcular saldo en tiempo real
-  (function() {
-    const inputPrecio = document.getElementById('inputPrecio');
-    const inputAbono  = document.getElementById('inputAbono');
-    const inputSaldo  = document.getElementById('inputSaldo');
+  function recalcularFila(el) {
+    const row = el.closest('tr');
+    if (!row) return;
 
-    function recalcularSaldo() {
-      const p = parseFloat(inputPrecio.value) || 0;
-      const a = parseFloat(inputAbono.value)  || 0;
-      const s = Math.max(p - a, 0);
-      inputSaldo.value = '$' + s.toFixed(2);
+    const cantInput = row.querySelector('input[name="items_cantidad[]"]');
+    const puInput   = row.querySelector('input[name="items_precio_unitario[]"]');
+    const subtotalSpan = row.querySelector('.subtotal-item');
+
+    const cant = Number(cantInput?.value || 0);
+    const pu   = Number(puInput?.value || 0);
+    const subtotal = cant * pu;
+
+    if (subtotalSpan) {
+      subtotalSpan.textContent = subtotal.toFixed(2);
     }
 
-    if (inputPrecio && inputAbono && inputSaldo) {
-      inputPrecio.addEventListener('input', recalcularSaldo);
-      inputAbono.addEventListener('input', recalcularSaldo);
-      recalcularSaldo();
+    recalcularTotal();
+  }
+
+  function recalcularTotal() {
+    const filas = document.querySelectorAll('#items-body .item-row');
+    let total = 0;
+
+    filas.forEach(row => {
+      const cant = Number(row.querySelector('input[name="items_cantidad[]"]')?.value || 0);
+      const pu   = Number(row.querySelector('input[name="items_precio_unitario[]"]')?.value || 0);
+      if (cant > 0) {
+        total += cant * pu;
+      }
+    });
+
+    const totalSpan = document.getElementById('total-items');
+    if (totalSpan) totalSpan.textContent = total.toFixed(2);
+
+    // Sincronizar con precio total si está vacío o 0
+    const precioInput = document.getElementById('precio-total-input');
+    if (precioInput && (!precioInput.value || Number(precioInput.value) === 0)) {
+      if (total > 0) {
+        precioInput.value = total.toFixed(2);
+      }
     }
-  })();
+  }
+
+  function agregarItem() {
+    const tbody = document.getElementById('items-body');
+    if (!tbody) return;
+
+    const tr = document.createElement('tr');
+    tr.className = 'item-row';
+    tr.innerHTML = `
+      <td class="px-2 py-1">
+        <input
+          type="number"
+          step="1"
+          min="0"
+          name="items_cantidad[]"
+          class="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1 text-xs text-slate-100 text-right"
+          value="1"
+          oninput="recalcularFila(this)"
+        />
+      </td>
+      <td class="px-2 py-1">
+        <input
+          type="text"
+          name="items_descripcion[]"
+          class="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1 text-xs text-slate-100"
+          placeholder="Descripción del producto / servicio"
+        />
+      </td>
+      <td class="px-2 py-1">
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          name="items_precio_unitario[]"
+          class="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1 text-xs text-slate-100 text-right"
+          value="0.00"
+          oninput="recalcularFila(this)"
+        />
+      </td>
+      <td class="px-2 py-1 text-right">
+        <span class="subtotal-item">0.00</span>
+      </td>
+      <td class="px-2 py-1 text-center">
+        <button
+          type="button"
+          class="text-xs text-rose-400 hover:text-rose-300"
+          onclick="eliminarFila(this)"
+          title="Eliminar ítem"
+        >
+          ✕
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+    recalcularTotal();
+  }
+
+  function eliminarFila(btn) {
+    const row = btn.closest('tr');
+    if (!row) return;
+    const tbody = row.parentElement;
+    tbody.removeChild(row);
+    recalcularTotal();
+  }
+
+  // Recalcular al cargar la página (por si vienen valores del servidor)
+  window.addEventListener('DOMContentLoaded', () => {
+    recalcularTotal();
+  });
 </script>
 
 <%- include('_foot') %>

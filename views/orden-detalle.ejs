@@ -1,107 +1,182 @@
 <%- include('_head', { title }) %>
-<%
-  function fechaCorta(value) {
-    if (!value) return '';
-    const d = (value instanceof Date) ? value : new Date(value);
-    if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10); // 2025-11-26
-  }
-%>
 
-<header class="p-4 bg-white shadow">
-  <div class="max-w-4xl mx-auto flex items-center justify-between">
-    <h1 class="text-xl font-semibold">Detalle de orden — <%= tipo === 'persona' ? 'Persona' : 'Institución' %></h1>
-    <a href="/admin/ordenes?tab=<%= tipo === 'persona' ? 'personas' : 'instituciones' %>"
-       class="text-sm text-slate-600 hover:text-slate-900">← Volver</a>
-  </div>
-</header>
+<main class="max-w-5xl mx-auto p-4 space-y-6">
+  <!-- Header -->
+  <header class="flex items-center justify-between gap-4">
+    <div>
+      <h1 class="text-xl font-semibold text-slate-100">
+        Detalle de orden — <%= tipo === 'institucion' ? 'Institución' : 'Persona' %>
+      </h1>
+      <p class="text-sm text-slate-400">
+        Aquí puedes ver la información completa de la orden y su estado de pago.
+      </p>
+    </div>
+    <a
+      href="/admin/ordenes?tab=<%= tipo === 'institucion' ? 'instituciones' : 'personas' %>"
+      class="text-xs md:text-sm text-slate-300 hover:text-white"
+    >
+      ← Volver
+    </a>
+  </header>
 
-<main class="max-w-4xl mx-auto p-4 space-y-4">
-
-  <section class="bg-white rounded-2xl shadow p-4 space-y-2">
+  <!-- ========== DATOS PRINCIPALES ========== -->
+  <section class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 space-y-2">
     <% if (tipo === 'persona') { %>
-      <p><strong>Nombre:</strong> <%= orden.nombre %></p>
-      <p><strong>N° orden:</strong> <%= orden.numero_orden %></p>
-      <p><strong>N° toma:</strong> <%= orden.numero_toma %></p>
-      <p><strong>Fecha toma:</strong> <%= fechaCorta(orden.fecha_toma) %></p>
-      <p><strong>Fecha entrega:</strong> <%= fechaCorta(orden.fecha_entrega) || '' %></p>
-      <p><strong>Urgencia:</strong> <%= orden.urgencia %></p>
-      <p><strong>Teléfono:</strong> <%= orden.telefono %></p>
-      <p><strong>Entrega:</strong> <%= orden.entrega %></p>
+      <div class="text-sm text-slate-100 space-y-1">
+        <p><span class="font-semibold text-slate-300">Nombre:</span> <%= orden.nombre || '' %></p>
+        <p><span class="font-semibold text-slate-300">N° orden:</span> <%= orden.numero_orden || '-' %></p>
+        <p><span class="font-semibold text-slate-300">N° toma:</span> <%= orden.numero_toma || '-' %></p>
+        <p><span class="font-semibold text-slate-300">Fecha toma:</span> <%= orden.fecha_toma ? orden.fecha_toma.toISOString().slice(0,10) : '-' %></p>
+        <p><span class="font-semibold text-slate-300">Fecha entrega:</span> <%= orden.fecha_entrega ? orden.fecha_entrega.toISOString().slice(0,10) : '-' %></p>
+        <p><span class="font-semibold text-slate-300">Urgencia:</span> <%= orden.urgencia || 'Normal' %></p>
+        <p><span class="font-semibold text-slate-300">Teléfono:</span> <%= orden.telefono || '-' %></p>
+        <p><span class="font-semibold text-slate-300">Entrega:</span> <%= orden.entrega || 'Pendiente' %></p>
+
+        <% if (orden.evento) { %>
+          <p><span class="font-semibold text-slate-300">Evento:</span> <%= orden.evento %></p>
+        <% } %>
+
+        <% if (orden.atendido_por) { %>
+          <p><span class="font-semibold text-slate-300">Atendido por:</span> <%= orden.atendido_por %></p>
+        <% } %>
+      </div>
     <% } else { %>
-      <p><strong>Institución:</strong> <%= orden.institucion %></p>
-      <p><strong>Sección:</strong> <%= orden.seccion %></p>
-      <p><strong>Paquete:</strong> <%= orden.paquete %></p>
-      <p><strong>Toma principal:</strong> <%= orden.toma_principal %></p>
-      <p><strong>Collage 1:</strong> <%= orden.collage1 %></p>
-      <p><strong>Collage 2:</strong> <%= orden.collage2 %></p>
-      <p><strong>Fecha toma:</strong> <%= fechaCorta(orden.fecha_toma) %></p>
-      <p><strong>Teléfono:</strong> <%= orden.telefono %></p>
-      <p><strong>Entrega:</strong> <%= orden.entrega %></p>
-      <p><strong>Urgencia:</strong> <%= orden.urgencia %></p>
+      <!-- Institución (por si usas la misma vista) -->
+      <div class="text-sm text-slate-100 space-y-1">
+        <p><span class="font-semibold text-slate-300">Institución:</span> <%= orden.institucion || '' %></p>
+        <% if (orden.nombre) { %>
+          <p><span class="font-semibold text-slate-300">Contacto:</span> <%= orden.nombre %></p>
+        <% } %>
+        <p><span class="font-semibold text-slate-300">Sección:</span> <%= orden.seccion || '-' %></p>
+        <p><span class="font-semibold text-slate-300">Paquete:</span> <%= orden.paquete || '-' %></p>
+        <p><span class="font-semibold text-slate-300">Fecha toma:</span> <%= orden.fecha_toma ? orden.fecha_toma.toISOString().slice(0,10) : '-' %></p>
+        <p><span class="font-semibold text-slate-300">Fecha entrega:</span> <%= orden.fecha_entrega ? orden.fecha_entrega.toISOString().slice(0,10) : '-' %></p>
+        <p><span class="font-semibold text-slate-300">Urgencia:</span> <%= orden.urgencia || 'Normal' %></p>
+        <p><span class="font-semibold text-slate-300">Teléfono:</span> <%= orden.telefono || '-' %></p>
+        <p><span class="font-semibold text-slate-300">Entrega:</span> <%= orden.entrega || 'Pendiente' %></p>
+      </div>
     <% } %>
   </section>
 
+  <!-- ========== DETALLE DE ÍTEMS (solo persona) ========== -->
   <% if (tipo === 'persona') { %>
-    <%
-      const precioNum = Number(orden.precio || 0);
-      const abonoNum  = Number(orden.pago_abono || 0);
-      const saldo     = Math.max(precioNum - abonoNum, 0);
-      const estadoPago = orden.pago_estado || 'Pendiente';
-    %>
-
-    <section class="bg-white rounded-2xl shadow p-4 space-y-2">
-      <h2 class="text-lg font-semibold mb-2">Información de pago</h2>
-      <p><strong>Precio:</strong> $<%= precioNum.toFixed(2) %></p>
-      <p><strong>Abonado:</strong> $<%= abonoNum.toFixed(2) %></p>
-      <p><strong>Saldo:</strong> $<%= saldo.toFixed(2) %></p>
-      <p><strong>Estado de pago:</strong> <%= estadoPago %></p>
-
-      <div class="mt-3 flex gap-2">
-        <a href="/admin/ordenes/persona/<%= idx %>/abono"
-           class="px-3 py-1.5 rounded-lg bg-sky-100 text-sky-800 text-xs">
-          Registrar abono
-        </a>
-        <form method="POST" action="/admin/ordenes/persona/<%= idx %>/marcar-pagado"
-              onsubmit="return confirm('¿Marcar esta orden como PAGADA?');">
-          <button type="submit"
-                  class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs">
-            Marcar como pagado
-          </button>
-        </form>
+    <section class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-sm font-semibold text-slate-100">
+          Detalle de productos / servicios
+        </h2>
+        <p class="text-[11px] text-slate-400">
+          Desglose de ítems registrados en la orden.
+        </p>
       </div>
-    </section>
 
-    <section class="bg-white rounded-2xl shadow p-4 space-y-2">
-      <h2 class="text-lg font-semibold mb-2">Historial de abonos</h2>
-
-      <% if (!orden.pagos || orden.pagos.length === 0) { %>
-        <p class="text-sm text-slate-500">No hay pagos registrados.</p>
+      <% if (!detalles || !detalles.length) { %>
+        <p class="text-sm text-slate-400">
+          No hay ítems registrados para esta orden.
+        </p>
       <% } else { %>
         <div class="overflow-x-auto">
-          <table class="min-w-full text-sm">
-            <thead class="bg-slate-50 text-slate-600">
+          <table class="min-w-full text-xs text-slate-100">
+            <thead class="bg-slate-800/80 text-slate-300">
               <tr>
-                <th class="px-3 py-2 text-left">Fecha</th>
-                <th class="px-3 py-2 text-right">Monto</th>
-                <th class="px-3 py-2 text-left">Nota</th>
+                <th class="px-2 py-2 text-left w-16">Cant.</th>
+                <th class="px-2 py-2 text-left">Descripción</th>
+                <th class="px-2 py-2 text-right w-24">P. unitario</th>
+                <th class="px-2 py-2 text-right w-24">Subtotal</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
-              <% orden.pagos.forEach(p => { %>
+            <tbody class="divide-y divide-slate-800">
+              <% detalles.forEach(d => { %>
                 <tr>
-                  <td class="px-3 py-2"><%= p.fecha %></td>
-                  <td class="px-3 py-2 text-right">$<%= Number(p.monto || 0).toFixed(2) %></td>
-                  <td class="px-3 py-2"><%= p.nota || '' %></td>
+                  <td class="px-2 py-1"><%= d.cantidad || 0 %></td>
+                  <td class="px-2 py-1"><%= d.descripcion || '' %></td>
+                  <td class="px-2 py-1 text-right">$ <%= (d.precio_unitario || 0).toFixed ? d.precio_unitario.toFixed(2) : Number(d.precio_unitario || 0).toFixed(2) %></td>
+                  <td class="px-2 py-1 text-right">
+                    $ <%= (d.subtotal != null
+                          ? Number(d.subtotal)
+                          : (Number(d.cantidad || 0) * Number(d.precio_unitario || 0))
+                        ).toFixed(2) %>
+                  </td>
                 </tr>
               <% }) %>
             </tbody>
+            <tfoot class="bg-slate-950/70">
+              <tr>
+                <td colspan="3" class="px-2 py-2 text-right text-[11px] text-slate-300">
+                  Total ítems:
+                </td>
+                <td class="px-2 py-2 text-right font-semibold text-sm">
+                  $ <%= (totalDetalle || 0).toFixed(2) %>
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       <% } %>
     </section>
   <% } %>
 
+  <!-- ========== INFORMACIÓN DE PAGO ========== -->
+  <section class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 space-y-4">
+    <h2 class="text-sm font-semibold text-slate-100">
+      Información de pago
+    </h2>
+
+    <div class="text-sm text-slate-100 space-y-1">
+      <p><span class="font-semibold text-slate-300">Precio:</span> $<%= (precio || 0).toFixed(2) %></p>
+      <p><span class="font-semibold text-slate-300">Abonado:</span> $<%= (abono || 0).toFixed(2) %></p>
+      <p><span class="font-semibold text-slate-300">Saldo:</span> $<%= (saldo || 0).toFixed(2) %></p>
+      <p><span class="font-semibold text-slate-300">Estado de pago:</span> <%= pagoEstado || 'Pendiente' %></p>
+    </div>
+
+    <!-- Botones de acciones de pago (los mismos de antes) -->
+    <% if (tipo === 'persona') { %>
+      <div class="flex flex-wrap gap-2 mt-3">
+        <form
+          method="POST"
+          action="/admin/ordenes/persona/<%= idx %>/abonar"
+          class="flex items-center gap-2"
+        >
+          <input
+            type="number"
+            name="monto"
+            step="0.01"
+            min="0"
+            placeholder="Monto a abonar"
+            class="w-32 rounded-lg bg-slate-950/70 border border-slate-700 px-2 py-1 text-xs text-slate-100"
+          />
+          <button
+            type="submit"
+            class="px-3 py-1.5 rounded-full text-xs bg-sky-600 text-white hover:bg-sky-500"
+          >
+            Registrar abono
+          </button>
+        </form>
+
+        <form
+          method="POST"
+          action="/admin/ordenes/persona/<%= idx %>/marcar-pagado"
+        >
+          <button
+            type="submit"
+            class="px-3 py-1.5 rounded-full text-xs bg-emerald-600 text-white hover:bg-emerald-500"
+          >
+            Marcar como pagado
+          </button>
+        </form>
+      </div>
+    <% } %>
+  </section>
+
+  <!-- Historial de abonos (placeholder, como lo tenías) -->
+  <section class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4">
+    <h2 class="text-sm font-semibold text-slate-100 mb-1">
+      Historial de abonos
+    </h2>
+    <p class="text-sm text-slate-400">
+      No hay pagos registrados.
+    </p>
+  </section>
 </main>
 
 <%- include('_foot') %>

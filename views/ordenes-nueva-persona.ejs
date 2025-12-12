@@ -1,104 +1,325 @@
-<%- include('_head', { title: 'Nueva orden (persona)' }) %>
+<%- include('_head', { title }) %>
 
-<main class="max-w-3xl mx-auto p-4">
-  <h1 class="text-2xl font-semibold mb-6">Nueva orden — Persona</h1>
+<main class="max-w-4xl mx-auto p-4 space-y-6">
 
-  <form method="POST" action="/admin/ordenes/nueva-persona" class="space-y-4">
-
+  <!-- Título + regreso -->
+  <header class="flex items-center justify-between gap-4">
     <div>
-      <label class="block text-sm font-medium mb-1">Nombre</label>
-      <input name="nombre" required class="w-full px-4 py-2 rounded border"
-             placeholder="Nombre completo" />
-    </div>
-
-    <div>
-      <label class="block text-sm font-medium mb-1">Orden</label>
-      <input name="numero_orden" required class="w-full px-4 py-2 rounded border"
-             placeholder="Ej.: 4521" />
-    </div>
-
-    <div>
-      <label class="block text-sm font-medium mb-1">Número de toma</label>
-      <input name="numero_toma" required class="w-full px-4 py-2 rounded border"
-             placeholder="Ej.: 18" />
-    </div>
-
-    <div>
-      <label class="block text-sm font-medium mb-1">Fecha de toma</label>
-      <input type="date" name="fecha_toma" required
-             class="w-full px-4 py-2 rounded border" />
-    </div>
-
-    <div>
-      <label class="block text-sm font-medium mb-1">Fecha de entrega</label>
-      <input type="date" name="fecha_entrega" required
-             class="w-full px-4 py-2 rounded border" />
-    </div>
-
-    <div>
-      <label class="block text-sm font-medium mb-1">Urgencia</label>
-      <select name="urgencia" class="w-full px-4 py-2 rounded border">
-        <option value="Normal">Normal</option>
-        <option value="Urgente">Urgente</option>
-        <option value="Muy urgente">Muy urgente</option>
-      </select>
-    </div>
-
-    <div class="grid md:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm font-medium mb-1">Precio ($)</label>
-        <input name="precio" required class="w-full px-4 py-2 rounded border"
-               placeholder="Ej.: 12.00" />
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium mb-1">Abono inicial ($ opcional)</label>
-        <input name="pago_abono" class="w-full px-4 py-2 rounded border"
-               placeholder="Ej.: 5.00 (dejar vacío si no abona)" />
-      </div>
-    </div>
-
-    <div class="grid md:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm font-medium mb-1">Teléfono</label>
-        <input name="telefono" class="w-full px-4 py-2 rounded border"
-               placeholder="5037XXXXXX" />
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium mb-1">Estado de entrega</label>
-        <select name="estado_entrega" class="w-full px-4 py-2 rounded border">
-          <option value="Pendiente">Pendiente</option>
-          <option value="Entregado">Entregado</option>
-        </select>
-      </div>
-    </div>
-
-    <div>
-      <label class="block text-sm font-medium mb-1">Estado de pago</label>
-      <select name="pago_estado" class="w-full px-4 py-2 rounded border">
-        <option value="Pendiente">Pendiente</option>
-        <option value="Abono">Abono</option>
-        <option value="Pagado">Pagado (si ya canceló todo)</option>
-      </select>
-      <p class="text-xs text-slate-500 mt-1">
-        Si eliges <strong>Pagado</strong> y dejas el abono vacío, se asumirá que el cliente pagó el total.
+      <h1 class="text-xl font-semibold text-slate-100">
+        Nueva orden — Persona
+      </h1>
+      <p class="text-sm text-slate-400">
+        Registra una orden individual, con detalle de productos/servicios tipo factura.
       </p>
     </div>
+    <a
+      href="/admin/ordenes?tab=personas"
+      class="text-xs md:text-sm text-slate-300 hover:text-white"
+    >
+      ← Volver a órdenes (personas)
+    </a>
+  </header>
 
-    <div class="flex justify-end space-x-2 pt-2">
+  <form method="POST" action="/admin/ordenes/nueva-persona" class="space-y-6">
+    
+    <!-- ================= DATOS PRINCIPALES ================= -->
+    <section class="bg-slate-900/70 border border-slate-700 rounded-2xl p-4 space-y-4">
+      <h2 class="text-sm font-semibold text-slate-100">Datos del cliente y la orden</h2>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Nombre del cliente <span class="text-rose-400">*</span>
+          </label>
+          <input type="text" name="nombre" required
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+            placeholder="Ej: Karla López"/>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Evento <span class="text-slate-500">(opcional)</span>
+          </label>
+          <input type="text" name="evento"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+            placeholder="Ej: Graduación CCA, Sesión navideña…"/>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            Atendido por <span class="text-slate-500">(opcional)</span>
+          </label>
+          <input type="text" name="atendido_por"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+            placeholder="Nombre del colaborador que atendió"/>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Teléfono</label>
+          <input type="text" name="telefono"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+            placeholder="Ej: 7815-6115"/>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">N.º de orden</label>
+          <input type="text" name="numero_orden"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"/>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">N.º de toma</label>
+          <input type="text" name="numero_toma"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"/>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Urgencia</label>
+          <select name="urgencia"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100">
+            <option value="Normal">Normal</option>
+            <option value="Urgente">Urgente</option>
+            <option value="Muy urgente">Muy urgente</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Fecha de toma</label>
+          <input type="date" name="fecha_toma"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"/>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Fecha de entrega</label>
+          <input type="date" name="fecha_entrega"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"/>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- =============== DETALLE DE ÍTEMS ================= -->
+    <section class="bg-slate-900/70 border border-slate-700 rounded-2xl p-4 space-y-3">
+
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-slate-100">Detalle de productos / servicios</h2>
+        <p class="text-[11px] text-slate-400">cantidad × precio unitario = subtotal.</p>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-xs text-slate-100">
+          <thead class="bg-slate-800/80 text-slate-300">
+            <tr>
+              <th class="px-2 py-2">Cant.</th>
+              <th class="px-2 py-2">Descripción</th>
+              <th class="px-2 py-2 text-right">P. unitario</th>
+              <th class="px-2 py-2 text-right">Subtotal</th>
+              <th></th>
+            </tr>
+          </thead>
+
+          <tbody id="items-body" class="divide-y divide-slate-800">
+            <!-- fila inicial -->
+            <tr class="item-row">
+              <td class="px-2 py-1">
+                <input type="number" name="items_cantidad[]" value="1" min="0" step="1"
+                  class="w-full text-right rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1"
+                  oninput="recalcularFila()"/>
+              </td>
+
+              <td class="px-2 py-1">
+                <input type="text" name="items_descripcion[]"
+                  class="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1"
+                  placeholder="Descripción del producto / servicio"/>
+              </td>
+
+              <td class="px-2 py-1">
+                <input type="number" name="items_precio_unitario[]" value="0.00" min="0" step="0.01"
+                  class="w-full text-right rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1"
+                  oninput="recalcularFila()"/>
+              </td>
+
+              <td class="px-2 py-1 text-right">
+                <span class="subtotal-item">0.00</span>
+              </td>
+
+              <td class="px-2 py-1 text-center">
+                <button type="button" onclick="eliminarFila(this)"
+                  class="text-xs text-rose-400 hover:text-rose-300">
+                  ✕
+                </button>
+              </td>
+            </tr>
+          </tbody>
+
+          <tfoot class="bg-slate-950/70">
+            <tr>
+              <td colspan="2" class="px-2 py-2">
+                <button type="button" onclick="agregarItem()"
+                  class="px-3 py-1.5 rounded-full bg-emerald-600 text-white text-xs hover:bg-emerald-500">
+                  ＋ Agregar ítem
+                </button>
+              </td>
+              <td class="px-2 py-2 text-right text-[11px] text-slate-300">Total calculado:</td>
+              <td class="px-2 py-2 text-right font-semibold text-sm">$ <span id="total-items">0.00</span></td>
+              <td></td>
+            </tr>
+          </tfoot>
+
+        </table>
+      </div>
+
+      <p class="text-[11px] text-slate-400">
+        Si el precio total está en 0, se usará la suma automática de los ítems.
+      </p>
+
+    </section>
+
+    <!-- =============== PAGO ================= -->
+    <section class="bg-slate-900/70 border border-slate-700 rounded-2xl p-4 space-y-4">
+      <h2 class="text-sm font-semibold text-slate-100">Pago y estado de la orden</h2>
+
+      <div class="grid md:grid-cols-3 gap-4">
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Precio total (opcional)</label>
+          <input type="number" name="precio" id="precio-total-input"
+            class="w-full text-right rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+            step="0.01" min="0" placeholder="Se tomará de los ítems si lo dejas en 0"
+            oninput="marcarPrecioManual()"/>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Abono inicial</label>
+          <input type="number" name="abono_inicial" min="0" step="0.01"
+            class="w-full text-right rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"/>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Estado de pago</label>
+          <select name="pago_estado"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100">
+            <option value="Pendiente">Pendiente</option>
+            <option value="Abono">Abono</option>
+            <option value="Pagado">Pagado</option>
+          </select>
+        </div>
+
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Estado de entrega</label>
+          <select name="estado_entrega"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100">
+            <option value="Pendiente">Pendiente</option>
+            <option value="Entregado">Entregado</option>
+          </select>
+        </div>
+      </div>
+
+    </section>
+
+    <div class="flex justify-end gap-3">
       <a href="/admin/ordenes?tab=personas"
-         class="px-4 py-2 rounded-lg border text-slate-700 hover:bg-slate-50">
+        class="px-4 py-2 rounded-full text-xs md:text-sm border border-slate-600 text-slate-200 hover:bg-slate-800">
         Cancelar
       </a>
-
       <button type="submit"
-        class="px-4 py-2 rounded-lg text-white bg-emerald-600 hover:bg-emerald-700">
+        class="px-4 py-2 rounded-full text-xs md:text-sm bg-emerald-600 text-white hover:bg-emerald-500">
         Guardar orden
       </button>
     </div>
 
   </form>
 </main>
+
+<!-- ================= JS ================= -->
+<script>
+  let precioTotalManual = false;
+
+  function marcarPrecioManual() {
+    const precioInput = document.getElementById("precio-total-input");
+    const valor = Number(precioInput.value || 0);
+    precioTotalManual = valor > 0;
+    if (!precioTotalManual) recalcularTotal();
+  }
+
+  function recalcularFila() {
+    recalcularTotal();
+  }
+
+  function recalcularTotal() {
+    const filas = document.querySelectorAll("#items-body .item-row");
+    let total = 0;
+
+    filas.forEach(row => {
+      const cant = Number(row.querySelector('input[name="items_cantidad[]"]').value || 0);
+      const pu   = Number(row.querySelector('input[name="items_precio_unitario[]"]').value || 0);
+      const subtotal = cant * pu;
+
+      row.querySelector(".subtotal-item").textContent = subtotal.toFixed(2);
+      total += subtotal;
+    });
+
+    document.getElementById("total-items").textContent = total.toFixed(2);
+
+    const precioInput = document.getElementById("precio-total-input");
+    if (!precioTotalManual) {
+      precioInput.value = total > 0 ? total.toFixed(2) : "";
+    }
+  }
+
+  function agregarItem() {
+    const tbody = document.getElementById("items-body");
+    const tr = document.createElement("tr");
+    tr.className = "item-row";
+
+    tr.innerHTML = `
+      <td class="px-2 py-1">
+        <input type="number" name="items_cantidad[]" value="1" min="0" step="1"
+          class="w-full text-right rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1"
+          oninput="recalcularFila()"/>
+      </td>
+
+      <td class="px-2 py-1">
+        <input type="text" name="items_descripcion[]"
+          class="w-full rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1"
+          placeholder="Descripción del producto / servicio"/>
+      </td>
+
+      <td class="px-2 py-1">
+        <input type="number" name="items_precio_unitario[]" value="0.00" min="0" step="0.01"
+          class="w-full text-right rounded-md bg-slate-950/60 border border-slate-700 px-2 py-1"
+          oninput="recalcularFila()"/>
+      </td>
+
+      <td class="px-2 py-1 text-right">
+        <span class="subtotal-item">0.00</span>
+      </td>
+
+      <td class="px-2 py-1 text-center">
+        <button type="button" onclick="eliminarFila(this)"
+          class="text-xs text-rose-400 hover:text-rose-300">✕</button>
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+    recalcularTotal();
+  }
+
+  function eliminarFila(btn) {
+    btn.closest("tr").remove();
+    recalcularTotal();
+  }
+
+  document.addEventListener("DOMContentLoaded", recalcularTotal);
+</script>
 
 <%- include('_foot') %>

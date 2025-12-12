@@ -674,7 +674,7 @@ function normalizarFechaFiltro(valor) {
     });
   });
 
-  router.post(
+      router.post(
     '/ordenes/nueva-persona',
     requireAuth,
     express.urlencoded({ extended: true }),
@@ -688,62 +688,126 @@ function normalizarFechaFiltro(valor) {
         fecha_toma,
         fecha_entrega,
         urgencia,
-        precio,
+        precio, // opcional, si lo dejas vacío usamos la suma de los detalles
         telefono,
         estado_entrega,
         pago_estado,
+        evento,
+        atendido_por,
       } = datos;
 
-      const precioNum = Number(precio) || 0;
-      let abonoNum = getAbonoFromBody(datos);
-      let pagoEstado = pago_estado || 'Pendiente';
+      // 1) Leer arrays del formulario (detalles tipo factura)
+      let itemsCant = datos.items_cantidad || [];
+      let itemsDesc = datos.items_descripcion || [];
+      let itemsPU   = datos.items_precio_unitario || [];
 
-      if (pagoEstado === 'Pagado' && precioNum > 0) {
+      if (!Array.isArray(itemsCant)) itemsCant = [itemsCant];
+      if (!Array.isArray(itemsDesc)) itemsDesc = [itemsDesc];
+      if (!Array.isArray(itemsPU))   itemsPU   = [itemsPU];
+
+      const detalles = [];
+      let totalDetalle = 0;
+
+      for (let i = 0; i < itemsDesc.length; i++) {
+        const desc = (itemsDesc[i] || '').trim();
+        const cant = Number(itemsCant[i]) || 0;
+        const pu   = Number(itemsPU[i])   || 0;
+
+        if (!desc || cant <= 0) continue;
+
+        const sub = cant * pu;
+        totalDetalle += sub;
+
+        detalles.push({
+          descripcion: desc,
+          cantidad: cant,
+          precio_unitario: pu,
+          subtotal: sub,
+        });
+      }
+
+      // 2) Precio total: si NO escribes nada en "precio", usamos la suma de detalles
+      let precioNum = Number(precio) || 0;
+      if (precioNum <= 0 && totalDetalle > 0) {
+        precioNum = totalDetalle;
+      }
+
+      // 3) Abono + estado de pago (igual que antes)
+      let abonoNum = getAbonoFromBody(datos);
+      let estadoPagoFinal = pago_estado || 'Pendiente';
+
+      if (estadoPagoFinal === 'Pagado' && precioNum > 0) {
         abonoNum = precioNum;
       }
 
-      if (abonoNum > 0 && abonoNum < precioNum && pagoEstado !== 'Pagado') {
-        pagoEstado = 'Abono';
+      if (abonoNum > 0 && abonoNum < precioNum && estadoPagoFinal !== 'Pagado') {
+        estadoPagoFinal = 'Abono';
       }
 
-      if (abonoNum === 0 && pagoEstado === 'Abono') {
-        pagoEstado = 'Pendiente';
+      if (abonoNum === 0 && estadoPagoFinal === 'Abono') {
+        estadoPagoFinal = 'Pendiente';
       }
 
       try {
-        await dbExec(
-          `
-        INSERT INTO ordenes_personas (
-          nombre,
-          numero_orden,
-          numero_toma,
-          fecha_toma,
-          fecha_entrega,
-          urgencia,
-          precio,
-          telefono,
-          entrega,
-          abono,
-          pago_estado
-        )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-        `,
-          [
-            nombre || '',
-            numero_orden || '',
-            numero_toma || '',
-            fecha_toma || null,
-            fecha_entrega || null,
-            urgencia || 'Normal',
-            precioNum,
-            telefono || '',
-            estado_entrega || 'Pendiente',
-            abonoNum,
-            pagoEstado,
-          ]
-        );
+        // 4) Insertar la orden y recuperar el id
+        const insertOrdenSql = `
+          INSERT INTO ordenes_personas (
+            nombre,
+            numero_orden,
+            numero_toma,
+            fecha_toma,
+            fecha_entrega,
+            urgencia,
+            precio,
+            telefono,
+            entrega,
+            abono,
+            pago_estado,
+            evento,
+            atendido_por
+          )
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          RETURNING id
+        `;
 
-        console.log('💾 Nueva orden persona guardada en PostgreSQL');
+        const { rows } = await db.query(insertOrdenSql, [
+          nombre || '',
+          numero_orden || '',
+          numero_toma || '',
+          fecha_toma || null,
+          fecha_entrega || null,
+          urgencia || 'Normal',
+          precioNum,
+          telefono || '',
+          estado_entrega || 'Pendiente',
+          abonoNum,
+          estadoPagoFinal,
+          evento || null,
+          atendido_por || null,
+        ]);
+
+        const ordenId = rows[0].id;
+
+        // 5) Insertar los detalles si hay
+        if (detalles.length) {
+          const insertDetSql = `
+            INSERT INTO ordenes_personas_detalle
+              (orden_persona_id, descripcion, cantidad, precio_unitario, subtotal)
+            VALUES ($1,$2,$3,$4,$5)
+          `;
+
+          for (const it of detalles) {
+            await dbExec(insertDetSql, [
+              ordenId,
+              it.descripcion,
+              it.cantidad,
+              it.precio_unitario,
+              it.subtotal,
+            ]);
+          }
+        }
+
+        console.log('💾 Nueva orden persona + detalles guardada en PostgreSQL');
       } catch (err) {
         console.error('❌ Error guardando orden PERSONA en PostgreSQL:', err);
       }
@@ -866,91 +930,199 @@ router.get(
   // ---------------------------------------------------------------------------
   // EDITAR ORDEN — PERSONA
   // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// EDITAR ORDEN — PERSONA (GET)
+// ---------------------------------------------------------------------------
+router.get('/ordenes/persona/:id/editar', requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
 
-  // GET - Editar persona
-  router.get('/ordenes/persona/:id/editar', requireAuth, async (req, res) => {
+    const rows = await dbSelect(
+      'SELECT * FROM ordenes_personas WHERE id = $1',
+      [id]
+    );
+
+    if (!rows.length) {
+      return res.status(404).send('Orden no encontrada');
+    }
+
+    const orden = rows[0];
+
+    // Detalle de ítems (solo lectura en esta vista)
+    const detalles = await dbSelect(
+      `
+      SELECT id, cantidad, descripcion, precio_unitario, subtotal
+      FROM ordenes_personas_detalle
+      WHERE orden_persona_id = $1
+      ORDER BY id ASC
+      `,
+      [id]
+    );
+
+    const precio = Number(orden.precio || 0);
+    const abono  = Number(orden.abono || 0);
+    const saldo  = Math.max(precio - abono, 0);
+    const pagoEstado = derivePagoEstado(orden);
+
+    let totalDetalle = 0;
+    for (const d of detalles) {
+      const sub = d.subtotal != null
+        ? Number(d.subtotal)
+        : (Number(d.cantidad || 0) * Number(d.precio_unitario || 0));
+      if (!isNaN(sub)) totalDetalle += sub;
+    }
+
+    res.render('ordenes-editar-persona', {
+      title: 'Editar orden — persona',
+      idx: id,
+      orden,
+      detalles,
+      totalDetalle,
+      precio,
+      abono,
+      saldo,
+      pagoEstado,
+    });
+  } catch (err) {
+    console.error('❌ Error GET editar persona:', err);
+    res.status(500).send('Error interno');
+  }
+});
+
+
+  // POST - Guardar edición persona
+// ---------------------------------------------------------------------------
+// EDITAR ORDEN — PERSONA (POST con ítems)
+// ---------------------------------------------------------------------------
+router.post(
+  '/ordenes/persona/:id/editar',
+  requireAuth,
+  express.urlencoded({ extended: true }),
+  async (req, res) => {
     try {
       const id = Number(req.params.id);
+      const datos = req.body || {};
 
-      const rows = await dbSelect(
-        'SELECT * FROM ordenes_personas WHERE id = $1',
+      if (!id || id <= 0) {
+        return res.redirect('/admin/ordenes?tab=personas');
+      }
+
+      const {
+        nombre,
+        numero_orden,
+        numero_toma,
+        fecha_toma,
+        fecha_entrega,
+        urgencia,
+        precio,          // total manual (puede ir en 0)
+        abono,
+        telefono,
+        estado_entrega,
+        evento,
+        atendido_por,
+      } = datos;
+
+      // ---------- Normalizar arrays de ítems ----------
+      function normArray(body, key) {
+        const raw = body[key];
+        if (!raw) return [];
+        if (Array.isArray(raw)) return raw;
+        return [raw];
+      }
+
+      const cantidades   = normArray(datos, 'items_cantidad[]');
+      const descripciones= normArray(datos, 'items_descripcion[]');
+      const preciosUnit  = normArray(datos, 'items_precio_unitario[]');
+
+      let totalItems = 0;
+      const itemsParaInsertar = [];
+
+      for (let i = 0; i < Math.max(cantidades.length, descripciones.length, preciosUnit.length); i++) {
+        const cant = Number(cantidades[i]) || 0;
+        const desc = (descripciones[i] || '').trim();
+        const pu   = Number(preciosUnit[i]) || 0;
+
+        if (cant <= 0 || !desc) continue;
+
+        const subtotal = cant * pu;
+        totalItems += subtotal;
+
+        itemsParaInsertar.push({ cant, desc, pu, subtotal });
+      }
+
+      // ---------- Precio y abono ----------
+      let precioNum = Number(precio) || 0;
+      const abonoNum = Number(abono) || 0;
+
+      // Si el precio está en 0 y hay detalle, se usa el total de ítems
+      if (precioNum <= 0 && totalItems > 0) {
+        precioNum = totalItems;
+      }
+
+      const pagoEstado = computePagoEstado(precioNum, abonoNum);
+
+      // ---------- Actualizar orden principal ----------
+      await dbExec(
+        `UPDATE ordenes_personas 
+         SET nombre       = $1,
+             numero_orden = $2,
+             numero_toma  = $3,
+             fecha_toma   = $4,
+             fecha_entrega= $5,
+             urgencia     = $6,
+             precio       = $7,
+             abono        = $8,
+             telefono     = $9,
+             entrega      = $10,
+             evento       = $11,
+             atendido_por = $12,
+             pago_estado  = $13
+         WHERE id = $14`,
+        [
+          nombre || '',
+          numero_orden || '',
+          numero_toma || '',
+          fecha_toma || null,
+          fecha_entrega || null,
+          urgencia || 'Normal',
+          precioNum,
+          abonoNum,
+          telefono || '',
+          estado_entrega || 'Pendiente',
+          evento || '',
+          atendido_por || '',
+          pagoEstado,
+          id,
+        ]
+      );
+
+      // ---------- Reemplazar detalle ----------
+      // Borramos el detalle viejo
+      await dbExec(
+        'DELETE FROM ordenes_personas_detalle WHERE orden_persona_id = $1',
         [id]
       );
 
-      if (!rows.length) {
-        return res.status(404).send('Orden no encontrada');
+      // Insertamos el detalle nuevo
+      for (const it of itemsParaInsertar) {
+        await dbExec(
+          `
+          INSERT INTO ordenes_personas_detalle
+            (orden_persona_id, cantidad, descripcion, precio_unitario, subtotal)
+          VALUES ($1, $2, $3, $4, $5)
+          `,
+          [id, it.cant, it.desc, it.pu, it.subtotal]
+        );
       }
 
-      const orden = rows[0];
-
-      res.render('ordenes-editar-persona', {
-        title: 'Editar orden — persona',
-        idx: id,
-        orden,
-      });
+      console.log('💾 Orden persona actualizada (cabecera + detalle)');
+      res.redirect('/admin/ordenes?tab=personas');
     } catch (err) {
-      console.error('❌ Error GET editar persona:', err);
+      console.error('❌ Error POST editar persona:', err);
       res.status(500).send('Error interno');
     }
-  });
-
-  // POST - Guardar edición persona
-  router.post(
-    '/ordenes/persona/:id/editar',
-    requireAuth,
-    express.urlencoded({ extended: true }),
-    async (req, res) => {
-      try {
-        const id = Number(req.params.id);
-
-        const {
-          nombre,
-          numero_orden,
-          numero_toma,
-          fecha_toma,
-          fecha_entrega,
-          urgencia,
-          precio,
-          abono,
-          telefono,
-          estado_entrega,
-        } = req.body;
-
-        await dbExec(
-          `UPDATE ordenes_personas 
-       SET nombre=$1,
-           numero_orden=$2,
-           numero_toma=$3,
-           fecha_toma=$4,
-           fecha_entrega=$5,
-           urgencia=$6,
-           precio=$7,
-           abono=$8,
-           telefono=$9,
-           entrega=$10
-       WHERE id = $11`,
-          [
-            nombre,
-            numero_orden,
-            numero_toma,
-            fecha_toma || null,
-            fecha_entrega || null,
-            urgencia,
-            Number(precio) || 0,
-            Number(abono) || 0,
-            telefono,
-            estado_entrega,
-            id,
-          ]
-        );
-
-        res.redirect(`/admin/ordenes?tab=personas`);
-      } catch (err) {
-        console.error('❌ Error POST editar persona:', err);
-        res.status(500).send('Error interno');
-      }
-    }
-  );
+  }
+);
 
   // ---------------------------------------------------------------------------
   // ELIMINAR ORDEN — INSTITUCIÓN
@@ -1032,6 +1204,9 @@ router.get(
  // ---------------------------------------------------------------------------
 // DETALLE ORDEN — PERSONA (PostgreSQL)
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// DETALLE ORDEN — PERSONA (PostgreSQL)
+// ---------------------------------------------------------------------------
 router.get(
   '/ordenes/persona/:id',
   requireAuth,
@@ -1043,22 +1218,54 @@ router.get(
     }
 
     try {
+      // Orden principal
       const rows = await dbSelect(
         'SELECT * FROM ordenes_personas WHERE id = $1',
         [id]
       );
-
       if (!rows.length) {
         return res.redirect('/admin/ordenes?tab=personas');
       }
-
       const orden = rows[0];
+
+      // Detalle de productos/servicios
+      const detalles = await dbSelect(
+        `
+        SELECT id, cantidad, descripcion, precio_unitario, subtotal
+        FROM ordenes_personas_detalle
+        WHERE orden_persona_id = $1
+        ORDER BY id ASC
+        `,
+        [id]
+      );
+
+      // Cálculos de pago
+      const precio = Number(orden.precio || 0);
+      const abono  = Number(orden.abono || 0);
+      const saldo  = Math.max(precio - abono, 0);
+      const pagoEstado = derivePagoEstado(orden);
+
+      // Total del detalle (por si quieres mostrarlo)
+      let totalDetalle = 0;
+      for (const d of detalles) {
+        const sub = d.subtotal != null
+          ? Number(d.subtotal)
+          : (Number(d.cantidad || 0) * Number(d.precio_unitario || 0));
+        if (!isNaN(sub)) totalDetalle += sub;
+      }
 
       res.render('orden-detalle', {
         title: 'Detalle de orden — persona',
         tipo: 'persona',
         idx: id,
         orden,
+        // nuevos:
+        detalles,
+        totalDetalle,
+        precio,
+        abono,
+        saldo,
+        pagoEstado,
       });
     } catch (err) {
       console.error('❌ Error detalle persona:', err);
@@ -1346,7 +1553,7 @@ router.get(
     }
   );
 
-  // ---------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------
   // TICKET 80 mm — PERSONA
   // ---------------------------------------------------------------------------
   router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
@@ -1367,6 +1574,17 @@ router.get(
       const saldo = Math.max(precio - abono, 0);
       const pagoEstado = derivePagoEstado(orden);
 
+      // 👇 NUEVO: leer desglose de productos/servicios
+      const detalles = await dbSelect(
+        `
+        SELECT descripcion, cantidad, precio_unitario, subtotal
+        FROM ordenes_personas_detalle
+        WHERE orden_persona_id = $1
+        ORDER BY id ASC
+        `,
+        [id]
+      );
+
       res.render('orden-ticket.ejs', {
         title: 'Ticket — persona',
         tipo: 'persona',
@@ -1376,12 +1594,15 @@ router.get(
         abono,
         saldo,
         pagoEstado,
+        detalles,   // 👈 ahora sí llega al EJS con data real
       });
     } catch (e) {
       console.error('❌ Error ticket persona:', e);
       res.redirect('/admin/ordenes?tab=personas');
     }
   });
+
+
 
   // ---------------------------------------------------------------------------
   // TICKET 80 mm — INSTITUCIÓN

@@ -37,6 +37,7 @@
       font-size: 12px;
       margin-left: 8px;
     }
+
     .recibo-logo {
       text-align: center;
     }
@@ -48,6 +49,7 @@
       max-width: 200px;
       height: auto;
     }
+
     /* CONTENEDOR TICKET 80 mm */
     .ticket-wrapper {
       width: 80mm;
@@ -77,8 +79,8 @@
       text-transform: uppercase;
     }
 
-    .small { 
-      font-size: 16px; 
+    .small {
+      font-size: 16px;
       font-weight: 790;
     }
 
@@ -95,18 +97,21 @@
     }
 
     .label {
-      font-weight: 900;      /* un poco más grueso */
-  font-size: 24px;
-  margin-right: 4px;
+      font-weight: 900;
+      font-size: 24px;
+      margin-right: 4px;
     }
-    .urgencia1{
-       font-weight: 750;      /* un poco más grueso */
-        font-size: 18px;
+
+    .urgencia1 {
+      font-weight: 750;
+      font-size: 18px;
     }
-.separator {
+
+    .separator {
       border-top: 1px dashed #9ca3af;
       margin: 4px 0;
     }
+
     .mt-2 { margin-top: 4px; }
     .mt-4 { margin-top: 8px; }
 
@@ -118,12 +123,14 @@
       font-size: 23px;
       white-space: pre-line;
     }
-.vertical-note {
-  font-size: 22px;
-  margin-top: 4px;
-}
+
+    .vertical-note {
+      font-size: 22px;
+      margin-top: 4px;
+    }
+
     @page {
-      /* ANCHO 80 mm, alto automático (la impressora corta) */
+      /* ANCHO 80 mm, alto automático (la impresora corta) */
       size: 80mm auto;
       margin: 3mm;
     }
@@ -150,22 +157,20 @@
       </a>
     </div>
   </div>
-  <%
-  function formatFecha(value) {
-    if (!value) return '';
-    const d = (value instanceof Date) ? value : new Date(value);
-    if (isNaN(d.getTime())) return '';
-    return d.toISOString().slice(0, 10); // YYYY-MM-DD
-  }
-%>
 
   <%
+    function formatFecha(value) {
+      if (!value) return '';
+      const d = (value instanceof Date) ? value : new Date(value);
+      if (isNaN(d.getTime())) return '';
+      return d.toISOString().slice(0, 10); // YYYY-MM-DD
+    }
+
     const precioLocal = Number(precio ?? orden.precio ?? 0) || 0;
     const abonoLocal  = Number(abono  ?? orden.abono  ?? 0) || 0;
     const saldoLocal  = Math.max(precioLocal - abonoLocal, 0);
     const fechaToma   = formatFecha(orden.fecha_toma);
-const fechaEnt    = formatFecha(orden.fecha_entrega);
-
+    const fechaEnt    = formatFecha(orden.fecha_entrega);
   %>
 
   <div class="ticket-wrapper">
@@ -174,13 +179,13 @@ const fechaEnt    = formatFecha(orden.fecha_entrega);
       <!-- CABECERA -->
       <div class="center">
         <div class="recibo-logo">
-            <img src="/admin-public/LOGO SIN FONDO (2).png" alt="Arte Fotográfico">
-          </div>
-        
+          <img src="/admin-public/LOGO SIN FONDO (2).png" alt="Arte Fotográfico">
+        </div>
+
         <div class="small">
           Calle Masferrer, Av. Morazán 2a Av. Norte #1-2<br />
           Sonsonate, El Salvador<br />
-          Tel: 2429-1030/7815-6115/6178-2099 
+          Tel: 2429-1030/7815-6115/6178-2099
         </div>
       </div>
 
@@ -208,10 +213,12 @@ const fechaEnt    = formatFecha(orden.fecha_entrega);
         <span><%= fechaEnt %></span>
       </div>
       <% } %>
+
       <div class="row small">
-  <span class="label">Tipo de Entrega:</span>
-  <span class="urgencia1"><%= orden.urgencia || 'Normal' %></span>
-</div>
+        <span class="label">Tipo de Entrega:</span>
+        <span class="urgencia1"><%= orden.urgencia || 'Normal' %></span>
+      </div>
+
       <hr />
 
       <!-- CLIENTE / INSTITUCIÓN -->
@@ -231,11 +238,23 @@ const fechaEnt    = formatFecha(orden.fecha_entrega);
             <span class="label">Tel:</span> <%= orden.telefono %>
           </div>
         <% } %>
+
+        <% if (orden.evento) { %>
+          <div class="mt-2">
+            <span class="label">Evento:</span> <%= orden.evento %>
+          </div>
+        <% } %>
+
+        <% if (orden.atendido_por) { %>
+          <div class="mt-2">
+            <span class="label">Atendido por:</span> <%= orden.atendido_por %>
+          </div>
+        <% } %>
       </div>
 
       <hr />
 
-      <!-- DETALLE BÁSICO (puedes ajustar campos) -->
+      <!-- DETALLE BÁSICO (persona / institución) -->
       <div class="small">
         <% if (tipo === 'institucion') { %>
           <% if (orden.seccion) { %>
@@ -275,6 +294,52 @@ const fechaEnt    = formatFecha(orden.fecha_entrega);
 
       <hr />
 
+      <!--  NUEVO: DETALLE TIPO FACTURA (solo personas y si hay datos) -->
+      <% if (tipo === 'persona' && typeof detalles !== 'undefined' && detalles && detalles.length) { %>
+        <div class="small">
+          <div class="label">Detalle:</div>
+
+          <table style="width:100%; font-size:16px; margin-top:2px; border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Cant</th>
+                <th style="text-align:left;">Descripción</th>
+                <th style="text-align:right;">P. unit</th>
+                <th style="text-align:right;">Sub</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% let totalDetalle = 0; %>
+              <% detalles.forEach(function(it) {
+                   const cant = Number(it.cantidad || 0);
+                   const pu   = Number(it.precio_unitario || 0);
+                   const sub  = Number(it.subtotal || (cant * pu));
+                   totalDetalle += sub;
+              %>
+                <tr>
+                  <td><%= cant %></td>
+                  <td><%= it.descripcion || '' %></td>
+                  <td class="right">$ <%= pu.toFixed(2) %></td>
+                  <td class="right">$ <%= sub.toFixed(2) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3" style="text-align:right; font-weight:700; padding-top:2px;">
+                  Total detalle:
+                </td>
+                <td class="right" style="font-weight:700;">
+                  $ <%= totalDetalle.toFixed(2) %>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <hr />
+      <% } %>
+
       <!-- PAGO -->
       <div class="small">
         <div class="row">
@@ -298,36 +363,34 @@ const fechaEnt    = formatFecha(orden.fecha_entrega);
       <div class="small mt-2">
         * Todo abono o reservación de evento no es reembolsable.
       </div>
-       <div class="vertical-note">
-              NOTA: FOTOS DISPONIBLES POR UN PERIODO DE 30 DÍAS.
-            </div>
+
+      <div class="vertical-note">
+        NOTA: FOTOS DISPONIBLES POR UN PERIODO DE 30 DÍAS.
+      </div>
+
       <hr />
 
-      <!-- OBSERVACIONES (escribes a mano o dejas en blanco) -->
+      <!-- OBSERVACIONES -->
       <div class="small">
         Observaciones:
         <div class="observaciones">
-          <!-- Puedes agregar aquí un campo de observaciones si luego lo tienes en la BD -->
+          <!-- (Por ahora se deja vacío para escribir a mano) -->
         </div>
       </div>
 
-     
-
       <div class="center small mt-2">
-        ¡Gracias por su preferencia! Escanea el código para chatear.<br />
+        ¡Gracias por su preferencia! Escanee el código para chatear.<br />
       </div>
-       <!-- CABECERA -->
+
       <div class="center">
         <div class="img-qr">
-            <img src="/admin-public/qr-code.png" alt="Arte Fotográfico">
-          </div>
+          <img src="/admin-public/qr-code.png" alt="Arte Fotográfico">
+        </div>
       </div>
 
     </div>
-<div class="separator"></div>
 
-
-
+    <div class="separator"></div>
   </div>
 </body>
 </html>
