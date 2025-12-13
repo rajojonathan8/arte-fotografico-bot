@@ -200,6 +200,14 @@ function calcularResumen(lista) {
 // ============================================================================
 // MÓDULO PRINCIPAL
 // ============================================================================
+function toText(v) {
+  if (Array.isArray(v)) {
+    const first = v.find(x => String(x || '').trim() !== '');
+    return (first || '').toString().trim();
+  }
+  return (v || '').toString().trim();
+}
+
 
 function mountAdmin(app) {
   const router = express.Router();
@@ -709,7 +717,7 @@ function normalizarFechaFiltro(valor) {
     });
   });
 
-      router.post(
+    router.post(
   '/ordenes/nueva-persona',
   requireAuth,
   express.urlencoded({ extended: true }),
@@ -726,19 +734,21 @@ function normalizarFechaFiltro(valor) {
       telefono,
       estado_entrega,
       pago_estado,
-      evento,
-      atendido_por,
+      // 👇 OJO: NO confíes directo en evento/atendido_por aquí
     } = datos;
+
+    // ✅ Blindaje: si viene array, tomamos solo el primer valor
+    const eventoTxt = toText(datos.evento);
+    const atendidoTxt = toText(datos.atendido_por);
 
     // 1) Ítems del body
     const { items, totalItems } = parseItemsFromBody(datos);
 
     // 2) Precio / abono / estado de pago
     let precioNum = Number(precio) || 0;
-    let abonoNum  = getAbonoFromBody(datos);
+    let abonoNum = getAbonoFromBody(datos);
     let pagoEstado = pago_estado || 'Pendiente';
 
-    // Si precio está en 0 y hay detalle, usamos el total de ítems
     if (precioNum <= 0 && totalItems > 0) {
       precioNum = totalItems;
     }
@@ -750,7 +760,6 @@ function normalizarFechaFiltro(valor) {
     }
 
     try {
-      // 3) Insertar cabecera y obtener id
       const insertCabecera = `
         INSERT INTO ordenes_personas (
           nombre,
@@ -783,13 +792,12 @@ function normalizarFechaFiltro(valor) {
         estado_entrega || 'Pendiente',
         abonoNum,
         pagoEstado,
-        evento || '',
-        atendido_por || '',
+        eventoTxt,       // ✅ aquí
+        atendidoTxt,     // ✅ aquí
       ]);
 
       const nuevaId = rows[0]?.id;
 
-      // 4) Insertar detalle si hay ítems
       if (nuevaId && items.length) {
         for (const it of items) {
           await dbExec(
@@ -1003,9 +1011,12 @@ router.post(
         abono,
         telefono,
         estado_entrega,
-        evento,
-        atendido_por,
+        // 👇 NO confiamos directo en evento/atendido_por
       } = datos;
+
+      // ✅ Blindaje
+      const eventoTxt = toText(datos.evento);
+      const atendidoTxt = toText(datos.atendido_por);
 
       // 1) Leer ítems del form
       const { items, totalItems } = parseItemsFromBody(datos);
@@ -1048,14 +1059,14 @@ router.post(
           abonoNum,
           telefono || '',
           estado_entrega || 'Pendiente',
-          evento || '',
-          atendido_por || '',
+          eventoTxt,       // ✅ aquí
+          atendidoTxt,     // ✅ aquí
           pagoEstado,
           id,
         ]
       );
 
-      // 4) Reemplazar el detalle: borrar todo y volver a insertar
+      // 4) Reemplazar detalle
       await dbExec(
         'DELETE FROM ordenes_personas_detalle WHERE orden_persona_id = $1',
         [id]
