@@ -38,17 +38,9 @@
       margin-left: 8px;
     }
 
-    .recibo-logo {
-      text-align: center;
-    }
-    .recibo-logo img {
-      max-width: 170px;
-      height: auto;
-    }
-    .img-qr img {
-      max-width: 200px;
-      height: auto;
-    }
+    .recibo-logo { text-align: center; }
+    .recibo-logo img { max-width: 170px; height: auto; }
+    .img-qr img { max-width: 200px; height: auto; }
 
     /* CONTENEDOR TICKET 80 mm */
     .ticket-wrapper {
@@ -94,6 +86,7 @@
       display: flex;
       justify-content: space-between;
       margin-bottom: 2px;
+      gap: 6px;
     }
 
     .label {
@@ -102,7 +95,7 @@
       margin-right: 4px;
     }
 
-    .urgencia1 {
+    .urgencia1{
       font-weight: 750;
       font-size: 18px;
     }
@@ -129,8 +122,56 @@
       margin-top: 4px;
     }
 
+    /* =========================
+       ✅ DETALLE ORDENADO (80mm)
+       ========================= */
+    .detalle-wrap{
+      margin-top: 4px;
+    }
+    .detalle-head{
+      display: grid;
+      grid-template-columns: 10mm 1fr 15mm 18mm; /* Cant | Desc | P.U | Sub */
+      gap: 2mm;
+      font-size: 14px;
+      font-weight: 900;
+      padding: 1mm 0;
+      border-bottom: 1px dashed #9ca3af;
+    }
+    .detalle-row{
+      display: grid;
+      grid-template-columns: 10mm 1fr 15mm 18mm;
+      gap: 2mm;
+      font-size: 14px;
+      padding: 1mm 0;
+      align-items: start;
+    }
+    .detalle-row .cant{
+      text-align: left;
+      font-weight: 900;
+    }
+    .detalle-row .desc{
+      overflow-wrap: anywhere; /* ✅ rompe bonito en ticket */
+      word-break: break-word;
+      line-height: 1.15;
+    }
+    .detalle-row .pu,
+    .detalle-row .sub{
+      text-align: right;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .detalle-total{
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      padding-top: 2mm;
+      border-top: 1px dashed #9ca3af;
+      font-size: 15px;
+      font-weight: 900;
+    }
+    .detalle-total .labelt{ font-weight: 900; }
+
     @page {
-      /* ANCHO 80 mm, alto automático (la impresora corta) */
       size: 80mm auto;
       margin: 3mm;
     }
@@ -138,10 +179,7 @@
     @media print {
       body { background: #fff; }
       .no-print { display: none; }
-      .ticket-wrapper {
-        margin: 0;
-        border: none;
-      }
+      .ticket-wrapper { margin: 0; border: none; }
     }
   </style>
 </head>
@@ -163,7 +201,7 @@
       if (!value) return '';
       const d = (value instanceof Date) ? value : new Date(value);
       if (isNaN(d.getTime())) return '';
-      return d.toISOString().slice(0, 10); // YYYY-MM-DD
+      return d.toISOString().slice(0, 10);
     }
 
     const precioLocal = Number(precio ?? orden.precio ?? 0) || 0;
@@ -171,6 +209,13 @@
     const saldoLocal  = Math.max(precioLocal - abonoLocal, 0);
     const fechaToma   = formatFecha(orden.fecha_toma);
     const fechaEnt    = formatFecha(orden.fecha_entrega);
+
+    const detallesSafe = Array.isArray(detalles) ? detalles : [];
+    const totalDetalle = detallesSafe.reduce((acc, it) => {
+      const c = Number(it.cantidad || 0);
+      const pu = Number(it.precio_unitario || 0);
+      return acc + (c * pu);
+    }, 0);
   %>
 
   <div class="ticket-wrapper">
@@ -239,22 +284,21 @@
           </div>
         <% } %>
 
-        <% if (orden.evento) { %>
+        <% if (tipo === 'persona' && (orden.evento || orden.atendido_por)) { %>
           <div class="mt-2">
-            <span class="label">Evento:</span> <%= orden.evento %>
-          </div>
-        <% } %>
-
-        <% if (orden.atendido_por) { %>
-          <div class="mt-2">
-            <span class="label">Atendido por:</span> <%= orden.atendido_por %>
+            <% if (orden.evento) { %>
+              <div><span class="label">Evento:</span> <%= orden.evento %></div>
+            <% } %>
+            <% if (orden.atendido_por) { %>
+              <div><span class="label">Atendido por:</span> <%= orden.atendido_por %></div>
+            <% } %>
           </div>
         <% } %>
       </div>
 
       <hr />
 
-      <!-- DETALLE BÁSICO (persona / institución) -->
+      <!-- DETALLE BÁSICO -->
       <div class="small">
         <% if (tipo === 'institucion') { %>
           <% if (orden.seccion) { %>
@@ -282,63 +326,46 @@
           </div>
         <% } else { %>
           <div class="row">
-            <span class="label">N° orden:</span>
-            <span><%= orden.numero_orden || '' %></span>
-          </div>
-          <div class="row">
             <span class="label">N° toma:</span>
             <span><%= orden.numero_toma || '' %></span>
           </div>
         <% } %>
       </div>
 
-      <hr />
-
-      <!--  NUEVO: DETALLE TIPO FACTURA (solo personas y si hay datos) -->
-      <% if (tipo === 'persona' && typeof detalles !== 'undefined' && detalles && detalles.length) { %>
-        <div class="small">
+      <!-- ✅ NUEVO: DETALLE ORDENADO -->
+      <% if (tipo === 'persona' && detallesSafe.length) { %>
+        <hr />
+        <div class="small detalle-wrap">
           <div class="label">Detalle:</div>
 
-          <table style="width:100%; font-size:16px; margin-top:2px; border-collapse:collapse;">
-            <thead>
-              <tr>
-                <th style="text-align:left;">Cant</th>
-                <th style="text-align:left;">Descripción</th>
-                <th style="text-align:right;">P. unit</th>
-                <th style="text-align:right;">Sub</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% let totalDetalle = 0; %>
-              <% detalles.forEach(function(it) {
-                   const cant = Number(it.cantidad || 0);
-                   const pu   = Number(it.precio_unitario || 0);
-                   const sub  = Number(it.subtotal || (cant * pu));
-                   totalDetalle += sub;
-              %>
-                <tr>
-                  <td><%= cant %></td>
-                  <td><%= it.descripcion || '' %></td>
-                  <td class="right">$ <%= pu.toFixed(2) %></td>
-                  <td class="right">$ <%= sub.toFixed(2) %></td>
-                </tr>
-              <% }) %>
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="3" style="text-align:right; font-weight:700; padding-top:2px;">
-                  Total detalle:
-                </td>
-                <td class="right" style="font-weight:700;">
-                  $ <%= totalDetalle.toFixed(2) %>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+          <div class="detalle-head">
+            <div>Cant</div>
+            <div>Descripción</div>
+            <div class="right">P. unit</div>
+            <div class="right">Sub</div>
+          </div>
 
-        <hr />
+          <% detallesSafe.forEach(function(it){ 
+               const c = Number(it.cantidad || 0);
+               const pu = Number(it.precio_unitario || 0);
+               const sub = c * pu;
+          %>
+            <div class="detalle-row">
+              <div class="cant"><%= c %></div>
+              <div class="desc"><%= it.descripcion || '' %></div>
+              <div class="pu">$ <%= pu.toFixed(2) %></div>
+              <div class="sub">$ <%= sub.toFixed(2) %></div>
+            </div>
+          <% }) %>
+
+          <div class="detalle-total">
+            <span class="labelt">Total detalle:</span>
+            <span>$ <%= totalDetalle.toFixed(2) %></span>
+          </div>
+        </div>
       <% } %>
+
+      <hr />
 
       <!-- PAGO -->
       <div class="small">
@@ -363,23 +390,19 @@
       <div class="small mt-2">
         * Todo abono o reservación de evento no es reembolsable.
       </div>
-
       <div class="vertical-note">
         NOTA: FOTOS DISPONIBLES POR UN PERIODO DE 30 DÍAS.
       </div>
 
       <hr />
 
-      <!-- OBSERVACIONES -->
       <div class="small">
         Observaciones:
-        <div class="observaciones">
-          <!-- (Por ahora se deja vacío para escribir a mano) -->
-        </div>
+        <div class="observaciones"></div>
       </div>
 
       <div class="center small mt-2">
-        ¡Gracias por su preferencia! Escanee el código para chatear.<br />
+        ¡Gracias por su preferencia! Escanea el código para chatear.<br />
       </div>
 
       <div class="center">
@@ -389,7 +412,6 @@
       </div>
 
     </div>
-
     <div class="separator"></div>
   </div>
 </body>
