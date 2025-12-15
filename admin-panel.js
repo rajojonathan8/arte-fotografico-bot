@@ -519,6 +519,9 @@ function mountAdmin(app) {
     // Filtros recibidos del formulario
     const fechaDesde = (req.query.fecha_desde || '').trim();
     const fechaHasta = (req.query.fecha_hasta || '').trim();
+    const fechaEntregaDesde = (req.query.fecha_entrega_desde || '').trim();
+    const fechaEntregaHasta = (req.query.fecha_entrega_hasta || '').trim();
+
     const busqueda = (req.query.q || '').trim().toLowerCase();
     const filtroUrg = (req.query.urgencia || '').trim();
     const filtroEnt = (req.query.entrega || '').trim();
@@ -567,6 +570,15 @@ function normalizarFechaFiltro(valor) {
     if (fechaDesde && f < fechaDesde) return false;
     if (fechaHasta && f > fechaHasta) return false;
   }
+  // 🔹 Fecha de entrega
+if (fechaEntregaDesde || fechaEntregaHasta) {
+  const fEnt = normalizarFechaFiltro(o.fecha_entrega);
+  if (!fEnt) return false;
+
+  if (fechaEntregaDesde && fEnt < fechaEntregaDesde) return false;
+  if (fechaEntregaHasta && fEnt > fechaEntregaHasta) return false;
+}
+
 
   // 🔹 Texto libre
   if (busqueda) {
@@ -628,6 +640,8 @@ function normalizarFechaFiltro(valor) {
       ordenesPersonas,
       fechaDesde,
       fechaHasta,
+      fechaEntregaDesde,
+      fechaEntregaHasta,
       busqueda,
       filtroUrg,
       filtroEnt,

@@ -83,6 +83,32 @@
                  focus:outline-none focus:ring-2 focus:ring-emerald-500">
       </div>
 
+      <!-- NUEVO: filtros por fecha de entrega -->
+<div>
+  <label class="block text-[11px] font-semibold text-slate-300 mb-1">
+    DESDE (FECHA ENTREGA)
+  </label>
+  <input
+    type="date"
+    name="fecha_entrega_desde"
+    value="<%= fechaEntregaDesde || '' %>"
+    class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+  />
+</div>
+
+<div>
+  <label class="block text-[11px] font-semibold text-slate-300 mb-1">
+    HASTA (FECHA ENTREGA)
+  </label>
+  <input
+    type="date"
+    name="fecha_entrega_hasta"
+    value="<%= fechaEntregaHasta || '' %>"
+    class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+  />
+</div>
+
+
       <!-- Urgencia -->
       <div>
         <label for="urgencia" class="block text-xs font-semibold text-slate-600 uppercase mb-1">
