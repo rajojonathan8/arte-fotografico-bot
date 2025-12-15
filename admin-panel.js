@@ -208,6 +208,19 @@ function toText(v) {
   return (v || '').toString().trim();
 }
 
+function paginate(list, page, pageSize) {
+  const totalItems = Array.isArray(list) ? list.length : 0;
+  const totalPages = Math.max(Math.ceil(totalItems / pageSize), 1);
+  const safePage = Math.min(Math.max(page, 1), totalPages);
+  const start = (safePage - 1) * pageSize;
+
+  return {
+    items: (list || []).slice(start, start + pageSize),
+    totalItems,
+    totalPages,
+    currentPage: safePage,
+  };
+}
 
 function mountAdmin(app) {
   const router = express.Router();
@@ -516,6 +529,11 @@ function mountAdmin(app) {
   router.get('/ordenes', requireAuth, async (req, res) => {
     const tab = req.query.tab === 'personas' ? 'personas' : 'instituciones';
 
+    // ✅ paginación (solo personas por ahora)
+const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+const pageSize = 20; // puedes cambiar a 30 si quieres
+
+
     // Filtros recibidos del formulario
     const fechaDesde = (req.query.fecha_desde || '').trim();
     const fechaHasta = (req.query.fecha_hasta || '').trim();
@@ -629,6 +647,10 @@ if (fechaEntregaDesde || fechaEntregaHasta) {
       pasaFiltrosGenerales
     );
 
+    // ✅ paginar SOLO personas (tab=personas)
+const pagPersonas = paginate(ordenesPersonas, page, pageSize);
+
+
     // Resúmenes de pago
     const resumenInstituciones = calcularResumen(ordenesInstituciones);
     const resumenPersonas = calcularResumen(ordenesPersonas);
@@ -637,7 +659,7 @@ if (fechaEntregaDesde || fechaEntregaHasta) {
       title: 'Órdenes y libros',
       tab,
       ordenesInstituciones,
-      ordenesPersonas,
+      ordenesPersonas: (tab === 'personas') ? pagPersonas.items : ordenesPersonas,
       fechaDesde,
       fechaHasta,
       fechaEntregaDesde,
@@ -648,6 +670,9 @@ if (fechaEntregaDesde || fechaEntregaHasta) {
       filtroPago,
       resumenInstituciones,
       resumenPersonas,
+      page: pagPersonas.currentPage,
+      totalPages: pagPersonas.totalPages,
+      pageSize,
     });
   });
 

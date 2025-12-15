@@ -676,6 +676,35 @@
       </div>
     </section>
   <% } %>
+  <% if (tab === 'personas' && totalPages > 1) { %>
+  <div class="flex items-center gap-2 mb-4">
+    <% 
+      const q = new URLSearchParams({
+        tab,
+        q: busqueda || '',
+        fecha_desde: fechaDesde || '',
+        fecha_hasta: fechaHasta || '',
+        urgencia: filtroUrg || '',
+        entrega: filtroEnt || '',
+        pago: filtroPago || ''
+      });
+    %>
+
+    <% if (page > 1) { %>
+      <a class="px-3 py-1 rounded bg-slate-800 text-slate-100" href="/admin/ordenes?<%= q.toString() %>&page=<%= page-1 %>">← Anterior</a>
+    <% } %>
+
+    <% for (let p=1; p<=totalPages; p++) { %>
+      <a class="px-3 py-1 rounded <%= p===page ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-100' %>"
+         href="/admin/ordenes?<%= q.toString() %>&page=<%= p %>"><%= p %></a>
+    <% } %>
+
+    <% if (page < totalPages) { %>
+      <a class="px-3 py-1 rounded bg-slate-800 text-slate-100" href="/admin/ordenes?<%= q.toString() %>&page=<%= page+1 %>">Siguiente →</a>
+    <% } %>
+  </div>
+<% } %>
+
 
 </main>
 
