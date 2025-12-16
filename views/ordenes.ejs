@@ -676,34 +676,49 @@
       </div>
     </section>
   <% } %>
-  <% if (tab === 'personas' && totalPages > 1) { %>
-  <div class="flex items-center gap-2 mb-4">
-    <% 
-      const q = new URLSearchParams({
-        tab,
-        q: busqueda || '',
-        fecha_desde: fechaDesde || '',
-        fecha_hasta: fechaHasta || '',
-        urgencia: filtroUrg || '',
-        entrega: filtroEnt || '',
-        pago: filtroPago || ''
-      });
-    %>
+  <% if (tab === 'personas' && pagerPersonas && totalPages > 1) { %>
+  <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
 
-    <% if (page > 1) { %>
-      <a class="px-3 py-1 rounded bg-slate-800 text-slate-100" href="/admin/ordenes?<%= q.toString() %>&page=<%= page-1 %>">← Anterior</a>
+    <!-- Anterior -->
+    <% if (pagerPersonas.hasPrev) { %>
+      <a href="<%= pagerPersonas.prevUrl %>"
+         class="px-3 py-2 rounded-lg bg-slate-800/70 text-slate-100 hover:bg-slate-700 text-sm">
+        ← Anterior
+      </a>
+    <% } else { %>
+      <span class="px-3 py-2 rounded-lg bg-slate-800/30 text-slate-500 text-sm">
+        ← Anterior
+      </span>
     <% } %>
 
-    <% for (let p=1; p<=totalPages; p++) { %>
-      <a class="px-3 py-1 rounded <%= p===page ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-100' %>"
-         href="/admin/ordenes?<%= q.toString() %>&page=<%= p %>"><%= p %></a>
+    <!-- Pages -->
+    <% pagerPersonas.pages.forEach(p => { %>
+      <% if (p.isEllipsis) { %>
+        <span class="px-3 py-2 rounded-lg bg-slate-800/30 text-slate-400 text-sm">…</span>
+      <% } else { %>
+        <a href="<%= p.url %>"
+           class="px-3 py-2 rounded-lg text-sm
+           <%= p.isCurrent ? 'bg-emerald-600 text-white' : 'bg-slate-800/70 text-slate-100 hover:bg-slate-700' %>">
+          <%= p.label %>
+        </a>
+      <% } %>
+    <% }) %>
+
+    <!-- Siguiente -->
+    <% if (pagerPersonas.hasNext) { %>
+      <a href="<%= pagerPersonas.nextUrl %>"
+         class="px-3 py-2 rounded-lg bg-slate-800/70 text-slate-100 hover:bg-slate-700 text-sm">
+        Siguiente →
+      </a>
+    <% } else { %>
+      <span class="px-3 py-2 rounded-lg bg-slate-800/30 text-slate-500 text-sm">
+        Siguiente →
+      </span>
     <% } %>
 
-    <% if (page < totalPages) { %>
-      <a class="px-3 py-1 rounded bg-slate-800 text-slate-100" href="/admin/ordenes?<%= q.toString() %>&page=<%= page+1 %>">Siguiente →</a>
-    <% } %>
   </div>
 <% } %>
+
 
 
 </main>

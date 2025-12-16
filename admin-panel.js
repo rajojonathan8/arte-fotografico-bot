@@ -222,6 +222,91 @@ function paginate(list, page, pageSize) {
   };
 }
 
+// =======================
+// PAGINACIÓN PRO (helpers)
+// =======================
+
+// Pagina un array y regresa meta
+function paginateArray(list, page, pageSize) {
+  const totalItems = Array.isArray(list) ? list.length : 0;
+  const totalPages = Math.max(Math.ceil(totalItems / pageSize), 1);
+  const currentPage = Math.min(Math.max(Number(page) || 1, 1), totalPages);
+  const start = (currentPage - 1) * pageSize;
+
+  return {
+    items: (list || []).slice(start, start + pageSize),
+    totalItems,
+    totalPages,
+    currentPage,
+    pageSize,
+  };
+}
+
+// Construye los botones de paginación tipo "pro" (1 2 3 ... 10)
+// Mantiene filtros en los links usando req.query
+function buildPagerPro({ currentPage, totalPages, reqQuery, windowSize = 7 }) {
+  const pages = [];
+
+  if (totalPages <= 1) {
+    return { pages, hasPrev: false, hasNext: false, prevPage: 1, nextPage: 1 };
+  }
+
+  const half = Math.floor(windowSize / 2);
+
+  let start = Math.max(1, currentPage - half);
+  let end = Math.min(totalPages, start + windowSize - 1);
+
+  // Ajuste si quedamos cortos al final
+  start = Math.max(1, end - windowSize + 1);
+
+  // helper: arma URL con mismos filtros
+  function makeUrl(p) {
+    const q = { ...reqQuery, page: String(p) };
+    // importante: si tab no viene, lo ponemos en personas cuando estamos en esa sección
+    if (!q.tab) q.tab = 'personas';
+    return '/admin/ordenes?' + new URLSearchParams(q).toString();
+  }
+
+  // Siempre mostramos el 1
+  pages.push({ label: '1', page: 1, url: makeUrl(1), isCurrent: currentPage === 1 });
+
+  // Ellipsis si hay hueco
+  if (start > 2) pages.push({ label: '…', isEllipsis: true });
+
+  // Ventana central
+  for (let p = Math.max(2, start); p <= Math.min(end, totalPages - 1); p++) {
+    pages.push({
+      label: String(p),
+      page: p,
+      url: makeUrl(p),
+      isCurrent: p === currentPage,
+    });
+  }
+
+  // Ellipsis final
+  if (end < totalPages - 1) pages.push({ label: '…', isEllipsis: true });
+
+  // Siempre mostramos el último si totalPages > 1
+  if (totalPages > 1) {
+    pages.push({
+      label: String(totalPages),
+      page: totalPages,
+      url: makeUrl(totalPages),
+      isCurrent: currentPage === totalPages,
+    });
+  }
+
+  return {
+    pages,
+    hasPrev: currentPage > 1,
+    hasNext: currentPage < totalPages,
+    prevPage: Math.max(currentPage - 1, 1),
+    nextPage: Math.min(currentPage + 1, totalPages),
+    prevUrl: makeUrl(Math.max(currentPage - 1, 1)),
+    nextUrl: makeUrl(Math.min(currentPage + 1, totalPages)),
+  };
+}
+
 function mountAdmin(app) {
   const router = express.Router();
 
@@ -647,33 +732,56 @@ if (fechaEntregaDesde || fechaEntregaHasta) {
       pasaFiltrosGenerales
     );
 
-    // ✅ paginar SOLO personas (tab=personas)
-const pagPersonas = paginate(ordenesPersonas, page, pageSize);
+   // ================= PAGINACIÓN PRO (solo personas) =================
+let pagPersonas = null;
+let pagerPersonas = null;
+
+if (tab === 'personas') {
+  pagPersonas = paginateArray(ordenesPersonas, page, pageSize);
+
+  pagerPersonas = buildPagerPro({
+    currentPage: pagPersonas.currentPage,
+    totalPages: pagPersonas.totalPages,
+    reqQuery: req.query,   // <-- CLAVE: mantiene filtros en links
+    windowSize: 7,
+  });
+} else {
+  // si no estás en personas, igual evitamos undefined
+  pagPersonas = paginateArray(ordenesPersonas, 1, pageSize);
+}
+
 
 
     // Resúmenes de pago
     const resumenInstituciones = calcularResumen(ordenesInstituciones);
     const resumenPersonas = calcularResumen(ordenesPersonas);
 
-    res.render('ordenes', {
-      title: 'Órdenes y libros',
-      tab,
-      ordenesInstituciones,
-      ordenesPersonas: (tab === 'personas') ? pagPersonas.items : ordenesPersonas,
-      fechaDesde,
-      fechaHasta,
-      fechaEntregaDesde,
-      fechaEntregaHasta,
-      busqueda,
-      filtroUrg,
-      filtroEnt,
-      filtroPago,
-      resumenInstituciones,
-      resumenPersonas,
-      page: pagPersonas.currentPage,
-      totalPages: pagPersonas.totalPages,
-      pageSize,
-    });
+  res.render('ordenes', {
+  title: 'Órdenes y libros',
+  tab,
+  ordenesInstituciones,
+  ordenesPersonas: (tab === 'personas') ? pagPersonas.items : ordenesPersonas,
+
+  fechaDesde,
+  fechaHasta,
+  fechaEntregaDesde,
+  fechaEntregaHasta,
+  busqueda,
+  filtroUrg,
+  filtroEnt,
+  filtroPago,
+
+  resumenInstituciones,
+  resumenPersonas,
+
+  // paginación
+  page: (tab === 'personas') ? pagPersonas.currentPage : 1,
+  totalPages: (tab === 'personas') ? pagPersonas.totalPages : 1,
+  pageSize,
+
+  pagerPersonas,  // <-- NUEVO (PRO)
+});
+
   });
 
   // ---------------------------------------------------------------------------
