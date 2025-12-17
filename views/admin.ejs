@@ -220,6 +220,29 @@
       <p class="mt-2 text-xs text-slate-500">
         Para ver el detalle, entra al módulo de Órdenes y libros.
       </p>
+      <!-- ✅ NUEVO: Editadas / Impresas -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+  <div class="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+    <div class="text-xs text-slate-300">Editadas</div>
+    <div class="mt-1 text-2xl font-semibold text-slate-100">
+      <%= (resumenEditor?.editadas ?? 0) %>
+    </div>
+    <div class="mt-1 text-[11px] text-slate-400">
+      Personas: <%= (resumenEditor?.editadasPersonas ?? 0) %> · Instituciones: <%= (resumenEditor?.editadasInst ?? 0) %>
+    </div>
+  </div>
+
+  <div class="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+    <div class="text-xs text-slate-300">Impresas</div>
+    <div class="mt-1 text-2xl font-semibold text-slate-100">
+      <%= (resumenEditor?.impresas ?? 0) %>
+    </div>
+    <div class="mt-1 text-[11px] text-slate-400">
+      Personas: <%= (resumenEditor?.impresasPersonas ?? 0) %> · Instituciones: <%= (resumenEditor?.impresasInst ?? 0) %>
+    </div>
+  </div>
+</div>
+
     </article>
 
     <!-- Próximas entregas (notificaciones) -->
@@ -307,7 +330,7 @@
     </article>
 
   </section>
-
+  
   <!-- ================= ENTREGAS ATRASADAS ================= -->
   <section class="bg-slate-900/70 border border-slate-700 rounded-2xl p-4 space-y-3">
     <h2 class="text-sm font-semibold text-slate-100 flex items-center justify-between">

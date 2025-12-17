@@ -545,6 +545,33 @@ function mountAdmin(app) {
         console.error('❌ Error cargando resumenEvento:', e);
       }
 
+      // =======================
+// RESUMEN EDITOR (panel principal)
+// =======================
+const [{ c: editadasPersonas }] = await dbSelect(
+  `SELECT COUNT(*)::int AS c FROM ordenes_personas WHERE editado = true`
+);
+
+const [{ c: editadasInst }] = await dbSelect(
+  `SELECT COUNT(*)::int AS c FROM ordenes_instituciones WHERE editado = true`
+);
+
+const [{ c: impresasPersonas }] = await dbSelect(
+  `SELECT COUNT(*)::int AS c FROM ordenes_personas WHERE impresos = true`
+);
+
+const [{ c: impresasInst }] = await dbSelect(
+  `SELECT COUNT(*)::int AS c FROM ordenes_instituciones WHERE impresos = true`
+);
+
+const resumenEditor = {
+  editadas: (editadasPersonas || 0) + (editadasInst || 0),
+  impresas: (impresasPersonas || 0) + (impresasInst || 0),
+  editadasPersonas: editadasPersonas || 0,
+  editadasInst: editadasInst || 0,
+  impresasPersonas: impresasPersonas || 0,
+  impresasInst: impresasInst || 0,
+};
 
       res.render('admin', {
         title: 'Panel de administración',
@@ -558,7 +585,9 @@ function mountAdmin(app) {
         resumenCitas,
         proximasEntregas,
         entregasAtrasadas,
-        resumenEvento, 
+        resumenEvento,
+        resumenEditor,
+
       });
     } catch (err) {
       console.error('❌ Error en dashboard /admin:', err);

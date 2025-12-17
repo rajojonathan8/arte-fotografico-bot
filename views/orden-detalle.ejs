@@ -40,6 +40,47 @@
           <p><span class="font-semibold text-slate-300">Atendido por:</span> <%= orden.atendido_por %></p>
         <% } %>
       </div>
+      <!-- ================= ESTADO DEL EDITOR ================= -->
+<div class="mt-4 flex flex-wrap items-center gap-2">
+
+  <!-- EDITADO -->
+  <% if (orden.editado) { %>
+    <span class="inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold
+      bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">
+      ✅ Editado
+    </span>
+    <% if (orden.editado_at) { %>
+      <span class="text-[11px] text-slate-400">
+        <%= new Date(orden.editado_at).toLocaleString('es-SV') %>
+      </span>
+    <% } %>
+  <% } else { %>
+    <span class="inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold
+      bg-slate-500/15 text-slate-300 border border-slate-500/20">
+      ⏳ No editado
+    </span>
+  <% } %>
+
+  <!-- IMPRESO -->
+  <% if (orden.impresos) { %>
+    <span class="inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold
+      bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-500/20">
+      🖨️ Impreso
+    </span>
+    <% if (orden.impreso_at) { %>
+      <span class="text-[11px] text-slate-400">
+        <%= new Date(orden.impreso_at).toLocaleString('es-SV') %>
+      </span>
+    <% } %>
+  <% } else { %>
+    <span class="inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold
+      bg-amber-500/15 text-amber-300 border border-amber-500/20">
+      🟡 Pendiente de impresión
+    </span>
+  <% } %>
+
+</div>
+
     <% } else { %>
       <!-- Institución (por si usas la misma vista) -->
       <div class="text-sm text-slate-100 space-y-1">
