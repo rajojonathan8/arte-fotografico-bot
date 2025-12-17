@@ -155,6 +155,21 @@ const sqlAlterEventoAtendido = `
   ADD COLUMN IF NOT EXISTS atendido_por TEXT;
 `;
 
+// 7) 🔹 NUEVO: columnas de control editor (editado / fechas)
+const sqlAlterEditorFlags = `
+  ALTER TABLE ordenes_personas
+    ADD COLUMN IF NOT EXISTS editado BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS editado_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS impreso_at TIMESTAMPTZ;
+
+  ALTER TABLE ordenes_instituciones
+    ADD COLUMN IF NOT EXISTS editado BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS editado_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS impreso_at TIMESTAMPTZ;
+`;
+await client.query(sqlAlterEditorFlags);
+console.log('🟢 Columnas editor (editado/editado_at/impreso_at) OK');
+
     await client.query(sqlConversaciones);
     console.log('🟢 Tabla "conversaciones" OK');
 

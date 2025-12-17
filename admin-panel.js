@@ -2319,50 +2319,87 @@ router.post(
 // PANEL DEL EDITOR (solo entregas de hoy + urgentes)
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
-// PANEL DEL EDITOR (solo entregas de hoy + urgentes)
+// ---------------------------------------------------------------------------
+// PANEL DEL EDITOR (rango entrega + urgentes)
 // ---------------------------------------------------------------------------
 router.get('/editor', requireAuth, async (req, res) => {
-  try {
-    const hoy = new Date();
-    const hoyISO = hoy.toISOString().slice(0, 10); // YYYY-MM-DD
+  // ================= FILTROS EDITOR =================
+  const diasDespues = 8;
 
-    // 🔹 Entregas de HOY (personas)
-    const entregasHoyPersonas = await dbSelect(
+  const hoy = new Date();
+  const yyyy = hoy.getFullYear();
+  const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+  const dd = String(hoy.getDate()).padStart(2, '0');
+  const hoyStr = `${yyyy}-${mm}-${dd}`; // YYYY-MM-DD
+
+  const entregaDesde = (req.query.entrega_desde || '').trim(); // YYYY-MM-DD
+  const entregaHasta = (req.query.entrega_hasta || '').trim(); // YYYY-MM-DD
+
+  function addDays(dateStr, days) {
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${da}`;
+  }
+
+  // si no mandan filtros: hoy -> hoy+8
+  const desdeFinal = entregaDesde || hoyStr;
+  const hastaFinal = entregaHasta || addDays(hoyStr, diasDespues);
+
+  // para mantener el returnTo en POST
+  const currentUrl = req.originalUrl.startsWith('/admin')
+    ? req.originalUrl
+    : `/admin${req.originalUrl}`;
+
+  try {
+    // 🔹 ENTREGAS EN RANGO (personas)
+    const entregasRangoPersonas = await dbSelect(
       `
       SELECT id, nombre, numero_orden, numero_toma,
-             fecha_toma, fecha_entrega, urgencia, entrega, impresos
+             fecha_toma, fecha_entrega, urgencia, entrega,
+             impresos, impreso_at,
+             editado, editado_at,
+             evento, atendido_por
       FROM ordenes_personas
-      WHERE fecha_entrega::date = $1
+      WHERE fecha_entrega::date >= $1
+        AND fecha_entrega::date <= $2
         AND (entrega IS NULL OR entrega <> 'Entregado')
-      ORDER BY urgencia DESC, id ASC
+      ORDER BY fecha_entrega ASC NULLS LAST, urgencia DESC, id ASC
       `,
-      [hoyISO]
+      [desdeFinal, hastaFinal]
     );
 
-    // 🔹 Entregas de HOY (instituciones)
-    const entregasHoyInst = await dbSelect(
+    // 🔹 ENTREGAS EN RANGO (instituciones)
+    const entregasRangoInst = await dbSelect(
       `
       SELECT id, institucion, nombre, seccion, paquete,
-             fecha_toma, fecha_entrega, urgencia, entrega, impresos
+             fecha_toma, fecha_entrega, urgencia, entrega,
+             impresos, impreso_at,
+             editado, editado_at
       FROM ordenes_instituciones
-      WHERE fecha_entrega::date = $1
+      WHERE fecha_entrega::date >= $1
+        AND fecha_entrega::date <= $2
         AND (entrega IS NULL OR entrega <> 'Entregado')
-      ORDER BY urgencia DESC, id ASC
+      ORDER BY fecha_entrega ASC NULLS LAST, urgencia DESC, id ASC
       `,
-      [hoyISO]
+      [desdeFinal, hastaFinal]
     );
 
-    // Unimos en un solo arreglo, marcando el tipo
-    const entregasHoy = [
-      ...entregasHoyPersonas.map(o => ({ ...o, _tipo: 'persona' })),
-      ...entregasHoyInst.map(o => ({ ...o, _tipo: 'institucion' })),
+    const entregasRango = [
+      ...entregasRangoPersonas.map(o => ({ ...o, _tipo: 'persona' })),
+      ...entregasRangoInst.map(o => ({ ...o, _tipo: 'institucion' })),
     ];
 
-    // 🔹 Órdenes URGENTES / MUY URGENTES (pendientes)
+    // 🔹 URGENTES (pendientes) — opcional: los mostramos aunque no caigan en el rango
     const urgentesPersonas = await dbSelect(
       `
       SELECT id, nombre, numero_orden, numero_toma,
-             fecha_toma, fecha_entrega, urgencia, entrega, impresos
+             fecha_toma, fecha_entrega, urgencia, entrega,
+             impresos, impreso_at,
+             editado, editado_at,
+             evento, atendido_por
       FROM ordenes_personas
       WHERE (urgencia = 'Urgente' OR urgencia = 'Muy urgente')
         AND (entrega IS NULL OR entrega <> 'Entregado')
@@ -2373,7 +2410,9 @@ router.get('/editor', requireAuth, async (req, res) => {
     const urgentesInst = await dbSelect(
       `
       SELECT id, institucion, nombre, seccion, paquete,
-             fecha_toma, fecha_entrega, urgencia, entrega, impresos
+             fecha_toma, fecha_entrega, urgencia, entrega,
+             impresos, impreso_at,
+             editado, editado_at
       FROM ordenes_instituciones
       WHERE (urgencia = 'Urgente' OR urgencia = 'Muy urgente')
         AND (entrega IS NULL OR entrega <> 'Entregado')
@@ -2388,18 +2427,108 @@ router.get('/editor', requireAuth, async (req, res) => {
 
     res.render('editor', {
       title: 'Panel del editor',
-      entregasHoy,
+      diasDespues,
+      entregaDesde: desdeFinal,
+      entregaHasta: hastaFinal,
+      currentUrl,
+      entregasRango,
       urgentes,
     });
   } catch (err) {
     console.error('❌ Error en /admin/editor:', err);
     res.render('editor', {
       title: 'Panel del editor',
-      entregasHoy: [],
+      diasDespues,
+      entregaDesde: desdeFinal,
+      entregaHasta: hastaFinal,
+      currentUrl,
+      entregasRango: [],
       urgentes: [],
     });
   }
 });
+function safeReturnTo(v) {
+  if (!v) return '/admin/editor';
+  // seguridad: solo permitimos volver al editor
+  if (typeof v === 'string' && v.startsWith('/admin/editor')) return v;
+  return '/admin/editor';
+}
+
+// ======================= PERSONAS =======================
+router.post('/editor/persona/:id/editado', requireAuth, express.urlencoded({ extended: true }), async (req, res) => {
+  const id = Number(req.params.id);
+  const returnTo = safeReturnTo(req.body.returnTo);
+
+  try {
+    await dbExec(
+      `UPDATE ordenes_personas
+       SET editado = TRUE,
+           editado_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
+  } catch (e) {
+    console.error('❌ Error marcando editado (persona):', e);
+  }
+  res.redirect(returnTo);
+});
+
+router.post('/editor/persona/:id/impreso', requireAuth, express.urlencoded({ extended: true }), async (req, res) => {
+  const id = Number(req.params.id);
+  const returnTo = safeReturnTo(req.body.returnTo);
+
+  try {
+    await dbExec(
+      `UPDATE ordenes_personas
+       SET impresos = TRUE,
+           impreso_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
+  } catch (e) {
+    console.error('❌ Error marcando impreso (persona):', e);
+  }
+  res.redirect(returnTo);
+});
+
+// =================== INSTITUCIONES ======================
+router.post('/editor/institucion/:id/editado', requireAuth, express.urlencoded({ extended: true }), async (req, res) => {
+  const id = Number(req.params.id);
+  const returnTo = safeReturnTo(req.body.returnTo);
+
+  try {
+    await dbExec(
+      `UPDATE ordenes_instituciones
+       SET editado = TRUE,
+           editado_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
+  } catch (e) {
+    console.error('❌ Error marcando editado (institucion):', e);
+  }
+  res.redirect(returnTo);
+});
+
+router.post('/editor/institucion/:id/impreso', requireAuth, express.urlencoded({ extended: true }), async (req, res) => {
+  const id = Number(req.params.id);
+  const returnTo = safeReturnTo(req.body.returnTo);
+
+  try {
+    await dbExec(
+      `UPDATE ordenes_instituciones
+       SET impresos = TRUE,
+           impreso_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
+  } catch (e) {
+    console.error('❌ Error marcando impreso (institucion):', e);
+  }
+  res.redirect(returnTo);
+});
+
+
 
 
 // ================================

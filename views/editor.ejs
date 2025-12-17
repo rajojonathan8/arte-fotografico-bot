@@ -1,296 +1,239 @@
-<%- include('_head', { title }) %> 
-
+<%- include('_head', { title }) %>
 <%
-  function fechaCorta(v) {
-    if (!v) return '';
-    const d = new Date(v);
-    if (isNaN(d)) return '';
-    return d.toISOString().slice(0, 10); // YYYY-MM-DD
-  }
+function formatDate(d) {
+  if (!d) return '-';
+  const date = new Date(d);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${day}/${m}/${y}`; // cambia a ${y}-${m}-${day} si lo prefieres
+}
 %>
-
-<header class="p-4 bg-white shadow">
-  <div class="max-w-6xl mx-auto flex items-center justify-between">
-    <div>
-      <h1 class="text-xl font-semibold">Panel del editor</h1>
-      <p class="text-sm text-slate-500">
-        Vista rápida de entregas del día y órdenes urgentes para impresión.
-      </p>
-    </div>
-    <a href="/admin" class="text-sm text-slate-600 hover:text-slate-900">
-      ← Volver al panel
-    </a>
-  </div>
-</header>
 
 <main class="max-w-6xl mx-auto p-4 space-y-6">
 
-  <!-- ================= RESUMEN RÁPIDO ================= -->
-  <section class="grid sm:grid-cols-2 gap-4">
-    <article class="bg-slate-900/80 text-slate-100 rounded-2xl border border-slate-700 p-4">
-      <p class="text-xs uppercase text-slate-400 font-semibold">Resumen</p>
-      <p class="mt-2 text-sm">
-        Entregas de hoy pendientes:
-        <span class="font-semibold">
-          <%= (entregasHoy && entregasHoy.length) || 0 %>
-        </span>
+  <!-- Header -->
+  <header class="flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold text-slate-100">Panel del editor</h1>
+      <p class="text-sm text-slate-400 mt-1">
+        Aquí verás entregas dentro del rango seleccionado (por defecto: hoy → +<%= diasDespues || 8 %> días), más las urgentes.
+        Orden recomendado: <strong>Editar → Imprimir</strong> → Marcar <strong>editado</strong> → Marcar <strong>impreso</strong>.
       </p>
-      <p class="text-sm">
-        Órdenes urgentes pendientes:
-        <span class="font-semibold">
-          <%= (urgentes && urgentes.length) || 0 %>
-        </span>
-      </p>
-    </article>
+    </div>
 
-    <article class="bg-slate-900/80 text-slate-100 rounded-2xl border border-slate-700 p-4 text-sm">
-      <p class="text-xs uppercase text-slate-400 font-semibold">Leyenda</p>
-      <ul class="mt-2 space-y-1">
-        <li>🟡 <strong>Pendiente</strong>: aún no se han marcado como impresos.</li>
-        <li>🟢 <strong>Impresos</strong>: ya marcados como impresos
-          (columna <code>impresos = true</code>, no cambia el estado de entrega).
-        </li>
-      </ul>
-    </article>
+    <div class="flex items-center gap-3">
+      <a href="/admin" class="text-sm text-slate-300 hover:text-white">← Volver al panel</a>
+      <a href="/admin/ordenes?tab=personas" class="text-sm text-slate-300 hover:text-white">Ver órdenes</a>
+    </div>
+  </header>
+
+  <!-- Filtros -->
+  <section class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+    <form method="GET" action="/admin/editor" class="grid md:grid-cols-6 gap-3 items-end">
+      <div class="md:col-span-2">
+        <label class="block text-xs font-medium text-slate-300 mb-1">Entrega desde</label>
+        <input
+          type="date"
+          name="entrega_desde"
+          value="<%= entregaDesde || '' %>"
+          class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+        />
+      </div>
+
+      <div class="md:col-span-2">
+        <label class="block text-xs font-medium text-slate-300 mb-1">Entrega hasta</label>
+        <input
+          type="date"
+          name="entrega_hasta"
+          value="<%= entregaHasta || '' %>"
+          class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+        />
+      </div>
+
+      <div class="md:col-span-2 flex gap-2">
+        <button
+          type="submit"
+          class="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm hover:bg-emerald-500"
+        >
+          Filtrar
+        </button>
+        <a
+          href="/admin/editor"
+          class="px-4 py-2 rounded-full bg-slate-200 text-slate-900 text-sm hover:bg-white"
+        >
+          Limpiar
+        </a>
+      </div>
+
+      <div class="md:col-span-6 text-xs text-slate-400 mt-1">
+        Rango actual: <span class="text-slate-200"><%= entregaDesde %></span> → <span class="text-slate-200"><%= entregaHasta %></span>
+      </div>
+    </form>
   </section>
 
-  <!-- =============== ENTREGAS DE HOY =============== -->
-  <section class="bg-white rounded-2xl shadow p-4">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-lg font-semibold">Entregas de hoy</h2>
-      <p class="text-xs text-slate-500">
-        Solo se muestran órdenes con fecha de entrega de hoy y aún pendientes de impresión.
-      </p>
+  <!-- Entregas en rango -->
+  <section class="space-y-3">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-slate-100">Entregas en rango (<%= (entregasRango || []).length %>)</h2>
+      <p class="text-xs text-slate-400">Pendientes de impresión: se muestran aunque no estén “Entregado”.</p>
     </div>
 
-    <div class="overflow-x-auto">
-      <table class="min-w-full text-sm">
-        <thead class="bg-slate-50 text-slate-600">
-          <tr>
-            <th class="px-3 py-2 text-left">Tipo</th>
-            <th class="px-3 py-2 text-left">Nombre / Institución</th>
-            <th class="px-3 py-2 text-left">Detalle</th>
-            <th class="px-3 py-2 text-left">Fecha toma</th>
-            <th class="px-3 py-2 text-left">Fecha entrega</th>
-            <th class="px-3 py-2 text-center">Urgencia</th>
-            <th class="px-3 py-2 text-center">Impresos</th>
-            <th class="px-3 py-2 text-center">Acciones</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          <% if (!entregasHoy || entregasHoy.length === 0) { %>
-            <tr>
-              <td colspan="8" class="px-3 py-4 text-center text-slate-500">
-                No hay entregas pendientes para hoy.
-              </td>
-            </tr>
-          <% } else { %>
-            <% entregasHoy.forEach(o => {
-                 const esPersona = o._tipo === 'persona';
-                 const urg = o.urgencia || 'Normal';
-                 const impresos = !!o.impresos;
-            %>
-              <tr class="hover:bg-slate-50">
-                <!-- Tipo -->
-                <td class="px-3 py-2">
-                  <% if (esPersona) { %>
-                    <span class="inline-flex px-2 py-1 rounded-full text-[11px] bg-emerald-600 text-white font-semibold">
-  Persona
-</span>
-                  <% } else { %>
-                    <span class="inline-flex px-2 py-1 rounded-full text-[11px] bg-sky-600 text-white font-semibold">
-  Institución
-</span>
-                  <% } %>
-                </td>
+    <div class="grid md:grid-cols-2 gap-4">
+      <% (entregasRango || []).forEach(o => { %>
+        <div class="bg-slate-900/60 border border-slate-700 rounded-2xl p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div class="text-sm text-slate-200">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px]
+                <%= o._tipo === 'persona'
+                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20'
+                  : 'bg-sky-500/15 text-sky-300 border border-sky-500/20' %>">
+                <%= o._tipo === 'persona' ? 'Persona' : 'Institución' %>
+              </span>
+              <span class="ml-2 text-slate-400 text-xs">ID <%= o.id %></span>
+            </div>
 
-                <!-- Nombre / Institución -->
-                <td class="px-3 py-2">
-                  <%= esPersona ? (o.nombre || '') : (o.institucion || '') %>
-                </td>
+            <div class="flex items-center gap-2">
+              <% if (o.editado) { %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">
+                  Editado
+                </span>
+              <% } %>
+              <% if (o.impresos) { %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-rose-500/15 text-rose-300 border border-rose-500/20">
+                  Impreso
+                </span>
+              <% } %>
+            </div>
+          </div>
 
-                <!-- Detalle -->
-                <td class="px-3 py-2">
-                  <% if (esPersona) { %>
-                    Orden: <%= o.numero_orden || '' %> · Toma: <%= o.numero_toma || '' %>
-                  <% } else { %>
-                    <%= o.seccion || '' %> · Paquete: <%= o.paquete || '' %>
-                  <% } %>
-                </td>
+          <div class="mt-3 text-sm text-slate-100 font-semibold">
+            <%= o._tipo === 'persona' ? (o.nombre || '-') : (o.institucion || '-') %>
+          </div>
 
-                <!-- Fechas -->
-                <td class="px-3 py-2"><%= fechaCorta(o.fecha_toma) %></td>
-                <td class="px-3 py-2"><%= fechaCorta(o.fecha_entrega) %></td>
+          <div class="mt-2 text-xs text-slate-300 space-y-1">
+            <div><span class="text-slate-400">Detalle:</span>
+              <% if (o._tipo === 'persona') { %>
+                Orden: <%= (o.numero_orden || '-') %> · Toma: <%= (o.numero_toma || '-') %>
+              <% } else { %>
+                <%= (o.paquete || '-') %> · <%= (o.seccion || '-') %>
+              <% } %>
+            </div>
 
-                <!-- Urgencia -->
-                <td class="px-3 py-2 text-center">
-                  <% if (urg === 'Urgente' || urg === 'Muy urgente') { %>
-                    <span class="inline-flex px-2 py-1 rounded-full text-[11px] bg-red-100 text-red-700 font-semibold">
-                      <%= urg %>
-                    </span>
-                  <% } else { %>
-                    <span class="inline-flex px-2 py-1 rounded-full text-[11px] bg-slate-100 text-slate-700">
-                      <%= urg %>
-                    </span>
-                  <% } %>
-                </td>
+            <div>
+  <span class="text-slate-400">Entrega:</span>
+  <%= formatDate(o.fecha_entrega) %>
+</div>
 
-                <!-- Impresos -->
-                <td class="px-3 py-2 text-center">
-                  <% if (impresos) { %>
-                    <span class="inline-flex px-3 py-1 rounded-full text-[11px] bg-emerald-500 text-white font-semibold">
-                      Impresos
-                    </span>
-                  <% } else { %>
-                    <span class="inline-flex px-3 py-1 rounded-full text-[11px] bg-amber-400 text-slate-900 font-semibold">
-                      Pendiente
-                    </span>
-                  <% } %>
-                </td>
 
-                <!-- Acciones -->
-                <td class="px-3 py-2 text-center">
-                  <% if (!impresos) { %>
-                    <form
-                      method="POST"
-                      action="/admin/editor/impresos"
-                      onsubmit="return confirm('¿Marcar esta orden como IMPRESOS?');"
-                      class="inline">
-                      <input type="hidden" name="id" value="<%= o.id %>">
-                      <input type="hidden" name="tipo" value="<%= esPersona ? 'persona' : 'institucion' %>">
-                      <button
-                        type="submit"
-                        class="px-3 py-1.5 rounded-full text-xs bg-emerald-600 text-white hover:bg-emerald-700">
-                        Marcar como impresos
-                      </button>
-                    </form>
-                  <% } else { %>
-                    <span class="text-xs text-slate-400">Ya marcado</span>
-                  <% } %>
-                </td>
-              </tr>
-            <% }) %>
-          <% } %>
-        </tbody>
-      </table>
+            <% if (o._tipo === 'persona') { %>
+              <div><span class="text-slate-400">Evento:</span> <%= (o.evento || '-') %></div>
+              <div><span class="text-slate-400">Atendido por:</span> <%= (o.atendido_por || '-') %></div>
+            <% } %>
+
+            <div class="flex items-center gap-2 mt-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px]
+                <%= (o.urgencia === 'Urgente' || o.urgencia === 'Muy urgente')
+                  ? 'bg-rose-500/15 text-rose-300 border border-rose-500/20'
+                  : 'bg-slate-500/15 text-slate-300 border border-slate-500/20' %>">
+                <%= o.urgencia || 'Normal' %>
+              </span>
+
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px]
+                <%= o.impresos ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20'
+                               : 'bg-amber-500/15 text-amber-300 border border-amber-500/20' %>">
+                <%= o.impresos ? 'Impreso' : 'Pendiente' %>
+              </span>
+            </div>
+          </div>
+
+          <!-- Acciones (orden: Editar -> Imprimir -> Marcar editado -> Marcar impreso -> Ver) -->
+          <div class="mt-4 flex flex-wrap gap-2">
+            <% const editUrl = (o._tipo === 'persona')
+              ? `/admin/ordenes/persona/${o.id}/editar`
+              : `/admin/ordenes/institucion/${o.id}/editar`; %>
+
+            <% const verUrl = (o._tipo === 'persona')
+              ? `/admin/ordenes/persona/${o.id}`
+              : `/admin/ordenes/institucion/${o.id}`; %>
+
+            <% const imprimirUrl = (o._tipo === 'persona')
+              ? `/admin/ordenes/persona/${o.id}/ticket`
+              : `/admin/ordenes/institucion/${o.id}/ticket`; %>
+
+            <a href="<%= editUrl %>" class="px-4 py-2 rounded-full bg-slate-800 text-slate-100 text-sm hover:bg-slate-700">
+              ✏️ Editar
+            </a>
+
+            <a href="<%= imprimirUrl %>" target="_blank" class="px-4 py-2 rounded-full bg-indigo-600/90 text-white text-sm hover:bg-indigo-500">
+              🧾 Imprimir
+            </a>
+
+            <form method="POST" action="/admin/editor/<%= o._tipo %>/<%= o.id %>/editado">
+              <input type="hidden" name="returnTo" value="<%= currentUrl %>">
+              <button type="submit" class="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm hover:bg-emerald-500">
+                ✅ Marcar editado
+              </button>
+            </form>
+
+            <form method="POST" action="/admin/editor/<%= o._tipo %>/<%= o.id %>/impreso">
+              <input type="hidden" name="returnTo" value="<%= currentUrl %>">
+              <button type="submit" class="px-4 py-2 rounded-full bg-rose-600 text-white text-sm hover:bg-rose-500">
+                🖨️ Marcar impreso
+              </button>
+            </form>
+
+            <a href="<%= verUrl %>" class="px-4 py-2 rounded-full bg-slate-950/60 border border-slate-700 text-slate-100 text-sm hover:bg-slate-800">
+              👁️ Ver
+            </a>
+          </div>
+        </div>
+      <% }) %>
     </div>
+
+    <% if (!entregasRango || entregasRango.length === 0) { %>
+      <div class="text-sm text-slate-400">No hay entregas en el rango.</div>
+    <% } %>
   </section>
 
-  <!-- =============== ÓRDENES URGENTES =============== -->
-  <section class="bg-white rounded-2xl shadow p-4">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-lg font-semibold">Órdenes urgentes / muy urgentes</h2>
-      <p class="text-xs text-slate-500">
-        Todas las órdenes urgentes pendientes, aunque su entrega no sea hoy.
-      </p>
+  <!-- Urgentes -->
+  <section class="space-y-3 pt-2">
+    <h2 class="text-lg font-semibold text-slate-100">Urgentes / Muy urgentes (<%= (urgentes || []).length %>)</h2>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <% (urgentes || []).forEach(o => { %>
+        <div class="bg-slate-900/40 border border-slate-700 rounded-2xl p-4">
+          <div class="flex items-center justify-between">
+            <div class="text-sm text-slate-200">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px]
+                <%= o._tipo === 'persona'
+                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20'
+                  : 'bg-sky-500/15 text-sky-300 border border-sky-500/20' %>">
+                <%= o._tipo === 'persona' ? 'Persona' : 'Institución' %>
+              </span>
+              <span class="ml-2 text-slate-400 text-xs">ID <%= o.id %></span>
+            </div>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-rose-500/15 text-rose-300 border border-rose-500/20">
+              <%= o.urgencia || 'Urgente' %>
+            </span>
+          </div>
+
+          <div class="mt-3 text-sm text-slate-100 font-semibold">
+            <%= o._tipo === 'persona' ? (o.nombre || '-') : (o.institucion || '-') %>
+          </div>
+
+          <div class="mt-2 text-xs text-slate-300">
+            <div><span class="text-slate-400">Entrega:</span> <%= (o.fecha_entrega || '-') %></div>
+          </div>
+        </div>
+      <% }) %>
     </div>
 
-    <div class="overflow-x-auto">
-      <table class="min-w-full text-sm">
-        <thead class="bg-slate-50 text-slate-600">
-          <tr>
-            <th class="px-3 py-2 text-left">Tipo</th>
-            <th class="px-3 py-2 text-left">Nombre / Institución</th>
-            <th class="px-3 py-2 text-left">Detalle</th>
-            <th class="px-3 py-2 text-left">Fecha toma</th>
-            <th class="px-3 py-2 text-left">Fecha entrega</th>
-            <th class="px-3 py-2 text-center">Urgencia</th>
-            <th class="px-3 py-2 text-center">Impresos</th>
-            <th class="px-3 py-2 text-center">Acciones</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          <% if (!urgentes || urgentes.length === 0) { %>
-            <tr>
-              <td colspan="8" class="px-3 py-4 text-center text-slate-500">
-                No hay órdenes urgentes pendientes.
-              </td>
-            </tr>
-          <% } else { %>
-            <% urgentes.forEach(o => {
-                 const esPersona = o._tipo === 'persona';
-                 const urg = o.urgencia || 'Normal';
-                 const impresos = !!o.impresos;
-            %>
-              <tr class="hover:bg-slate-50">
-                <!-- Tipo -->
-                <td class="px-3 py-2">
-                  <% if (esPersona) { %>
-                    <span class="inline-flex px-2 py-1 rounded-full text-[11px] bg-emerald-600 text-white font-semibold">
-  Persona
-</span>
-                  <% } else { %>
-                    <span class="inline-flex px-2 py-1 rounded-full text-[11px] bg-sky-600 text-white font-semibold">
-  Institución
-</span>
-                  <% } %>
-                </td>
-
-                <!-- Nombre / Institución -->
-                <td class="px-3 py-2">
-                  <%= esPersona ? (o.nombre || '') : (o.institucion || '') %>
-                </td>
-
-                <!-- Detalle -->
-                <td class="px-3 py-2">
-                  <% if (esPersona) { %>
-                    Orden: <%= o.numero_orden || '' %> · Toma: <%= o.numero_toma || '' %>
-                  <% } else { %>
-                    <%= o.seccion || '' %> · Paquete: <%= o.paquete || '' %>
-                  <% } %>
-                </td>
-
-                <!-- Fechas -->
-                <td class="px-3 py-2"><%= fechaCorta(o.fecha_toma) %></td>
-                <td class="px-3 py-2"><%= fechaCorta(o.fecha_entrega) %></td>
-
-                <!-- Urgencia -->
-                <td class="px-3 py-2 text-center">
-                  <span class="inline-flex px-2 py-1 rounded-full text-[11px] bg-red-100 text-red-700 font-semibold">
-                    <%= urg %>
-                  </span>
-                </td>
-
-                <!-- Impresos -->
-                <td class="px-3 py-2 text-center">
-                  <% if (impresos) { %>
-                    <span class="inline-flex px-3 py-1 rounded-full text-[11px] bg-emerald-500 text-white font-semibold">
-                      Impresos
-                    </span>
-                  <% } else { %>
-                    <span class="inline-flex px-3 py-1 rounded-full text-[11px] bg-amber-400 text-slate-900 font-semibold">
-                      Pendiente
-                    </span>
-                  <% } %>
-                </td>
-
-                <!-- Acciones -->
-                <td class="px-3 py-2 text-center">
-                  <% if (!impresos) { %>
-                    <form
-                      method="POST"
-                      action="/admin/editor/impresos"
-                      onsubmit="return confirm('¿Marcar esta orden como IMPRESOS?');"
-                      class="inline">
-                      <input type="hidden" name="id" value="<%= o.id %>">
-                      <input type="hidden" name="tipo" value="<%= esPersona ? 'persona' : 'institucion' %>">
-                      <button
-                        type="submit"
-                        class="px-3 py-1.5 rounded-full text-xs bg-emerald-600 text-white hover:bg-emerald-700">
-                        Marcar como impresos
-                      </button>
-                    </form>
-                  <% } else { %>
-                    <span class="text-xs text-slate-400">Ya marcado</span>
-                  <% } %>
-                </td>
-              </tr>
-            <% }) %>
-          <% } %>
-        </tbody>
-      </table>
-    </div>
+    <% if (!urgentes || urgentes.length === 0) { %>
+      <div class="text-sm text-slate-400">No hay urgentes pendientes.</div>
+    <% } %>
   </section>
+
 </main>
 
 <%- include('_foot') %>
