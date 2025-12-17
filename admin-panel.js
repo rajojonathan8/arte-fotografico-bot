@@ -468,20 +468,26 @@ function mountAdmin(app) {
     const limiteISO = limite.toISOString().slice(0, 10);
 
     // Personas pendientes
-    const pendientesPersonas = await dbSelect(`
-      SELECT id, nombre, precio, abono, fecha_entrega, urgencia, entrega
-      FROM ordenes_personas
-      WHERE fecha_entrega IS NOT NULL
-        AND (entrega IS NULL OR entrega <> 'Entregado')
-    `);
+   // Personas pendientes
+const pendientesPersonas = await dbSelect(`
+  SELECT id, nombre, precio, abono, fecha_entrega, urgencia, entrega,
+         editado, editado_at,
+         impresos, impreso_at
+  FROM ordenes_personas
+  WHERE fecha_entrega IS NOT NULL
+    AND (entrega IS NULL OR entrega <> 'Entregado')
+`);
 
-    // Instituciones pendientes
-    const pendientesInst = await dbSelect(`
-      SELECT id, institucion, precio, abono, fecha_entrega, urgencia, entrega
-      FROM ordenes_instituciones
-      WHERE fecha_entrega IS NOT NULL
-        AND (entrega IS NULL OR entrega <> 'Entregado')
-    `);
+// Instituciones pendientes
+const pendientesInst = await dbSelect(`
+  SELECT id, institucion, precio, abono, fecha_entrega, urgencia, entrega,
+         editado, editado_at,
+         impresos, impreso_at
+  FROM ordenes_instituciones
+  WHERE fecha_entrega IS NOT NULL
+    AND (entrega IS NULL OR entrega <> 'Entregado')
+`);
+
 
     // Unir todo en un solo arreglo con un campo _tipo
     const todasPendientes = [
