@@ -6,6 +6,7 @@ const fs = require('fs');
 const multer = require('multer');
 const Tesseract = require('tesseract.js');
 const sharp = require('sharp');
+const QRCode = require('qrcode');
 
 // ============================================================================
 // RUTAS Y HELPERS COMPARTIDOS (data/…)
@@ -1726,6 +1727,14 @@ router.get(
       const abono = Number(orden.abono || 0);
       const saldo = Math.max(precio - abono, 0);
       const pagoEstado = derivePagoEstado(orden);
+      const baseUrl = (process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+const entregarUrl = `${baseUrl}/admin/entregar/persona/${id}`;
+
+// Generar QR como DataURL (imagen en base64)
+const qrDataUrl = await QRCode.toDataURL(entregarUrl, {
+  margin: 1,
+  width: 180,
+});
 
       // 👇 NUEVO: leer desglose de productos/servicios
       const detalles = await dbSelect(
@@ -1748,6 +1757,8 @@ router.get(
         saldo,
         pagoEstado,
         detalles,   // 👈 ahora sí llega al EJS con data real
+        qrDataUrl,
+        entregarUrl,
       });
     } catch (e) {
       console.error('❌ Error ticket persona:', e);
@@ -1755,6 +1766,29 @@ router.get(
     }
   });
 
+// ---------------------------------------------------------------------------
+// MARCAR ENTREGADO (QR) — PERSONA
+// ---------------------------------------------------------------------------
+router.get('/entregar/persona/:id', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id || id <= 0) return res.status(400).send('ID inválido');
+
+  try {
+    await dbExec(
+      `UPDATE ordenes_personas
+       SET entrega = 'Entregado',
+           updated_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
+
+    // Redirige al detalle para ver el cambio de una
+    return res.redirect(`/admin/ordenes/persona/${id}`);
+  } catch (err) {
+    console.error('❌ Error marcando entregado (persona):', err);
+    return res.status(500).send('Error interno');
+  }
+});
 
 
   // ---------------------------------------------------------------------------
