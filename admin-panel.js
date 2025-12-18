@@ -1774,21 +1774,21 @@ router.get('/entregar/persona/:id', requireAuth, async (req, res) => {
   if (!id || id <= 0) return res.status(400).send('ID inválido');
 
   try {
-    await dbExec(
+    // OJO: no dependamos de updated_at por si algo raro
+    const r = await dbExec(
       `UPDATE ordenes_personas
-       SET entrega = 'Entregado',
-           updated_at = NOW()
+       SET entrega = 'Entregado'
        WHERE id = $1`,
       [id]
     );
 
-    // Redirige al detalle para ver el cambio de una
     return res.redirect(`/admin/ordenes/persona/${id}`);
   } catch (err) {
     console.error('❌ Error marcando entregado (persona):', err);
-    return res.status(500).send('Error interno');
+    return res.status(500).send(`Error interno: ${err.message || err}`);
   }
 });
+
 
 
   // ---------------------------------------------------------------------------
