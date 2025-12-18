@@ -8,6 +8,7 @@ const Tesseract = require('tesseract.js');
 const sharp = require('sharp');
 const crypto = require('crypto');
 const QRCode = require('qrcode');
+const qrUrl = `${process.env.BASE_URL}/admin/ordenes/persona/${id}/entregar`;
 
 
 function getEntregaSecret() {
@@ -1799,6 +1800,68 @@ router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// MARCAR ORDEN PERSONA COMO ENTREGADA (VÍA QR)
+// ---------------------------------------------------------------------------
+router.get('/ordenes/persona/:id/entregar', async (req, res) => {
+  const id = Number(req.params.id);
+
+  if (!id || id <= 0) {
+    return res.status(400).send('ID inválido');
+  }
+
+  try {
+    await dbExec(
+      `
+      UPDATE ordenes_personas
+      SET entrega = 'Entregado',
+          updated_at = NOW()
+      WHERE id = $1
+      `,
+      [id]
+    );
+
+    // Página simple de confirmación (mobile friendly)
+    res.send(`
+      <html>
+        <head>
+          <title>Entrega confirmada</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <style>
+            body {
+              font-family: system-ui, sans-serif;
+              background: #0f172a;
+              color: #e5e7eb;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              margin: 0;
+            }
+            .box {
+              background: #020617;
+              padding: 24px;
+              border-radius: 16px;
+              text-align: center;
+              box-shadow: 0 10px 30px rgba(0,0,0,.5);
+            }
+            h1 { color: #22c55e; }
+          </style>
+        </head>
+        <body>
+          <div class="box">
+            <h1>✅ Entrega confirmada</h1>
+            <p>La orden fue marcada como <strong>ENTREGADA</strong>.</p>
+            <p>Puedes cerrar esta ventana.</p>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('❌ Error al marcar entrega por QR:', err);
+    res.status(500).send('Error interno');
+  }
+});
 
 
 
