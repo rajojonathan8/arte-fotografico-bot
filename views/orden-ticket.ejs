@@ -410,6 +410,14 @@
           <img src="/admin-public/qr-code.png" alt="Arte Fotográfico">
         </div>
       </div>
+      <% if (typeof qrDataUrl !== 'undefined' && qrDataUrl) { %>
+  <div style="margin-top:10px; text-align:center;">
+    <div style="font-size:12px; font-weight:bold;">Marcar como ENTREGADO</div>
+    <img src="<%= qrDataUrl %>" alt="QR Entregado" style="width:160px; height:160px; margin:6px auto;" />
+    <div style="font-size:10px; color:#444;">Escanee para marcar entrega.</div>
+  </div>
+<% } %>
+
 
     </div>
     <div class="separator"></div>

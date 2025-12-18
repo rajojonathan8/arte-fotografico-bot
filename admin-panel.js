@@ -6,6 +6,33 @@ const fs = require('fs');
 const multer = require('multer');
 const Tesseract = require('tesseract.js');
 const sharp = require('sharp');
+const crypto = require('crypto');
+const QRCode = require('qrcode');
+
+
+function getEntregaSecret() {
+  // poné un secret en tu .env (PASO 3). Si no existe, igual funciona,
+  // pero es mejor que exista.
+  return process.env.ENTREGA_QR_SECRET || 'cambia-este-secret-en-env';
+}
+
+function signEntregaToken({ tipo, id }) {
+  const payload = `${tipo}:${id}`;
+  return crypto
+    .createHmac('sha256', getEntregaSecret())
+    .update(payload)
+    .digest('hex');
+}
+
+function verifyEntregaToken({ tipo, id, token }) {
+  if (!token) return false;
+  const expected = signEntregaToken({ tipo, id });
+  // timingSafeEqual para comparar seguro
+  return crypto.timingSafeEqual(
+    Buffer.from(token, 'utf8'),
+    Buffer.from(expected, 'utf8')
+  );
+}
 
 // ============================================================================
 // RUTAS Y HELPERS COMPARTIDOS (data/…)
@@ -1706,54 +1733,72 @@ router.get(
     }
   );
 
-    // ---------------------------------------------------------------------------
-  // TICKET 80 mm — PERSONA
-  // ---------------------------------------------------------------------------
-  router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
-    const id = Number(req.params.id);
+ // ---------------------------------------------------------------------------
+// TICKET 80 mm — PERSONA
+// ---------------------------------------------------------------------------
+router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
 
-    try {
-      const rows = await dbSelect(
-        'SELECT * FROM ordenes_personas WHERE id = $1',
-        [id]
-      );
-      if (!rows.length) {
-        return res.redirect('/admin/ordenes?tab=personas');
-      }
-
-      const orden = rows[0];
-      const precio = Number(orden.precio || 0);
-      const abono = Number(orden.abono || 0);
-      const saldo = Math.max(precio - abono, 0);
-      const pagoEstado = derivePagoEstado(orden);
-
-      // 👇 NUEVO: leer desglose de productos/servicios
-      const detalles = await dbSelect(
-        `
-        SELECT descripcion, cantidad, precio_unitario, subtotal
-        FROM ordenes_personas_detalle
-        WHERE orden_persona_id = $1
-        ORDER BY id ASC
-        `,
-        [id]
-      );
-
-      res.render('orden-ticket.ejs', {
-        title: 'Ticket — persona',
-        tipo: 'persona',
-        idx: id,
-        orden,
-        precio,
-        abono,
-        saldo,
-        pagoEstado,
-        detalles,   // 👈 ahora sí llega al EJS con data real
-      });
-    } catch (e) {
-      console.error('❌ Error ticket persona:', e);
-      res.redirect('/admin/ordenes?tab=personas');
+  try {
+    const rows = await dbSelect(
+      'SELECT * FROM ordenes_personas WHERE id = $1',
+      [id]
+    );
+    if (!rows.length) {
+      return res.redirect('/admin/ordenes?tab=personas');
     }
-  });
+
+    const orden = rows[0];
+    const precio = Number(orden.precio || 0);
+    const abono = Number(orden.abono || 0);
+    const saldo = Math.max(precio - abono, 0);
+    const pagoEstado = derivePagoEstado(orden);
+
+    // 👇 leer desglose de productos/servicios
+    const detalles = await dbSelect(
+      `
+      SELECT descripcion, cantidad, precio_unitario, subtotal
+      FROM ordenes_personas_detalle
+      WHERE orden_persona_id = $1
+      ORDER BY id ASC
+      `,
+      [id]
+    );
+
+    // ✅ QR: link seguro para marcar ENTREGADO
+    const token = signEntregaToken({ tipo: 'persona', id });
+
+    // baseUrl correcto (Render detrás de proxy)
+    const proto = (req.headers['x-forwarded-proto'] || req.protocol);
+    const host  = req.headers['x-forwarded-host'] || req.get('host');
+    const baseUrl = `${proto}://${host}`;
+
+    const qrUrl = `${baseUrl}/admin/entrega/persona/${id}?t=${token}`;
+
+    // Generar imagen QR (dataURL)
+    const qrDataUrl = await QRCode.toDataURL(qrUrl, { margin: 0, width: 180 });
+
+    res.render('orden-ticket.ejs', {
+      title: 'Ticket — persona',
+      tipo: 'persona',
+      idx: id,
+      orden,
+      precio,
+      abono,
+      saldo,
+      pagoEstado,
+      detalles,
+
+      // ✅ nuevos para el ticket
+      qrUrl,
+      qrDataUrl,
+    });
+  } catch (e) {
+    console.error('❌ Error ticket persona:', e);
+    res.redirect('/admin/ordenes?tab=personas');
+  }
+});
+
 
 
 
@@ -2349,6 +2394,39 @@ router.post(
     }
   );
 
+// ---------------------------------------------------------------------------
+// ✅ MARCAR ENTREGA DESDE QR (PERSONA) — requiere login
+// URL: /admin/entrega/persona/:id?t=TOKEN
+// ---------------------------------------------------------------------------
+router.get('/entrega/persona/:id', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const token = (req.query.t || '').toString();
+
+  if (!id || id <= 0) return res.redirect('/admin/ordenes?tab=personas');
+
+  const ok = verifyEntregaToken({ tipo: 'persona', id, token });
+  if (!ok) {
+    return res.status(403).send('Token inválido o vencido.');
+  }
+
+  try {
+    await dbExec(
+      `
+      UPDATE ordenes_personas
+      SET entrega = 'Entregado',
+          updated_at = NOW()
+      WHERE id = $1
+      `,
+      [id]
+    );
+
+    // Te mando al detalle (o al editor si prefieres)
+    return res.redirect(`/admin/ordenes/persona/${id}`);
+  } catch (e) {
+    console.error('❌ Error marcando entrega por QR (persona):', e);
+    return res.status(500).send('Error interno');
+  }
+});
 
 // ---------------------------------------------------------------------------
 // PANEL DEL EDITOR (solo entregas de hoy + urgentes)
