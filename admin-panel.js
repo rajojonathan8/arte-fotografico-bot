@@ -7,7 +7,7 @@ const multer = require('multer');
 const Tesseract = require('tesseract.js');
 const sharp = require('sharp');
 const QRCode = require('qrcode');
-const crypto = require('crypto');
+
 
 // ============================================================================
 // RUTAS Y HELPERS COMPARTIDOS (data/…)
@@ -338,6 +338,78 @@ function mountAdmin(app) {
     if (req.session && req.session.isAdmin) return next();
     return res.redirect('/admin/login');
   }
+function getBaseUrl(req) {
+  // 1) Preferimos BASE_URL (Render)
+  const env = (process.env.BASE_URL || '').trim();
+  if (env) return env.replace(/\/$/, '');
+
+  // 2) Fallback: lo armamos del request
+  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const host = req.get('host');
+  return `${proto}://${host}`;
+}
+router.get('/entrega/persona/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id || id <= 0) return res.status(400).send('ID inválido');
+
+  // solo mostramos una pantalla simple (sin requireAuth)
+  return res.render('entrega-pin.ejs', {
+    title: 'Confirmar entrega',
+    tipo: 'persona',
+    id,
+    error: null,
+    ok: false,
+  });
+});
+router.post(
+  '/entrega/persona/:id',
+  express.urlencoded({ extended: true }),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const pin = (req.body.pin || '').trim();
+
+    if (!id || id <= 0) {
+      return res.status(400).send('ID inválido');
+    }
+
+    const ENTREGA_PIN = (process.env.ENTREGA_PIN || '').trim();
+    if (!ENTREGA_PIN) {
+      return res.status(500).send('Falta configurar ENTREGA_PIN');
+    }
+
+    if (pin !== ENTREGA_PIN) {
+      return res.render('entrega-pin.ejs', {
+        title: 'Confirmar entrega',
+        tipo: 'persona',
+        id,
+        error: 'PIN incorrecto',
+        ok: false,
+      });
+    }
+
+    try {
+      await dbExec(
+        `UPDATE ordenes_personas
+         SET entrega = 'Entregado',
+             impreso_at = COALESCE(impreso_at, NOW()),
+             updated_at = NOW()
+         WHERE id = $1`,
+        [id]
+      );
+
+      return res.render('entrega-pin.ejs', {
+        title: 'Confirmar entrega',
+        tipo: 'persona',
+        id,
+        error: null,
+        ok: true,
+      });
+    } catch (e) {
+      console.error('❌ Error marcando entregado:', e);
+      return res.status(500).send('Error interno');
+    }
+  }
+);
 
   // ---------------------------------------------------------------------------
   // LOGIN
@@ -1747,9 +1819,15 @@ const qrDataUrl = await QRCode.toDataURL(entregarUrl, {
         `,
         [id]
       );
-      // ✅ QR para confirmar entrega (NO entrega automático)
-const entregaUrl = computeEntregaUrl(req, 'persona', id);
-const qrEntregaDataUrl = await QRCode.toDataURL(entregaUrl, { margin: 1, scale: 6 });
+      const entregaUrl = `${getBaseUrl(req)}/admin/entrega/persona/${id}`;
+
+let qrEntregaDataUrl = '';
+try {
+  qrEntregaDataUrl = await QRCode.toDataURL(entregaUrl, { margin: 1, width: 220 });
+} catch (e) {
+  console.error('❌ Error generando QR:', e);
+  qrEntregaDataUrl = '';
+}
 
       res.render('orden-ticket.ejs', {
         title: 'Ticket — persona',
@@ -1761,132 +1839,14 @@ const qrEntregaDataUrl = await QRCode.toDataURL(entregaUrl, { margin: 1, scale: 
         saldo,
         pagoEstado,
         detalles,   // 👈 ahora sí llega al EJS con data real
-        qrDataUrl,
-        entregarUrl,
-        entregaUrl,
-        qrEntregaDataUrl,
-
+         entregaUrl,
+  qrEntregaDataUrl,
       });
     } catch (e) {
       console.error('❌ Error ticket persona:', e);
       res.redirect('/admin/ordenes?tab=personas');
     }
   });
-
-  // ---------------------------------------------------------------------------
-// CONFIRMAR ENTREGA POR QR (PUBLICO + PIN)
-// ---------------------------------------------------------------------------
-router.get('/entrega/:tipo/:id', async (req, res) => {
-  const tipo = (req.params.tipo || '').trim(); // 'persona' | 'institucion'
-  const id = Number(req.params.id);
-  const token = (req.query.token || '').trim();
-
-  if (!['persona', 'institucion'].includes(tipo) || !id || id <= 0) {
-    return res.status(400).send('Link inválido');
-  }
-
-  const v = verifyEntregaToken(token, { tipo, id });
-  if (!v.ok) {
-    return res.status(400).send(`Link inválido: ${v.reason}`);
-  }
-
-  try {
-    const table = (tipo === 'persona') ? 'ordenes_personas' : 'ordenes_instituciones';
-    const rows = await dbSelect(`SELECT id, entrega, fecha_entrega, nombre, institucion FROM ${table} WHERE id = $1`, [id]);
-    if (!rows.length) return res.status(404).send('Orden no encontrada');
-
-    const orden = rows[0];
-
-    // si ya está entregado, mostramos pantalla informativa
-    const yaEntregado = (orden.entrega === 'Entregado');
-
-    res.render('entrega-confirm', {
-      title: 'Confirmar entrega',
-      tipo,
-      id,
-      token,
-      orden,
-      yaEntregado,
-      error: '',
-      ok: '',
-    });
-  } catch (e) {
-    console.error('❌ Error GET confirmar entrega:', e);
-    res.status(500).send('Error interno');
-  }
-});
-
-router.post('/entrega/:tipo/:id', express.urlencoded({ extended: true }), async (req, res) => {
-  const tipo = (req.params.tipo || '').trim();
-  const id = Number(req.params.id);
-  const token = (req.query.token || '').trim();
-  const pin = String((req.body?.pin || '')).trim();
-
-  if (!['persona', 'institucion'].includes(tipo) || !id || id <= 0) {
-    return res.status(400).send('Link inválido');
-  }
-
-  const v = verifyEntregaToken(token, { tipo, id });
-  if (!v.ok) {
-    return res.status(400).send(`Link inválido: ${v.reason}`);
-  }
-
-  try {
-    const table = (tipo === 'persona') ? 'ordenes_personas' : 'ordenes_instituciones';
-
-    const rows = await dbSelect(`SELECT id, entrega, fecha_entrega, nombre, institucion FROM ${table} WHERE id = $1`, [id]);
-    if (!rows.length) return res.status(404).send('Orden no encontrada');
-    const orden = rows[0];
-
-    // validar PIN
-    const EMP_PIN = String(process.env.EMPLOYEE_PIN || '').trim();
-    if (!EMP_PIN) {
-      return res.status(500).send('Falta configurar EMPLOYEE_PIN');
-    }
-
-    if (pin !== EMP_PIN) {
-      return res.render('entrega-confirm', {
-        title: 'Confirmar entrega',
-        tipo,
-        id,
-        token,
-        orden,
-        yaEntregado: (orden.entrega === 'Entregado'),
-        error: 'PIN incorrecto. Intenta de nuevo.',
-        ok: '',
-      });
-    }
-
-    // Si ya está entregado, no hacemos nada
-    if (orden.entrega !== 'Entregado') {
-      await dbExec(
-        `UPDATE ${table}
-         SET entrega = 'Entregado',
-             updated_at = NOW()
-         WHERE id = $1`,
-        [id]
-      );
-    }
-
-    // recargar orden para mostrar estado final
-    const rows2 = await dbSelect(`SELECT id, entrega, fecha_entrega, nombre, institucion FROM ${table} WHERE id = $1`, [id]);
-    const orden2 = rows2[0];
-
-    return res.render('entrega-confirm', {
-      title: 'Confirmar entrega',
-      tipo,
-      id,
-      token,
-      orden: orden2,
-      yaEntregado: true,
-      error: '',
-      ok: '✅ Entrega marcada como ENTREGADA.',
-    });
-  } catch (e) {
-    console.error('❌ Error POST confirmar entrega:', e);
-    res.status(500).send('Error interno');
-  }
-});
 
 // ---------------------------------------------------------------------------
 // MARCAR ENTREGADO (QR) — PERSONA
@@ -2505,54 +2465,6 @@ router.post(
     }
   );
 
-// ===================== QR ENTREGA (SEGURO) =====================
-function getBaseUrl(req) {
-  // Preferimos variable fija (Render), si no existe usamos el host actual
-  const envBase = (process.env.PUBLIC_BASE_URL || '').trim();
-  if (envBase) return envBase.replace(/\/+$/, '');
-  return `${req.protocol}://${req.get('host')}`;
-}
-
-function signEntregaToken({ tipo, id, exp }) {
-  const secret = process.env.QR_SECRET || 'dev-secret';
-  const payload = `${tipo}|${id}|${exp}`;
-  const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-  return Buffer.from(`${payload}|${sig}`).toString('base64url');
-}
-
-function verifyEntregaToken(token, { tipo, id }) {
-  try {
-    const raw = Buffer.from(token, 'base64url').toString('utf8');
-    const parts = raw.split('|');
-    if (parts.length !== 4) return { ok: false, reason: 'Formato inválido' };
-
-    const [tTipo, tId, tExp, tSig] = parts;
-    if (tTipo !== tipo) return { ok: false, reason: 'Tipo no coincide' };
-    if (String(tId) !== String(id)) return { ok: false, reason: 'ID no coincide' };
-
-    const exp = Number(tExp);
-    if (!exp || Date.now() > exp) return { ok: false, reason: 'Token expirado' };
-
-    const secret = process.env.QR_SECRET || 'dev-secret';
-    const payload = `${tTipo}|${tId}|${tExp}`;
-    const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-
-    if (sig !== tSig) return { ok: false, reason: 'Firma inválida' };
-
-    return { ok: true, exp };
-  } catch (e) {
-    return { ok: false, reason: 'Token inválido' };
-  }
-}
-
-function computeEntregaUrl(req, tipo, id) {
-  const base = getBaseUrl(req);
-  // token válido por 8 días
-  const exp = Date.now() + (8 * 24 * 60 * 60 * 1000);
-  const token = signEntregaToken({ tipo, id, exp });
-  return `${base}/admin/entrega/${tipo}/${id}?token=${token}`;
-}
-// ===============================================================
 
 // ---------------------------------------------------------------------------
 // PANEL DEL EDITOR (solo entregas de hoy + urgentes)

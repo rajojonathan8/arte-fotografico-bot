@@ -1,0 +1,42 @@
+<%- include('_head', { title }) %>
+
+<main class="max-w-md mx-auto p-4">
+  <section class="bg-slate-900/70 border border-slate-700 rounded-2xl p-4 space-y-3">
+    <h1 class="text-lg font-semibold text-slate-100">Confirmar entrega</h1>
+
+    <% if (ok) { %>
+      <div class="p-3 rounded-xl bg-emerald-600/20 border border-emerald-700 text-emerald-200">
+        ✅ Entrega confirmada correctamente.
+      </div>
+    <% } else { %>
+      <p class="text-sm text-slate-300">
+        Para marcar como <b>Entregado</b>, ingresá el PIN de empleado.
+      </p>
+
+      <% if (error) { %>
+        <div class="p-3 rounded-xl bg-rose-600/20 border border-rose-700 text-rose-200">
+          <%= error %>
+        </div>
+      <% } %>
+
+      <form method="POST" action="/admin/entrega/persona/<%= id %>" class="space-y-3">
+        <input
+          type="password"
+          name="pin"
+          placeholder="PIN"
+          class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+          autofocus
+          required
+        />
+        <button
+          type="submit"
+          class="w-full px-4 py-2 rounded-full bg-emerald-600 text-white hover:bg-emerald-500"
+        >
+          Confirmar entrega
+        </button>
+      </form>
+    <% } %>
+  </section>
+</main>
+
+<%- include('_foot') %>
