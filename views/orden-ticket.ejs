@@ -411,12 +411,14 @@
         </div>
       </div>
       <% if (qrDataUrl) { %>
-  <hr style="border:none;border-top:1px dashed #999;margin:10px 0;" />
-  <div style="text-align:center;">
-    
-    <img src="<%= qrDataUrl %>" alt="QR Entregar" style="width:100px; margin-top:6px;" />
-   
-  </div>
+  <hr />
+<div style="text-align:center; margin-top:8px;">
+  <div style="font-size:12px; font-weight:700;">Confirmar entrega (empleado)</div>
+  <div style="font-size:10px;">Escanear y escribir PIN</div>
+  <img src="<%= qrEntregaDataUrl %>" style="width:160px; height:160px; margin:6px auto;" />
+</div>
+
+  
 <% } %>
 
     </div>

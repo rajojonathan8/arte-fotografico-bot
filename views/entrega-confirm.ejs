@@ -1,0 +1,64 @@
+<%- include('_head', { title }) %>
+
+<main class="max-w-xl mx-auto p-4">
+  <div class="bg-slate-900/70 border border-slate-700 rounded-2xl p-5 space-y-4">
+    <h1 class="text-xl font-semibold text-slate-100">Confirmar entrega</h1>
+
+    <div class="text-sm text-slate-300 space-y-1">
+      <div><span class="text-slate-400">Tipo:</span> <%= tipo %></div>
+      <div><span class="text-slate-400">ID:</span> <%= id %></div>
+      <% if (tipo === 'persona') { %>
+        <div><span class="text-slate-400">Cliente:</span> <%= orden?.nombre || '-' %></div>
+      <% } else { %>
+        <div><span class="text-slate-400">Institución:</span> <%= orden?.institucion || '-' %></div>
+      <% } %>
+      <div><span class="text-slate-400">Estado:</span> <%= orden?.entrega || 'Pendiente' %></div>
+    </div>
+
+    <% if (ok) { %>
+      <div class="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-sm">
+        <%= ok %>
+      </div>
+    <% } %>
+
+    <% if (error) { %>
+      <div class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-200 text-sm">
+        <%= error %>
+      </div>
+    <% } %>
+
+    <% if (yaEntregado) { %>
+      <div class="text-sm text-slate-300">
+        ✅ Esta orden ya está marcada como <strong>Entregada</strong>.
+      </div>
+    <% } else { %>
+      <form method="POST" action="/admin/entrega/<%= tipo %>/<%= id %>?token=<%= encodeURIComponent(token) %>" class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">
+            PIN de empleado
+          </label>
+          <input
+            type="password"
+            name="pin"
+            class="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+            placeholder="Ingresa el PIN"
+            autocomplete="off"
+            inputmode="numeric"
+          />
+          <p class="mt-1 text-[11px] text-slate-500">
+            Por seguridad, solo un empleado con PIN puede confirmar la entrega.
+          </p>
+        </div>
+
+        <button
+          type="submit"
+          class="w-full px-4 py-2 rounded-full bg-emerald-600 text-white hover:bg-emerald-500"
+        >
+          Confirmar entrega
+        </button>
+      </form>
+    <% } %>
+  </div>
+</main>
+
+<%- include('_foot') %>
