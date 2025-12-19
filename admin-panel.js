@@ -389,13 +389,12 @@ router.post(
 
     try {
       await dbExec(
-        `UPDATE ordenes_personas
-         SET entrega = 'Entregado',
-             impreso_at = COALESCE(impreso_at, NOW()),
-             updated_at = NOW()
-         WHERE id = $1`,
-        [id]
-      );
+  `UPDATE ordenes_personas
+   SET entrega = 'Entregado'
+   WHERE id = $1`,
+  [id]
+);
+
 
       return res.render('entrega-pin.ejs', {
         title: 'Confirmar entrega',
@@ -1783,93 +1782,73 @@ router.get(
     // ---------------------------------------------------------------------------
   // TICKET 80 mm — PERSONA
   // ---------------------------------------------------------------------------
-  router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
-    const id = Number(req.params.id);
-
-    try {
-      const rows = await dbSelect(
-        'SELECT * FROM ordenes_personas WHERE id = $1',
-        [id]
-      );
-      if (!rows.length) {
-        return res.redirect('/admin/ordenes?tab=personas');
-      }
-
-      const orden = rows[0];
-      const precio = Number(orden.precio || 0);
-      const abono = Number(orden.abono || 0);
-      const saldo = Math.max(precio - abono, 0);
-      const pagoEstado = derivePagoEstado(orden);
-      const baseUrl = (process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
-const entregarUrl = `${baseUrl}/admin/entregar/persona/${id}`;
-
-// Generar QR como DataURL (imagen en base64)
-const qrDataUrl = await QRCode.toDataURL(entregarUrl, {
-  margin: 1,
-  width: 180,
-});
-
-      // 👇 NUEVO: leer desglose de productos/servicios
-      const detalles = await dbSelect(
-        `
-        SELECT descripcion, cantidad, precio_unitario, subtotal
-        FROM ordenes_personas_detalle
-        WHERE orden_persona_id = $1
-        ORDER BY id ASC
-        `,
-        [id]
-      );
-      const entregaUrl = `${getBaseUrl(req)}/admin/entrega/persona/${id}`;
-
-let qrEntregaDataUrl = '';
-try {
-  qrEntregaDataUrl = await QRCode.toDataURL(entregaUrl, { margin: 1, width: 220 });
-} catch (e) {
-  console.error('❌ Error generando QR:', e);
-  qrEntregaDataUrl = '';
-}
-
-      res.render('orden-ticket.ejs', {
-        title: 'Ticket — persona',
-        tipo: 'persona',
-        idx: id,
-        orden,
-        precio,
-        abono,
-        saldo,
-        pagoEstado,
-        detalles,   // 👈 ahora sí llega al EJS con data real
-         entregaUrl,
-  qrEntregaDataUrl,
-      });
-    } catch (e) {
-      console.error('❌ Error ticket persona:', e);
-      res.redirect('/admin/ordenes?tab=personas');
-    }
-  });
-
-// ---------------------------------------------------------------------------
-// MARCAR ENTREGADO (QR) — PERSONA
-// ---------------------------------------------------------------------------
-router.get('/entregar/persona/:id', requireAuth, async (req, res) => {
+router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
-  if (!id || id <= 0) return res.status(400).send('ID inválido');
 
   try {
-    // OJO: no dependamos de updated_at por si algo raro
-    const r = await dbExec(
-      `UPDATE ordenes_personas
-       SET entrega = 'Entregado'
-       WHERE id = $1`,
+    const rows = await dbSelect(
+      'SELECT * FROM ordenes_personas WHERE id = $1',
+      [id]
+    );
+    if (!rows.length) {
+      return res.redirect('/admin/ordenes?tab=personas');
+    }
+
+    const orden = rows[0];
+    const precio = Number(orden.precio || 0);
+    const abono = Number(orden.abono || 0);
+    const saldo = Math.max(precio - abono, 0);
+    const pagoEstado = derivePagoEstado(orden);
+
+    // Detalles
+    const detalles = await dbSelect(
+      `
+      SELECT descripcion, cantidad, precio_unitario, subtotal
+      FROM ordenes_personas_detalle
+      WHERE orden_persona_id = $1
+      ORDER BY id ASC
+      `,
       [id]
     );
 
-    return res.redirect(`/admin/ordenes/persona/${id}`);
-  } catch (err) {
-    console.error('❌ Error marcando entregado (persona):', err);
-    return res.status(500).send(`Error interno: ${err.message || err}`);
+    // ✅ URL que abre la pantalla del PIN (NO marca entregado solo por abrir)
+    const entregaUrl = `${getBaseUrl(req)}/admin/entrega/persona/${id}`;
+
+    // ✅ QR (DataURL)
+    let qrEntregaDataUrl = '';
+    try {
+      qrEntregaDataUrl = await QRCode.toDataURL(entregaUrl, { margin: 1, width: 220 });
+    } catch (e) {
+      console.error('❌ Error generando QR:', e);
+      qrEntregaDataUrl = '';
+    }
+
+    // ✅ Importante: mandamos variables con nombres consistentes
+    res.render('orden-ticket.ejs', {
+      title: 'Ticket — persona',
+      tipo: 'persona',
+      idx: id,
+      orden,
+      precio,
+      abono,
+      saldo,
+      pagoEstado,
+      detalles,
+
+      // QR entrega con PIN
+      entregaUrl,
+      qrEntregaDataUrl,
+
+      // (compatibilidad por si tu EJS aún pide qrDataUrl)
+      qrDataUrl: qrEntregaDataUrl,
+    });
+  } catch (e) {
+    console.error('❌ Error ticket persona:', e);
+    res.redirect('/admin/ordenes?tab=personas');
   }
 });
+
+
 
 
 
