@@ -1391,38 +1391,50 @@ router.post(
   );
 
   // ---------------------------------------------------------------------------
-  // DETALLE ORDEN — INSTITUCIÓN
-  // ---------------------------------------------------------------------------
-  router.get(
-    '/ordenes/institucion/:id',
-    requireAuth,
-    async (req, res) => {
-      const id = Number(req.params.id);
+// DETALLE ORDEN — INSTITUCIÓN
+// ---------------------------------------------------------------------------
+router.get('/ordenes/institucion/:id', requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
 
-      try {
-        const rows = await dbSelect(
-          'SELECT * FROM ordenes_instituciones WHERE id = $1',
-          [id]
-        );
+  if (!id || id <= 0) {
+    return res.redirect('/admin/ordenes?tab=instituciones');
+  }
 
-        if (!rows.length) {
-          return res.redirect('/admin/ordenes?tab=instituciones');
-        }
+  try {
+    const rows = await dbSelect(
+      'SELECT * FROM ordenes_instituciones WHERE id = $1',
+      [id]
+    );
 
-        const orden = rows[0];
-
-        res.render('orden-detalle', {
-          title: 'Detalle de orden — institución',
-          tipo: 'institucion',
-          idx: id,
-          orden,
-        });
-      } catch (e) {
-        console.error('❌ Error detalle institucion:', e);
-        res.redirect('/admin/ordenes?tab=instituciones');
-      }
+    if (!rows.length) {
+      return res.redirect('/admin/ordenes?tab=instituciones');
     }
-  );
+
+    const orden = rows[0];
+
+    const precio = Number(orden.precio || 0);
+    const abono  = Number(orden.abono || 0);
+    const saldo  = Math.max(precio - abono, 0);
+
+    res.render('orden-detalle', {
+      title: 'Detalle de orden — institución',
+      tipo: 'institucion',
+      idx: id,
+      orden,
+      precio,
+      abono,
+      saldo,
+      pagoEstado: orden.pago_estado || 'Pendiente', // 👈 importante
+      detalles: [], // 👈 instituciones NO usan detalle tipo factura
+      totalDetalle: precio,
+    });
+
+  } catch (err) {
+    console.error('❌ Error detalle institución:', err);
+    res.redirect('/admin/ordenes?tab=instituciones');
+  }
+});
+
 
   // ---------------------------------------------------------------------------
   // DETALLE ORDEN — PERSONA
