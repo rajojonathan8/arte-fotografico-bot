@@ -410,13 +410,16 @@
           <img src="/admin-public/qr-code.png" alt="Arte Fotográfico">
         </div>
       </div>
-      <% if (qrEntregaDataUrl) { %>
-  <div style="text-align:center; margin-top:10px;">
-    
-    <img src="<%= qrEntregaDataUrl %>" alt="QR entrega" style="width:160px; height:auto; margin:6px auto;" />
-    
+      <% if (barcodeDataUrl) { %>
+  <div style="text-align:center; margin-top:10px">
+  
+    <img 
+      src="<%= barcodeDataUrl %>" 
+      style="width:100%; max-width:260px"
+    >
   </div>
 <% } %>
+
 
 
     </div>

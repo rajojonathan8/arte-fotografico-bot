@@ -7,6 +7,7 @@ const multer = require('multer');
 const Tesseract = require('tesseract.js');
 const sharp = require('sharp');
 const QRCode = require('qrcode');
+const bwipjs = require('bwip-js');
 
 
 // ============================================================================
@@ -1136,7 +1137,7 @@ router.get(
 
       try {
         await dbExec(
-  `UPDATE ordenes_personas 
+  `UPDATE ordenes_instituciones
    SET nombre=$1,
        numero_toma=$2,
        fecha_toma=$3,
@@ -1802,9 +1803,7 @@ router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
       'SELECT * FROM ordenes_personas WHERE id = $1',
       [id]
     );
-    if (!rows.length) {
-      return res.redirect('/admin/ordenes?tab=personas');
-    }
+    if (!rows.length) return res.redirect('/admin/ordenes?tab=personas');
 
     const orden = rows[0];
     const precio = Number(orden.precio || 0);
@@ -1812,7 +1811,6 @@ router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
     const saldo = Math.max(precio - abono, 0);
     const pagoEstado = derivePagoEstado(orden);
 
-    // Detalles
     const detalles = await dbSelect(
       `
       SELECT descripcion, cantidad, precio_unitario, subtotal
@@ -1823,20 +1821,27 @@ router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
       [id]
     );
 
-    // ✅ URL que abre la pantalla del PIN (NO marca entregado solo por abrir)
-    const entregaUrl = `${getBaseUrl(req)}/admin/entrega/persona/${id}`;
+    // ✅ URL correcta (funciona en local y en Render)
+    const baseUrl = getBaseUrl(req);
+    const entregaUrl = `${baseUrl}/admin/entrega/persona/${id}`;
 
-    // ✅ QR (DataURL)
-    let qrEntregaDataUrl = '';
+    // ✅ Código de barras (Code128) para la URL
+    let barcodeDataUrl = '';
     try {
-      qrEntregaDataUrl = await QRCode.toDataURL(entregaUrl, { margin: 1, width: 220 });
+      const png = await bwipjs.toBuffer({
+        bcid: 'code128',
+        text: entregaUrl,
+        scale: 3,
+        height: 10,
+        includetext: false,
+      });
+      barcodeDataUrl = `data:image/png;base64,${png.toString('base64')}`;
     } catch (e) {
-      console.error('❌ Error generando QR:', e);
-      qrEntregaDataUrl = '';
+      console.error('❌ Error generando barcode:', e);
+      barcodeDataUrl = '';
     }
 
-    // ✅ Importante: mandamos variables con nombres consistentes
-    res.render('orden-ticket.ejs', {
+    return res.render('orden-ticket.ejs', {
       title: 'Ticket — persona',
       tipo: 'persona',
       idx: id,
@@ -1847,16 +1852,12 @@ router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
       pagoEstado,
       detalles,
 
-      // QR entrega con PIN
       entregaUrl,
-      qrEntregaDataUrl,
-
-      // (compatibilidad por si tu EJS aún pide qrDataUrl)
-      qrDataUrl: qrEntregaDataUrl,
+      barcodeDataUrl,
     });
   } catch (e) {
     console.error('❌ Error ticket persona:', e);
-    res.redirect('/admin/ordenes?tab=personas');
+    return res.redirect('/admin/ordenes?tab=personas');
   }
 });
 
