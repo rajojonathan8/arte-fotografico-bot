@@ -1829,12 +1829,15 @@ router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
     let barcodeDataUrl = '';
     try {
       const png = await bwipjs.toBuffer({
-        bcid: 'code128',
-        text: entregaUrl,
-        scale: 3,
-        height: 10,
-        includetext: false,
-      });
+  bcid: 'code128',
+  text: entregaUrl,
+  scale: 6,          // 👈 más ancho (antes 2-3)
+  height: 20,        // 👈 más alto (antes 10)
+  includetext: true, // 👈 opcional, ayuda para pruebas
+  textsize: 10,
+  paddingwidth: 20,  // 👈 margen blanco lateral (zona silenciosa)
+  paddingheight: 10,
+});
       barcodeDataUrl = `data:image/png;base64,${png.toString('base64')}`;
     } catch (e) {
       console.error('❌ Error generando barcode:', e);
