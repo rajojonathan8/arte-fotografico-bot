@@ -35,7 +35,7 @@ const BUSINESS_PHONE = process.env.BUSINESS_PHONE;
 // Dirección fija (usada por IA)
 const ADDRESS_TEXT =
   'Calle Masferrer, Av. Morazán, 2ª Av. Norte #1-2, entre Piedra Lisa y Casa de Cultura de Sonsonate, enfrente de Academia Patty.';
-const MAPS_LINK = 'https://maps.app.goo.gl/7GWy4QG27d9Jdw9G9';
+const MAPS_LINK = 'https://maps.app.goo.gl/ePhR766tvLCoNrkJ7';
 
 // ===== Estado por usuario (flujo guiado de citas)
 const estadosUsuarios = {}; // { [tel]: { paso, datos: { nombre, fechaHora, tipoSesion, telefono } } }
