@@ -396,13 +396,8 @@ router.post(
 );
 
 
-      return res.render('entrega-pin.ejs', {
-        title: 'Confirmar entrega',
-        tipo: 'persona',
-        id,
-        error: null,
-        ok: true,
-      });
+      return res.redirect(`/admin/ordenes/persona/${id}?entrega=ok`);
+
     } catch (e) {
       console.error('❌ Error marcando entregado:', e);
       return res.status(500).send('Error interno');
