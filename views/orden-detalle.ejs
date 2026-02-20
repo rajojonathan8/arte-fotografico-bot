@@ -26,7 +26,7 @@
         <p><span class="font-semibold text-slate-300">Nombre:</span> <%= orden.nombre || '' %></p>
         <p><span class="font-semibold text-slate-300">N° orden:</span> <%= orden.numero_orden || '-' %></p>
         <p><span class="font-semibold text-slate-300">N° toma:</span> <%= orden.numero_toma || '-' %></p>
-        <p><span class="font-semibold text-slate-300">Fecha toma:</span> <%= orden.fecha_toma ? orden.fecha_toma.toISOString().slice(0,10) : '-' %></p>
+        <p><span class="font-semibold text-slate-300">Fecha pedido:</span> <%= orden.fecha_toma ? orden.fecha_toma.toISOString().slice(0,10) : '-' %></p>
         <p><span class="font-semibold text-slate-300">Fecha entrega:</span> <%= orden.fecha_entrega ? orden.fecha_entrega.toISOString().slice(0,10) : '-' %></p>
         <p><span class="font-semibold text-slate-300">Urgencia:</span> <%= orden.urgencia || 'Normal' %></p>
         <p><span class="font-semibold text-slate-300">Teléfono:</span> <%= orden.telefono || '-' %></p>
