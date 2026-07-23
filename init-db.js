@@ -109,6 +109,43 @@ async function main() {
       ALTER TABLE ordenes_instituciones
       ADD COLUMN IF NOT EXISTS impresos boolean DEFAULT false;
     `;
+    // ============================================================================
+// MEJORAS PARA ÓRDENES DE INSTITUCIONES
+// ============================================================================
+
+const sqlMejorasOrdenesInstituciones = `
+  ALTER TABLE ordenes_instituciones
+    ADD COLUMN IF NOT EXISTS grado TEXT,
+    ADD COLUMN IF NOT EXISTS sesion TEXT,
+    ADD COLUMN IF NOT EXISTS descripcion TEXT,
+    ADD COLUMN IF NOT EXISTS fotos_color TEXT,
+    ADD COLUMN IF NOT EXISTS fotos_blanco_negro TEXT,
+    ADD COLUMN IF NOT EXISTS campos_extra JSONB NOT NULL DEFAULT '{}'::jsonb;
+`;
+
+const sqlCamposTextoInstituciones = `
+  ALTER TABLE ordenes_instituciones
+    ALTER COLUMN toma_principal DROP DEFAULT,
+    ALTER COLUMN collage1 DROP DEFAULT,
+    ALTER COLUMN collage2 DROP DEFAULT,
+    ALTER COLUMN collage3 DROP DEFAULT;
+
+  ALTER TABLE ordenes_instituciones
+    ALTER COLUMN toma_principal TYPE TEXT
+      USING COALESCE(toma_principal::text, ''),
+    ALTER COLUMN collage1 TYPE TEXT
+      USING COALESCE(collage1::text, ''),
+    ALTER COLUMN collage2 TYPE TEXT
+      USING COALESCE(collage2::text, ''),
+    ALTER COLUMN collage3 TYPE TEXT
+      USING COALESCE(collage3::text, '');
+
+  ALTER TABLE ordenes_instituciones
+    ALTER COLUMN toma_principal SET DEFAULT '',
+    ALTER COLUMN collage1 SET DEFAULT '',
+    ALTER COLUMN collage2 SET DEFAULT '',
+    ALTER COLUMN collage3 SET DEFAULT '';
+`;
       // 🔹 NUEVO: columnas extra para órdenes de personas
     const sqlAlterEventoPersonas = `
       ALTER TABLE ordenes_personas
@@ -178,6 +215,12 @@ console.log('🟢 Columnas editor (editado/editado_at/impreso_at) OK');
 
     await client.query(sqlOrdenesInstituciones);
     console.log('🟢 Tabla "ordenes_instituciones" OK');
+
+    await client.query(sqlMejorasOrdenesInstituciones);
+console.log('🟢 Nuevos campos de instituciones OK');
+
+await client.query(sqlCamposTextoInstituciones);
+console.log('🟢 Toma principal y collages convertidos a texto OK');
       // 👇 NUEVO
     await client.query(sqlAlterEvento);
     await client.query(sqlAlterAtendidoPor);
