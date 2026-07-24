@@ -158,7 +158,33 @@
           <option value="Pagado" <%= filtroPago === 'Pagado' ? 'selected' : '' %>>Pagado</option>
         </select>
       </div>
+<% if (tab === 'instituciones') { %>
+  <div>
+    <label
+      for="grado"
+      class="mb-1 block text-[11px] font-semibold uppercase text-slate-300"
+    >
+      Grado
+    </label>
 
+    <select
+      id="grado"
+      name="grado"
+      class="w-full min-w-[150px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+    >
+      <option value="">Todos</option>
+
+      <% (gradosDisponibles || []).forEach(function(grado) { %>
+        <option
+          value="<%= grado %>"
+          <%= filtroGrado === String(grado).toLowerCase() ? 'selected' : '' %>
+        >
+          <%= grado %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+<% } %>
       <div class="flex gap-2">
         <button
           type="submit"
@@ -225,11 +251,25 @@
   </div>
 </div>
 
-        <a
-          href="/admin/ordenes/nueva-institucion"
-          class="px-4 py-2 text-sm rounded-full bg-emerald-600 text-white hover:bg-emerald-700">
-          + Nueva orden (institución)
-        </a>
+        <div class="flex flex-wrap items-center gap-2">
+
+  <a
+    href="/admin/ordenes/instituciones/importar"
+    class="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+  >
+    <span>📥</span>
+    Importar listado PDF
+  </a>
+
+  <a
+    href="/admin/ordenes/nueva-institucion"
+    class="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+  >
+    <span>+</span>
+    Nueva orden
+  </a>
+
+</div>
       </div>
 
       <div class="overflow-x-auto">
@@ -238,12 +278,18 @@
             <tr>
               <th class="px-3 py-2 text-left">Institución</th>
               <th class="px-3 py-2 text-left">Nombre</th>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-200">
+  Grado
+</th>
               <th class="px-3 py-2 text-left">Sección</th>
               <th class="px-3 py-2 text-left">Paquete</th>
-              <th class="px-3 py-2 text-center">Toma principal</th>
-              <th class="px-3 py-2 text-center">Collage 1</th>
-              <th class="px-3 py-2 text-center">Collage 2</th>
-              <th class="px-3 py-2 text-center">Collage 3</th>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-200">
+  Color
+</th>
+
+<th class="px-3 py-3 text-left text-xs font-semibold text-slate-200">
+  Blanco y negro
+</th>
               <th class="px-3 py-2 text-left">Fecha toma</th>
               <th class="px-3 py-2 text-left">Fecha entrega</th>  <!-- ⬅️ NUEVA -->
               <th class="px-3 py-2 text-left">Teléfono</th>
@@ -278,12 +324,62 @@
                 <tr class="hover:bg-slate-50">
                   <td class="px-3 py-2"><%= o.institucion %></td>
                   <td class="px-3 py-2"><%= o.nombre || '' %></td>
+                  <td class="px-3 py-3 align-top text-sm text-slate-200">
+  <%= o.grado || '-' %>
+</td>
                   <td class="px-3 py-2"><%= o.seccion %></td>
                   <td class="px-3 py-2"><%= o.paquete %></td>
-                  <td class="px-3 py-2 text-center"><%= o.toma_principal %></td>
-                  <td class="px-3 py-2 text-center"><%= o.collage1 %></td>
-                  <td class="px-3 py-2 text-center"><%= o.collage2 %></td>
-                  <td class="px-3 py-2 text-center"><%= o.collage3 || 0 %></td>
+                  <td class="px-3 py-3 align-top text-xs text-slate-200">
+  <div class="space-y-1 min-w-[150px]">
+    <div>
+      <span class="text-slate-400">Principal:</span>
+      <%= o.color_toma_principal || '-' %>
+    </div>
+
+    <div>
+      <span class="text-slate-400">Secundaria:</span>
+      <%= o.color_toma_secundaria || '-' %>
+    </div>
+
+    <div>
+      <span class="text-slate-400">Collage:</span>
+      <%= o.color_collage_letras || '-' %>
+    </div>
+
+    <% if (o.color_adicionales) { %>
+      <div>
+        <span class="text-slate-400">Adicional:</span>
+        <%= o.color_adicionales %>
+      </div>
+    <% } %>
+  </div>
+</td>
+
+<td class="px-3 py-3 align-top text-xs text-slate-200">
+  <div class="space-y-1 min-w-[150px]">
+    <div>
+      <span class="text-slate-400">Principal:</span>
+      <%= o.byn_toma_principal || '-' %>
+    </div>
+
+    <div>
+      <span class="text-slate-400">Secundaria:</span>
+      <%= o.byn_toma_secundaria || '-' %>
+    </div>
+
+    <div>
+      <span class="text-slate-400">Collage:</span>
+      <%= o.byn_collage_letras || '-' %>
+    </div>
+
+    <% if (o.byn_adicionales) { %>
+      <div>
+        <span class="text-slate-400">Adicional:</span>
+        <%= o.byn_adicionales %>
+      </div>
+    <% } %>
+  </div>
+</td>
                   <td class="px-3 py-2"><%= fechaCorta(o.fecha_toma) %></td>
 <td class="px-3 py-2"><%= fechaCorta(o.fecha_entrega) %></td>
                   <td class="px-3 py-2"><%= o.telefono %></td>

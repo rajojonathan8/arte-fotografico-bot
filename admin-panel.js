@@ -7,7 +7,7 @@ const multer = require('multer');
 const Tesseract = require('tesseract.js');
 const sharp = require('sharp');
 const QRCode = require('qrcode');
-
+const { PDFParse } = require('pdf-parse');
 
 // ============================================================================
 // RUTAS Y HELPERS COMPARTIDOS (data/…)
@@ -56,7 +56,29 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10 MB
   },
 });
+// Configuración exclusiva para importar listados PDF.
+// El archivo se mantiene en memoria y no se guarda permanentemente.
+const uploadPdf = multer({
+  storage: multer.memoryStorage(),
 
+  limits: {
+    fileSize: 15 * 1024 * 1024, // 15 MB
+    files: 1,
+  },
+
+  fileFilter: (req, file, cb) => {
+    const nombreEsPdf = /\.pdf$/i.test(file.originalname || '');
+    const tipoEsPdf = file.mimetype === 'application/pdf';
+
+    if (!nombreEsPdf && !tipoEsPdf) {
+      return cb(
+        new Error('Solo se permiten archivos PDF.')
+      );
+    }
+
+    cb(null, true);
+  },
+});
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -158,9 +180,19 @@ function parseItemsFromBody(datos) {
   const len = Math.max(cantidades.length, descripciones.length, preciosUnit.length);
 
   for (let i = 0; i < len; i++) {
-    const cant = Number(cantidades[i]) || 0;
-    const desc = (descripciones[i] || '').trim();
-    const pu   = Number(preciosUnit[i]) || 0;
+    const cant = Math.max(
+  Math.floor(Number(cantidades[i]) || 0),
+  0
+);
+
+const desc = String(descripciones[i] || '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const pu = Math.max(
+  Number(preciosUnit[i]) || 0,
+  0
+);
 
     if (cant <= 0 || !desc) continue;
 
@@ -308,7 +340,462 @@ function buildPagerPro({ currentPage, totalPages, reqQuery, windowSize = 7 }) {
     nextUrl: makeUrl(Math.min(currentPage + 1, totalPages)),
   };
 }
+// ============================================================================
+// IMPORTADOR DE LISTADOS PDF — DETECCIÓN DE ALUMNOS
+// ============================================================================
 
+function normalizarTextoComparacion(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function limpiarLineaPdf(linea) {
+  return String(linea || '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\t+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[•●▪■►▶*-]+\s*/, '')
+
+    // Quita numeraciones como:
+    // 1.
+    // 1)
+    // 01 -
+    // 15:
+    // 25º
+    .replace(/^\s*\(?\d{1,4}\)?\s*[.)°ºª:\-–—]+\s*/, '')
+
+    // Quita numeración simple al inicio:
+    // 1 JUAN PÉREZ
+    .replace(/^\s*\d{1,4}\s+(?=[A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/, '')
+    .replace(/\b(validada|validado|pendiente|activo|activa|retirado|retirada)\b/gi, '')
+.replace(/\b\d{5,12}\b/g, '')
+.replace(/\s+/g, ' ')
+    .trim();
+}
+
+function esEncabezadoPdf(linea) {
+  const texto = normalizarTextoComparacion(linea);
+
+  if (!texto) return true;
+
+  const encabezadosExactos = [
+    'no. nombre del estudiante estado observacion nie validada',
+    'no nombre del estudiante estado observacion nie validada',
+    'nombre del estudiante',
+    'nombre completo del estudiante',
+    'nombre completo del alumno',
+    'sede educativa',
+    'servicio educativo',
+    'matricula oficial de estudiantes',
+    'matricula oficial',
+    'gerencia de gestion y registro academico',
+    'departamento de registro academico',
+    'director(a) del centro educativo',
+    'director del centro educativo',
+    'directora del centro educativo',
+    'ministerio de educacion ciencia y tecnologia',
+    'ministerio de educacion, ciencia y tecnologia',
+    'seccion a - jornada completa',
+    'seccion a jornada completa',
+    'jornada completa',
+    'jornada matutina',
+    'jornada vespertina',
+    'jornada nocturna',
+    'observacion',
+    'observaciones',
+    'estado',
+    'nie',
+    'validada',
+    'validado',
+  ];
+
+  if (encabezadosExactos.includes(texto)) {
+    return true;
+  }
+
+  const fragmentosBloqueados = [
+    'ministerio de educacion',
+    'matricula oficial',
+    'registro academico',
+    'sede educativa',
+    'servicio educativo',
+    'centro educativo',
+    'nombre del estudiante',
+    'nombre completo del alumno',
+    'nombre completo del estudiante',
+    'director(a)',
+    'director del',
+    'directora del',
+    'pagina ',
+    'page ',
+    'jornada completa',
+    'jornada matutina',
+    'jornada vespertina',
+    'jornada nocturna',
+    'seccion ',
+  ];
+
+  return fragmentosBloqueados.some((fragmento) =>
+    texto.includes(fragmento)
+  );
+}
+
+function pareceNombreAlumno(linea) {
+  const texto = limpiarLineaPdf(linea);
+
+  if (!texto) return false;
+  if (texto.length < 7 || texto.length > 120) return false;
+
+  if (esEncabezadoPdf(texto)) {
+    return false;
+  }
+
+  // Elimina líneas de paginación:
+  // of 2 --
+  // Page 1 of 2
+  // 1 de 2
+  if (
+    /^(page\s*)?\d*\s*(of|de)\s*\d+\s*[-–—]*$/i.test(texto) ||
+    /^of\s+\d+/i.test(texto)
+  ) {
+    return false;
+  }
+
+  // Descarta correos, enlaces y valores monetarios.
+  if (
+    /https?:\/\//i.test(texto) ||
+    /www\./i.test(texto) ||
+    /@/.test(texto) ||
+    /\$/.test(texto) ||
+    /%/.test(texto)
+  ) {
+    return false;
+  }
+
+  // Descarta líneas con fechas.
+  if (
+    /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/.test(texto) ||
+    /\b\d{4}-\d{2}-\d{2}\b/.test(texto)
+  ) {
+    return false;
+  }
+
+  // Un nombre puede incluir letras, espacios, apóstrofes,
+  // guiones y una coma entre apellidos y nombres.
+  if (
+    !/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ'’.,\- ]+$/.test(texto)
+  ) {
+    return false;
+  }
+
+  const sinComa = texto.replace(/,/g, ' ');
+  const palabras = sinComa
+    .split(/\s+/)
+    .map((palabra) => palabra.trim())
+    .filter(Boolean);
+
+  // La mayoría de nombres completos tiene entre 3 y 8 palabras.
+  if (palabras.length < 3 || palabras.length > 8) {
+    return false;
+  }
+
+  // Cada palabra debe contener letras.
+  const palabrasValidas = palabras.every((palabra) =>
+    /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(palabra)
+  );
+
+  if (!palabrasValidas) {
+    return false;
+  }
+
+  // Evita frases comunes aunque tengan varias palabras.
+  const textoNormalizado = normalizarTextoComparacion(texto);
+
+  const palabrasAdministrativas = [
+    'educativa',
+    'educativo',
+    'educacion',
+    'ministerio',
+    'matricula',
+    'registro',
+    'academico',
+    'departamento',
+    'gerencia',
+    'director',
+    'directora',
+    'seccion',
+    'jornada',
+    'estudiantes',
+    'alumnos',
+    'observacion',
+    'validada',
+    'estado',
+    'ciencia',
+    'tecnologia',
+  ];
+
+  const coincidenciasAdministrativas =
+    palabrasAdministrativas.filter((palabra) =>
+      textoNormalizado.includes(palabra)
+    ).length;
+
+  if (coincidenciasAdministrativas >= 1) {
+    return false;
+  }
+
+  // Detecta nombres en formato:
+  // GARCIA RUIZ, CARLOS ALBERTO
+  if (texto.includes(',')) {
+    const partes = texto.split(',');
+
+    if (partes.length === 2) {
+      const apellidos = partes[0].trim().split(/\s+/);
+      const nombres = partes[1].trim().split(/\s+/);
+
+      return (
+        apellidos.length >= 1 &&
+        apellidos.length <= 4 &&
+        nombres.length >= 1 &&
+        nombres.length <= 4
+      );
+    }
+  }
+
+  // También acepta formato:
+  // CARLOS ALBERTO GARCIA RUIZ
+  return palabras.length >= 3;
+}
+
+function crearClaveAlumno(nombre) {
+  return normalizarTextoComparacion(nombre)
+    .replace(/[.,]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extraerPosiblesAlumnos(textoPdf) {
+  const lineasOriginales = String(textoPdf || '')
+    .split(/\r?\n/)
+    .map(limpiarLineaPdf)
+    .filter(Boolean);
+
+  const alumnos = [];
+  const vistos = new Set();
+
+  for (const linea of lineasOriginales) {
+    if (!pareceNombreAlumno(linea)) {
+      continue;
+    }
+
+    const clave = crearClaveAlumno(linea);
+
+    if (!clave || vistos.has(clave)) {
+      continue;
+    }
+
+    vistos.add(clave);
+    alumnos.push(linea);
+  }
+
+  return alumnos;
+}
+
+function corregirNombreArchivo(nombre) {
+  const original = String(nombre || '');
+
+  try {
+    const corregido = Buffer
+      .from(original, 'latin1')
+      .toString('utf8');
+
+    // Solo usa el corregido cuando realmente mejora caracteres dañados.
+    if (
+      corregido.includes('°') ||
+      corregido.includes('ñ') ||
+      corregido.includes('á') ||
+      corregido.includes('é') ||
+      corregido.includes('í') ||
+      corregido.includes('ó') ||
+      corregido.includes('ú')
+    ) {
+      return corregido;
+    }
+
+    return original;
+  } catch {
+    return original;
+  }
+}
+function extraerAlumnosDesdeTablas(resultadoTablas) {
+  const alumnos = [];
+  const vistos = new Set();
+
+  const paginas = Array.isArray(resultadoTablas?.pages)
+    ? resultadoTablas.pages
+    : [];
+
+  for (const pagina of paginas) {
+    const tablas = Array.isArray(pagina?.tables)
+      ? pagina.tables
+      : [];
+
+    for (const tabla of tablas) {
+      if (!Array.isArray(tabla)) continue;
+
+      for (const filaOriginal of tabla) {
+        if (!Array.isArray(filaOriginal)) continue;
+
+        const celdas = filaOriginal.map((celda) =>
+          String(celda ?? '')
+            .replace(/\u00A0/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+        );
+
+        const contenidoFila = celdas.join(' ').trim();
+
+        if (!contenidoFila) continue;
+
+        /*
+         * Formato esperado:
+         * 0: número
+         * 1: NIE
+         * 2: nombre
+         * 3: estado
+         * 4: validada
+         * 5: observación
+         */
+
+        const numero = celdas[0] || '';
+        const nie = celdas[1] || '';
+        const nombre = celdas[2] || '';
+        const estado = celdas[3] || '';
+
+        const numeroValido = /^\d{1,3}$/.test(numero);
+        const nieValido = /^\d{5,12}$/.test(nie);
+        const estadoValido = /matriculad[oa]/i.test(estado);
+
+        if (
+          numeroValido &&
+          nieValido &&
+          nombre &&
+          estadoValido &&
+          pareceNombreAlumno(nombre)
+        ) {
+          const nombreLimpio = limpiarLineaPdf(nombre);
+          const clave = crearClaveAlumno(nombreLimpio);
+
+          if (!vistos.has(clave)) {
+            vistos.add(clave);
+            alumnos.push(nombreLimpio);
+          }
+
+          continue;
+        }
+
+        /*
+         * Respaldo por si pdf-parse cambia el número de columnas
+         * o une alguna celda.
+         */
+
+        const tieneNumero = celdas.some((celda) =>
+          /^\d{1,3}$/.test(celda)
+        );
+
+        const tieneNie = celdas.some((celda) =>
+          /^\d{5,12}$/.test(celda)
+        );
+
+        const tieneEstado = celdas.some((celda) =>
+          /matriculad[oa]/i.test(celda)
+        );
+
+        if (!tieneNumero || !tieneNie || !tieneEstado) {
+          continue;
+        }
+
+        const posibleNombre = celdas.find((celda) => {
+          if (!celda) return false;
+          if (/^\d+$/.test(celda)) return false;
+          if (/matriculad[oa]/i.test(celda)) return false;
+          if (/^(sí|si|no)$/i.test(celda)) return false;
+
+          return pareceNombreAlumno(celda);
+        });
+
+        if (!posibleNombre) continue;
+
+        const nombreLimpio = limpiarLineaPdf(posibleNombre);
+        const clave = crearClaveAlumno(nombreLimpio);
+
+        if (!vistos.has(clave)) {
+          vistos.add(clave);
+          alumnos.push(nombreLimpio);
+        }
+      }
+    }
+  }
+
+  return alumnos;
+}
+// ============================================================================
+// IMPORTACIÓN MASIVA DE ÓRDENES INSTITUCIONALES
+// ============================================================================
+
+function normalizarListaAlumnos(body) {
+  const datos = body || {};
+
+  let alumnos =
+    datos.alumnos ??
+    datos['alumnos[]'] ??
+    [];
+
+  if (!Array.isArray(alumnos)) {
+    alumnos = [alumnos];
+  }
+
+  const vistos = new Set();
+  const resultado = [];
+
+  for (const valor of alumnos) {
+    const nombre = String(valor || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!nombre) continue;
+
+    const clave = nombre
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLocaleLowerCase('es')
+      .replace(/[.,]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!clave || vistos.has(clave)) {
+      continue;
+    }
+
+    vistos.add(clave);
+    resultado.push(nombre);
+  }
+
+  return resultado;
+}
+
+function normalizarClaveImportacion(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es')
+    .replace(/[.,]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 function mountAdmin(app) {
   const router = express.Router();
 
@@ -338,6 +825,130 @@ function mountAdmin(app) {
     if (req.session && req.session.isAdmin) return next();
     return res.redirect('/admin/login');
   }
+
+  // ---------------------------------------------------------------------------
+// IMPORTADOR PDF — PANTALLA PRINCIPAL
+// ---------------------------------------------------------------------------
+router.get(
+  '/ordenes/instituciones/importar',
+  requireAuth,
+  (req, res) => {
+    res.render('ordenes-importar-pdf', {
+      title: 'Importar listado PDF',
+      error: '',
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// IMPORTADOR PDF — EXTRAER TEXTO Y MOSTRAR VISTA PREVIA
+// ---------------------------------------------------------------------------
+router.post(
+  '/ordenes/instituciones/importar/preview',
+  requireAuth,
+  (req, res, next) => {
+    uploadPdf.single('archivo_pdf')(req, res, (err) => {
+      if (err) {
+        return res.status(400).render('ordenes-importar-pdf', {
+          title: 'Importar listado PDF',
+          error: err.message || 'No se pudo subir el archivo.',
+        });
+      }
+
+      next();
+    });
+  },
+  async (req, res) => {
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).render('ordenes-importar-pdf', {
+        title: 'Importar listado PDF',
+        error: 'Selecciona un archivo PDF.',
+      });
+    }
+
+    let parser;
+
+    try {
+      parser = new PDFParse({
+        data: req.file.buffer,
+      });
+
+      const resultadoTexto = await parser.getText();
+const textoPdf = String(resultadoTexto.text || '').trim();
+
+let alumnos = [];
+let resultadoTablas = null;
+
+try {
+  resultadoTablas = await parser.getTable();
+  console.log(
+  '📋 Tablas detectadas:',
+  JSON.stringify(resultadoTablas, null, 2)
+);
+  alumnos = extraerAlumnosDesdeTablas(resultadoTablas);
+
+  console.log(
+    `📊 Alumnos detectados desde tabla: ${alumnos.length}`
+  );
+} catch (tableError) {
+  console.error(
+    '⚠️ No se pudo procesar la tabla del PDF:',
+    tableError.message
+  );
+}
+
+// Respaldo: usar extracción de texto cuando no se encontró una tabla útil.
+if (!alumnos.length && textoPdf) {
+  alumnos = extraerPosiblesAlumnos(textoPdf);
+
+  console.log(
+    `📄 Alumnos detectados desde texto: ${alumnos.length}`
+  );
+}
+
+if (!textoPdf && !alumnos.length) {
+  return res.status(422).render('ordenes-importar-pdf', {
+    title: 'Importar listado PDF',
+    error:
+      'No se pudo extraer información del PDF. Posiblemente sea un archivo escaneado.',
+  });
+}
+
+      return res.render('ordenes-importar-preview', {
+        title: 'Vista previa de importación',
+        nombreArchivo: corregirNombreArchivo(
+  req.file.originalname || 'Listado.pdf'
+),
+        totalPaginas: Number(resultadoTexto.total || 0),
+        alumnos,
+        textoExtraido: textoPdf,
+        error:
+          alumnos.length === 0
+            ? 'Se extrajo texto, pero no se detectaron nombres automáticamente.'
+            : '',
+      });
+    } catch (err) {
+      console.error('❌ Error procesando PDF:', err);
+
+      return res.status(500).render('ordenes-importar-pdf', {
+        title: 'Importar listado PDF',
+        error:
+          'No se pudo leer el PDF. Verifica que el archivo no esté dañado o protegido con contraseña.',
+      });
+    } finally {
+      if (parser) {
+        try {
+          await parser.destroy();
+        } catch (destroyError) {
+          console.error(
+            '⚠️ No se pudo liberar el lector PDF:',
+            destroyError.message
+          );
+        }
+      }
+    }
+  }
+);
 function getBaseUrl(req) {
   // 1) Preferimos BASE_URL (Render)
   const env = (process.env.BASE_URL || '').trim();
@@ -732,7 +1343,8 @@ const pageSize = 20; // puedes cambiar a 30 si quieres
     const filtroUrg = (req.query.urgencia || '').trim();
     const filtroEnt = (req.query.entrega || '').trim();
     const filtroPago = (req.query.pago || '').trim();
-
+    // Nuevo filtro exclusivo para instituciones
+const filtroGrado = (req.query.grado || '').trim().toLowerCase();
     // 🔵 Cargar desde PostgreSQL
     let ordenesInstitucionesAll = [];
     let ordenesPersonasAll = [];
@@ -747,7 +1359,14 @@ const pageSize = 20; // puedes cambiar a 30 si quieres
     } catch (e) {
       console.error('❌ Error cargando órdenes desde PostgreSQL:', e);
     }
-
+// Lista única de grados para el selector del formulario
+const gradosDisponibles = [
+  ...new Set(
+    (ordenesInstitucionesAll || [])
+      .map((o) => String(o.grado || '').trim())
+      .filter(Boolean)
+  ),
+].sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
 function normalizarFechaFiltro(valor) {
   if (!valor) return '';
 
@@ -789,16 +1408,35 @@ if (fechaEntregaDesde || fechaEntregaHasta) {
   // 🔹 Texto libre
   if (busqueda) {
     const texto = [
-      o.institucion,
-      o.seccion,
-      o.paquete,
-      o.nombre,
-      o.telefono,
-      o.numero_orden,
-      o.n_orden,
-      o.numero_toma,
-      o.n_toma,
-    ]
+  o.institucion,
+  o.nombre,
+  o.grado,
+  o.seccion,
+  o.paquete,
+  o.telefono,
+
+  // Tomas y collages a color
+  o.color_toma_principal,
+  o.color_toma_secundaria,
+  o.color_collage_letras,
+  o.color_adicionales,
+
+  // Tomas y collages blanco y negro
+  o.byn_toma_principal,
+  o.byn_toma_secundaria,
+  o.byn_collage_letras,
+  o.byn_adicionales,
+
+  // Compatibilidad con órdenes antiguas
+  o.numero_orden,
+  o.n_orden,
+  o.numero_toma,
+  o.n_toma,
+  o.toma_principal,
+  o.collage1,
+  o.collage2,
+  o.collage3,
+]
       .filter(Boolean)
       .join(' ')
       .toLowerCase();
@@ -823,7 +1461,14 @@ if (fechaEntregaDesde || fechaEntregaHasta) {
     const p = derivePagoEstado(o).toLowerCase();
     if (p !== filtroPago.toLowerCase()) return false;
   }
+// Filtro por grado: solo afecta registros de instituciones
+if (filtroGrado) {
+  const gradoOrden = String(o.grado || '').trim().toLowerCase();
 
+  if (gradoOrden !== filtroGrado) {
+    return false;
+  }
+}
   return true;
 }
 
@@ -873,7 +1518,8 @@ if (tab === 'personas') {
   filtroUrg,
   filtroEnt,
   filtroPago,
-
+  filtroGrado,
+gradosDisponibles,
   resumenInstituciones,
   resumenPersonas,
 
@@ -891,73 +1537,273 @@ if (tab === 'personas') {
   // NUEVA ORDEN — INSTITUCIÓN
   // ---------------------------------------------------------------------------
   router.get('/ordenes/nueva-institucion', requireAuth, (req, res) => {
-    res.render('ordenes-nueva', {
-      title: 'Nueva orden — institución',
-    });
+  res.render('ordenes-nueva', {
+    title: 'Nueva orden — institución',
+    error: '',
+    datos: {},
   });
+});
 
   router.post(
-    '/ordenes/nueva-institucion',
-    requireAuth,
-    express.urlencoded({ extended: true }),
-    async (req, res) => {
-      const datos = req.body || {};
+  '/ordenes/nueva-institucion',
+  requireAuth,
+  express.urlencoded({ extended: true }),
+  async (req, res) => {
+    const datos = req.body || {};
 
-      const precioNum = Number(datos.precio) || 0;
-      let abonoNum = Number(datos.abono_inicial || 0);
-      let pagoEstado = datos.pago_estado || 'Pendiente';
+    // ============================================================
+    // DATOS GENERALES
+    // ============================================================
+    const institucion = toText(datos.institucion);
+    const nombre = toText(datos.nombre);
 
-      // Ajuste de coherencia
-      if (pagoEstado === 'Pagado' && precioNum > 0) {
-        abonoNum = precioNum;
-      } else {
-        pagoEstado = computePagoEstado(precioNum, abonoNum);
-      }
+    const grado = toText(datos.grado);
+    const seccion = toText(datos.seccion);
+    const sesion = toText(datos.sesion);
+    const paquete = toText(datos.paquete);
 
-      try {
-        await dbExec(
-          `
-        INSERT INTO ordenes_instituciones (
-          nombre, institucion, seccion, paquete,
-          toma_principal, collage1, collage2, collage3,
-          fecha_toma, fecha_entrega, telefono,
-          entrega, urgencia,
-          precio, abono, pago_estado
-        )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-        `,
-          [
-            datos.nombre || '',
-            datos.institucion || '',
-            datos.seccion || '',
-            datos.paquete || '',
-            Number(datos.toma_principal || 0),
-            Number(datos.collage1 || 0),
-            Number(datos.collage2 || 0),
-            Number(datos.collage3 || 0),
-            datos.fecha_toma || null,
-            datos.fecha_entrega || null,
-            datos.telefono || '',
-            datos.entrega || 'Pendiente',
-            datos.urgencia || 'Normal',
-            precioNum,
-            abonoNum,
-            pagoEstado,
-          ]
-        );
+    const descripcion = toText(datos.descripcion);
+    // ============================================================
+// TOMAS Y COLLAGES — COLOR
+// ============================================================
+const colorTomaPrincipal = toText(datos.color_toma_principal);
+const colorTomaSecundaria = toText(datos.color_toma_secundaria);
+const colorCollageLetras = toText(datos.color_collage_letras);
+const colorAdicionales = toText(datos.color_adicionales);
 
-        console.log('💾 Nueva orden de institución guardada en PostgreSQL');
-      } catch (err) {
-        console.error(
-          '❌ Error guardando orden institución en PostgreSQL:',
-          err
-        );
-      }
+// ============================================================
+// TOMAS Y COLLAGES — BLANCO Y NEGRO
+// ============================================================
+const bynTomaPrincipal = toText(datos.byn_toma_principal);
+const bynTomaSecundaria = toText(datos.byn_toma_secundaria);
+const bynCollageLetras = toText(datos.byn_collage_letras);
+const bynAdicionales = toText(datos.byn_adicionales);
+    // ============================================================
+    // TOMAS Y COLLAGES
+    // Ahora son TEXTO, no números
+    // ============================================================
+   
 
-      res.redirect('/admin/ordenes?tab=instituciones');
+    // ============================================================
+    // FECHAS Y CONTACTO
+    // ============================================================
+    const fechaToma = datos.fecha_toma || null;
+    const fechaEntrega = datos.fecha_entrega || null;
+    const telefono = toText(datos.telefono);
+
+    const urgencia = toText(datos.urgencia) || 'Normal';
+    const estadoEntrega =
+      toText(datos.entrega || datos.estado_entrega) || 'Pendiente';
+
+    // ============================================================
+    // VALIDACIÓN DE CAMPOS OBLIGATORIOS
+    // ============================================================
+    const errores = [];
+
+    if (!institucion) {
+      errores.push('El nombre de la institución es obligatorio.');
     }
+
+    if (!nombre) {
+      errores.push('El nombre del alumno o contacto es obligatorio.');
+    }
+
+   
+
+    if (errores.length > 0) {
+      return res.status(400).render('ordenes-nueva', {
+        title: 'Nueva orden — institución',
+        error: errores.join(' '),
+        datos,
+      });
+    }
+    if (!colorTomaPrincipal) {
+  errores.push('La toma principal a color es obligatoria.');
+}
+
+if (!bynTomaPrincipal) {
+  errores.push('La toma principal en blanco y negro es obligatoria.');
+}
+    // ============================================================
+    // PAGO
+    // ============================================================
+    // Productos adicionales
+const { items, totalItems } = parseItemsFromBody(datos);
+
+// Precio principal de la orden
+const precioBase = Math.max(
+  Number(datos.precio) || 0,
+  0
+);
+
+// Si no se escribió precio, usamos el total de los productos.
+// Precio final = precio base del paquete + productos adicionales
+const precioFinal = precioBase + totalItems;
+
+let abonoNum = Math.max(
+  Number(datos.abono_inicial || datos.abono) || 0,
+  0
+);
+
+let pagoEstado = toText(datos.pago_estado) || 'Pendiente';
+
+if (pagoEstado === 'Pagado' && precioFinal > 0) {
+  abonoNum = precioFinal;
+}
+
+pagoEstado = computePagoEstado(
+  precioFinal,
+  abonoNum
+);
+
+    // Campos personalizados se implementarán después.
+    const camposExtra = {};
+const cliente = await db.connect();
+
+try {
+  await cliente.query('BEGIN');
+
+  const resultadoOrden = await cliente.query(
+    `
+    INSERT INTO ordenes_instituciones (
+      institucion,
+      nombre,
+      grado,
+      seccion,
+      sesion,
+      paquete,
+
+      color_toma_principal,
+      color_toma_secundaria,
+      color_collage_letras,
+      color_adicionales,
+
+      byn_toma_principal,
+      byn_toma_secundaria,
+      byn_collage_letras,
+      byn_adicionales,
+
+      descripcion,
+
+      fecha_toma,
+      fecha_entrega,
+      telefono,
+      urgencia,
+      entrega,
+
+      precio,
+      abono,
+      pago_estado,
+      campos_extra
+    )
+    VALUES (
+      $1, $2, $3, $4, $5, $6,
+      $7, $8, $9, $10,
+      $11, $12, $13, $14,
+      $15,
+      $16, $17, $18, $19, $20,
+      $21, $22, $23, $24
+    )
+    RETURNING id
+    `,
+    [
+      institucion,
+      nombre,
+      grado,
+      seccion,
+      sesion,
+      paquete,
+
+      colorTomaPrincipal,
+      colorTomaSecundaria,
+      colorCollageLetras,
+
+      // Adicionales color ya no se usarán.
+      '',
+
+      bynTomaPrincipal,
+      bynTomaSecundaria,
+
+      // Collage y adicionales B/N ya no se usarán.
+      '',
+      '',
+
+      descripcion,
+
+      fechaToma,
+      fechaEntrega,
+      telefono,
+      urgencia,
+      estadoEntrega,
+
+      precioFinal,
+      abonoNum,
+      pagoEstado,
+      JSON.stringify(camposExtra),
+    ]
   );
 
+  const nuevaOrdenId = resultadoOrden.rows[0]?.id;
+
+  if (!nuevaOrdenId) {
+    throw new Error(
+      'No se recibió el ID de la orden institucional.'
+    );
+  }
+
+  for (const item of items) {
+    await cliente.query(
+      `
+      INSERT INTO ordenes_instituciones_detalle (
+        orden_institucion_id,
+        cantidad,
+        descripcion,
+        precio_unitario,
+        subtotal
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      `,
+      [
+        nuevaOrdenId,
+        item.cant,
+        item.desc,
+        item.pu,
+        item.subtotal,
+      ]
+    );
+  }
+
+  await cliente.query('COMMIT');
+
+  console.log(
+    `💾 Orden institucional ${nuevaOrdenId} guardada con ${items.length} productos adicionales`
+  );
+
+  return res.redirect(
+    '/admin/ordenes?tab=instituciones'
+  );
+} catch (err) {
+  await cliente.query('ROLLBACK');
+
+  console.error(
+    '❌ Error guardando orden institucional:',
+    err
+  );
+
+  return res.status(500).render(
+    'ordenes-nueva',
+    {
+      title: 'Nueva orden — institución',
+      error:
+        'No se pudo guardar la orden. No se registró ningún dato.',
+      datos,
+    }
+  );
+} finally {
+  cliente.release();
+}
+  }
+);
   // ---------------------------------------------------------------------------
   // NUEVA ORDEN — PERSONA
   // ---------------------------------------------------------------------------
@@ -1099,77 +1945,237 @@ router.get(
 
       const orden = rows[0];
 
-      // 👇 usa la vista que ya tenías para instituciones
+      // Productos o servicios adicionales de esta orden
+      const detalles = await dbSelect(
+        `
+        SELECT
+          id,
+          cantidad,
+          descripcion,
+          precio_unitario,
+          subtotal
+        FROM ordenes_instituciones_detalle
+        WHERE orden_institucion_id = $1
+        ORDER BY id ASC
+        `,
+        [id]
+      );
+
+      // Suma total de los productos adicionales
+      const totalDetalle = detalles.reduce(
+        (acumulado, item) =>
+          acumulado +
+          Number(item.cantidad || 0) *
+          Number(item.precio_unitario || 0),
+        0
+      );
+
       res.render('ordenes-editar-institucion.ejs', {
         title: 'Editar orden — institución',
-        idx: id,   // la vista suele usar idx en la acción del form
+        idx: id,
         orden,
+        detalles,
+        totalDetalle,
       });
     } catch (err) {
-      console.error('❌ Error cargando orden institución:', err);
-      return res.redirect('/admin/ordenes?tab=instituciones');
+      console.error(
+        '❌ Error cargando orden institución:',
+        err
+      );
+
+      return res.redirect(
+        '/admin/ordenes?tab=instituciones'
+      );
     }
   }
 );
 
+ // ---------------------------------------------------------------------------
+// ACTUALIZAR ORDEN — INSTITUCIÓN
+// ---------------------------------------------------------------------------
+router.post(
+  '/ordenes/institucion/:id/editar',
+  requireAuth,
+  express.urlencoded({ extended: true }),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const datos = req.body || {};
 
-  router.post(
-    '/ordenes/institucion/:id/editar',
-    requireAuth,
-    express.urlencoded({ extended: true }),
-    async (req, res) => {
-      const id = Number(req.params.id);
-      const datos = req.body || {};
-
-      if (!id || id <= 0) {
-        return res.redirect('/admin/ordenes?tab=instituciones');
-      }
-
-      const precioNum = Number(datos.precio) || 0;
-      const abonoNum = Number(datos.abono) || 0;
-      const pagoEstado = computePagoEstado(precioNum, abonoNum);
-
-      try {
-        await dbExec(
-  `UPDATE ordenes_personas 
-   SET nombre=$1,
-       numero_toma=$2,
-       fecha_toma=$3,
-       fecha_entrega=$4,
-       urgencia=$5,
-       precio=$6,
-       abono=$7,
-       telefono=$8,
-       entrega=$9,
-       evento=$10,
-       atendido_por=$11,
-       updated_at = NOW()
-   WHERE id = $12`,
-  [
-    req.body.nombre || '',
-    req.body.numero_toma || '',
-    req.body.fecha_toma || null,
-    req.body.fecha_entrega || null,
-    req.body.urgencia || 'Normal',
-    Number(req.body.precio) || 0,
-    Number(req.body.abono) || 0,
-    req.body.telefono || '',
-    req.body.estado_entrega || 'Pendiente',
-    req.body.evento || '',
-    req.body.atendido_por || '',
-    id,
-  ]
-);
-
-        console.log('💾 Orden institución actualizada en PostgreSQL');
-      } catch (err) {
-        console.error('❌ Error actualizando orden institución:', err);
-      }
-
-      res.redirect('/admin/ordenes?tab=instituciones');
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.redirect('/admin/ordenes?tab=instituciones');
     }
-  );
 
+    // Productos adicionales enviados desde el formulario
+    const { items, totalItems } = parseItemsFromBody(datos);
+
+    // El campo precio representa el precio base del paquete.
+    const precioBase = Math.max(
+      Number(datos.precio) || 0,
+      0
+    );
+
+    // Total definitivo de la orden
+    const precioFinal = precioBase + totalItems;
+
+    let abonoNum = Math.max(
+      Number(datos.abono) || 0,
+      0
+    );
+
+    // Evita que el abono supere el total de la orden.
+    if (precioFinal > 0 && abonoNum > precioFinal) {
+      abonoNum = precioFinal;
+    }
+
+    const pagoEstado = computePagoEstado(
+      precioFinal,
+      abonoNum
+    );
+
+    const fechaToma = datos.fecha_toma || null;
+    const fechaEntrega = datos.fecha_entrega || null;
+
+    const cliente = await db.connect();
+
+    try {
+      await cliente.query('BEGIN');
+
+      const resultadoActualizacion = await cliente.query(
+        `
+        UPDATE ordenes_instituciones
+        SET
+          institucion = $1,
+          nombre = $2,
+          grado = $3,
+          seccion = $4,
+          sesion = $5,
+          paquete = $6,
+          telefono = $7,
+
+          color_toma_principal = $8,
+          color_toma_secundaria = $9,
+          color_collage_letras = $10,
+          color_adicionales = $11,
+
+          byn_toma_principal = $12,
+          byn_toma_secundaria = $13,
+          byn_collage_letras = $14,
+          byn_adicionales = $15,
+
+          fecha_toma = $16,
+          fecha_entrega = $17,
+          urgencia = $18,
+
+          precio = $19,
+          abono = $20,
+          pago_estado = $21,
+          entrega = $22,
+
+          descripcion = $23,
+          updated_at = NOW()
+
+        WHERE id = $24
+        `,
+        [
+          String(datos.institucion || '').trim(),
+          String(datos.nombre || '').trim(),
+          String(datos.grado || '').trim(),
+          String(datos.seccion || '').trim(),
+          String(datos.sesion || '').trim(),
+          String(datos.paquete || '').trim(),
+          String(datos.telefono || '').trim(),
+
+          String(datos.color_toma_principal || '').trim(),
+          String(datos.color_toma_secundaria || '').trim(),
+          String(datos.color_collage_letras || '').trim(),
+
+          // Ya no se utiliza Adicionales en Color.
+          '',
+
+          String(datos.byn_toma_principal || '').trim(),
+          String(datos.byn_toma_secundaria || '').trim(),
+
+          // Ya no se utiliza Collage ni Adicionales B/N.
+          '',
+          '',
+
+          fechaToma,
+          fechaEntrega,
+          String(datos.urgencia || 'Normal').trim(),
+
+          precioFinal,
+          abonoNum,
+          pagoEstado,
+          String(datos.entrega || 'Pendiente').trim(),
+
+          String(datos.descripcion || '').trim(),
+          id,
+        ]
+      );
+
+      if (resultadoActualizacion.rowCount === 0) {
+        throw new Error(
+          `No se encontró la orden institucional ${id}.`
+        );
+      }
+
+      // Eliminar los productos anteriores
+      await cliente.query(
+        `
+        DELETE FROM ordenes_instituciones_detalle
+        WHERE orden_institucion_id = $1
+        `,
+        [id]
+      );
+
+      // Guardar nuevamente los productos del formulario
+      for (const item of items) {
+        await cliente.query(
+          `
+          INSERT INTO ordenes_instituciones_detalle (
+            orden_institucion_id,
+            cantidad,
+            descripcion,
+            precio_unitario,
+            subtotal
+          )
+          VALUES ($1, $2, $3, $4, $5)
+          `,
+          [
+            id,
+            item.cant,
+            item.desc,
+            item.pu,
+            item.subtotal,
+          ]
+        );
+      }
+
+      await cliente.query('COMMIT');
+
+      console.log(
+        `💾 Orden institucional ${id} actualizada con ${items.length} productos adicionales`
+      );
+
+      return res.redirect(
+        `/admin/ordenes/institucion/${id}/editar?actualizada=1`
+      );
+    } catch (err) {
+      await cliente.query('ROLLBACK');
+
+      console.error(
+        `❌ Error actualizando la orden institucional ${id}:`,
+        err
+      );
+
+      return res.status(500).send(
+        'No se pudo actualizar la orden de institución. No se guardó ningún cambio.'
+      );
+    } finally {
+      cliente.release();
+    }
+  }
+);
   // ---------------------------------------------------------------------------
   // EDITAR ORDEN — PERSONA
   // ---------------------------------------------------------------------------
@@ -1388,10 +2394,323 @@ router.post(
   // ---------------------------------------------------------------------------
 // DETALLE ORDEN — INSTITUCIÓN
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// IMPORTADOR PDF — CONFIGURAR ÓRDENES
+// ---------------------------------------------------------------------------
+router.post(
+  '/ordenes/instituciones/importar/configurar',
+  requireAuth,
+  express.urlencoded({
+    extended: true,
+    limit: '2mb',
+  }),
+  async (req, res) => {
+    const alumnos = normalizarListaAlumnos(req.body);
+
+    if (!alumnos.length) {
+      return res.status(400).render('ordenes-importar-pdf', {
+        title: 'Importar listado PDF',
+        error:
+          'No hay alumnos para configurar. Selecciona nuevamente el PDF.',
+      });
+    }
+
+    try {
+      // Instituciones existentes para facilitar la selección.
+      const institucionesExistentes = await dbSelect(
+        `
+        SELECT DISTINCT institucion
+        FROM ordenes_instituciones
+        WHERE institucion IS NOT NULL
+          AND TRIM(institucion) <> ''
+        ORDER BY institucion ASC
+        `
+      );
+
+      return res.render('ordenes-importar-configurar', {
+        title: 'Configurar importación',
+        alumnos,
+        institucionesExistentes:
+          institucionesExistentes.map((fila) => fila.institucion),
+        error: '',
+        datos: {},
+      });
+    } catch (err) {
+      console.error(
+        '❌ Error preparando configuración de importación:',
+        err
+      );
+
+      return res.status(500).send(
+        'No se pudo preparar la importación.'
+      );
+    }
+  }
+);
+// ---------------------------------------------------------------------------
+// IMPORTADOR PDF — CONFIRMAR E IMPORTAR EN POSTGRESQL
+// ---------------------------------------------------------------------------
+router.post(
+  '/ordenes/instituciones/importar/confirmar',
+  requireAuth,
+  express.urlencoded({
+    extended: true,
+    limit: '2mb',
+  }),
+  async (req, res) => {
+    const datos = req.body || {};
+    const alumnos = normalizarListaAlumnos(datos);
+
+    const institucion = toText(datos.institucion);
+    const grado = toText(datos.grado);
+    const seccion = toText(datos.seccion);
+    const paquete = toText(datos.paquete);
+
+    const fechaToma = datos.fecha_toma || null;
+    const fechaEntrega = datos.fecha_entrega || null;
+
+    const colorTomaPrincipal = toText(
+      datos.color_toma_principal
+    );
+
+    const colorTomaSecundaria = toText(
+      datos.color_toma_secundaria
+    );
+
+    const colorCollageLetras = toText(
+      datos.color_collage_letras
+    );
+
+    const colorAdicionales = toText(
+      datos.color_adicionales
+    );
+
+    const bynTomaPrincipal = toText(
+      datos.byn_toma_principal
+    );
+
+    const bynTomaSecundaria = toText(
+      datos.byn_toma_secundaria
+    );
+
+    const bynCollageLetras = toText(
+      datos.byn_collage_letras
+    );
+
+    const bynAdicionales = toText(
+      datos.byn_adicionales
+    );
+
+    const descripcion = toText(datos.descripcion);
+    const telefono = toText(datos.telefono);
+
+    const urgencia =
+      toText(datos.urgencia) || 'Normal';
+
+    const entrega =
+      toText(datos.entrega) || 'Pendiente';
+
+    const precioNum = Math.max(
+      Number(datos.precio) || 0,
+      0
+    );
+
+    const abonoNum = Math.max(
+      Number(datos.abono) || 0,
+      0
+    );
+
+    const pagoEstado = computePagoEstado(
+      precioNum,
+      abonoNum
+    );
+
+    const errores = [];
+
+    if (!institucion) {
+      errores.push('La institución es obligatoria.');
+    }
+
+    if (!grado) {
+      errores.push('El grado es obligatorio.');
+    }
+
+    if (!seccion) {
+      errores.push('La sección es obligatoria.');
+    }
+
+    if (!alumnos.length) {
+      errores.push('No hay alumnos para importar.');
+    }
+
+    if (errores.length) {
+      return res.status(400).send(errores.join(' '));
+    }
+
+    const cliente = await db.connect();
+
+    let importados = 0;
+    let duplicados = 0;
+
+    const nombresDuplicados = [];
+    const camposExtra = {};
+
+    try {
+      await cliente.query('BEGIN');
+
+      /*
+       * Obtenemos todas las órdenes del mismo grupo una sola vez.
+       * Es más eficiente que consultar la base por cada alumno.
+       */
+      const existentesResult = await cliente.query(
+        `
+        SELECT nombre
+        FROM ordenes_instituciones
+        WHERE LOWER(TRIM(institucion)) = LOWER(TRIM($1))
+          AND LOWER(TRIM(grado)) = LOWER(TRIM($2))
+          AND LOWER(TRIM(seccion)) = LOWER(TRIM($3))
+        `,
+        [
+          institucion,
+          grado,
+          seccion,
+        ]
+      );
+
+      const nombresExistentes = new Set(
+        existentesResult.rows.map((fila) =>
+          normalizarClaveImportacion(fila.nombre)
+        )
+      );
+
+      for (const nombreAlumno of alumnos) {
+        const claveAlumno =
+          normalizarClaveImportacion(nombreAlumno);
+
+        if (
+          !claveAlumno ||
+          nombresExistentes.has(claveAlumno)
+        ) {
+          duplicados += 1;
+          nombresDuplicados.push(nombreAlumno);
+          continue;
+        }
+
+        await cliente.query(
+          `
+          INSERT INTO ordenes_instituciones (
+            institucion,
+            nombre,
+            grado,
+            seccion,
+            sesion,
+            paquete,
+
+            color_toma_principal,
+            color_toma_secundaria,
+            color_collage_letras,
+            color_adicionales,
+
+            byn_toma_principal,
+            byn_toma_secundaria,
+            byn_collage_letras,
+            byn_adicionales,
+
+            descripcion,
+
+            fecha_toma,
+            fecha_entrega,
+            telefono,
+            urgencia,
+            entrega,
+
+            precio,
+            abono,
+            pago_estado,
+            campos_extra
+          )
+          VALUES (
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, $9, $10,
+            $11, $12, $13, $14,
+            $15,
+            $16, $17, $18, $19, $20,
+            $21, $22, $23, $24
+          )
+          `,
+          [
+            institucion,
+            nombreAlumno,
+            grado,
+            seccion,
+            '', // sesion
+            paquete,
+
+            colorTomaPrincipal,
+            colorTomaSecundaria,
+            colorCollageLetras,
+            colorAdicionales,
+
+            bynTomaPrincipal,
+            bynTomaSecundaria,
+            bynCollageLetras,
+            bynAdicionales,
+
+            descripcion,
+
+            fechaToma,
+            fechaEntrega,
+            telefono,
+            urgencia,
+            entrega,
+
+            precioNum,
+            abonoNum,
+            pagoEstado,
+            JSON.stringify(camposExtra),
+          ]
+        );
+
+        nombresExistentes.add(claveAlumno);
+        importados += 1;
+      }
+
+      await cliente.query('COMMIT');
+
+      console.log(
+        `✅ Importación terminada: ${importados} creados, ${duplicados} duplicados`
+      );
+
+      return res.render('ordenes-importar-resultado', {
+        title: 'Importación finalizada',
+        institucion,
+        grado,
+        seccion,
+        totalRecibidos: alumnos.length,
+        importados,
+        duplicados,
+        nombresDuplicados,
+      });
+    } catch (err) {
+      await cliente.query('ROLLBACK');
+
+      console.error(
+        '❌ Error en importación masiva institucional:',
+        err
+      );
+
+      return res.status(500).send(
+        'La importación no pudo completarse. No se guardó ninguna orden.'
+      );
+    } finally {
+      cliente.release();
+    }
+  }
+);
 router.get('/ordenes/institucion/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
 
-  if (!id || id <= 0) {
+  if (!Number.isInteger(id) || id <= 0) {
     return res.redirect('/admin/ordenes?tab=instituciones');
   }
 
@@ -1407,30 +2726,81 @@ router.get('/ordenes/institucion/:id', requireAuth, async (req, res) => {
 
     const orden = rows[0];
 
-    const precio = Number(orden.precio || 0);
-    const abono  = Number(orden.abono || 0);
-    const saldo  = Math.max(precio - abono, 0);
+    // Productos o servicios adicionales
+    const detalles = await dbSelect(
+      `
+      SELECT
+        id,
+        cantidad,
+        descripcion,
+        precio_unitario,
+        subtotal
+      FROM ordenes_instituciones_detalle
+      WHERE orden_institucion_id = $1
+      ORDER BY id ASC
+      `,
+      [id]
+    );
 
-    res.render('orden-detalle', {
+    const totalDetalle = detalles.reduce(
+      (total, item) =>
+        total +
+        Number(item.cantidad || 0) *
+        Number(item.precio_unitario || 0),
+      0
+    );
+
+    // orden.precio contiene el total completo
+    const precio = Math.max(
+      Number(orden.precio || 0),
+      0
+    );
+
+    const precioBase = Math.max(
+      precio - totalDetalle,
+      0
+    );
+
+    const abono = Math.max(
+      Number(orden.abono || 0),
+      0
+    );
+
+    const saldo = Math.max(
+      precio - abono,
+      0
+    );
+
+    return res.render('orden-detalle', {
       title: 'Detalle de orden — institución',
       tipo: 'institucion',
       idx: id,
       orden,
+
+      // Totales
       precio,
+      precioBase,
       abono,
       saldo,
-      pagoEstado: orden.pago_estado || 'Pendiente', // 👈 importante
-      detalles: [], // 👈 instituciones NO usan detalle tipo factura
-      totalDetalle: precio,
-    });
 
+      pagoEstado:
+        orden.pago_estado || 'Pendiente',
+
+      // Productos adicionales
+      detalles,
+      totalDetalle,
+    });
   } catch (err) {
-    console.error('❌ Error detalle institución:', err);
-    res.redirect('/admin/ordenes?tab=instituciones');
+    console.error(
+      '❌ Error detalle institución:',
+      err
+    );
+
+    return res.redirect(
+      '/admin/ordenes?tab=instituciones'
+    );
   }
 });
-
-
   // ---------------------------------------------------------------------------
   // DETALLE ORDEN — PERSONA
   // ---------------------------------------------------------------------------
@@ -1862,44 +3232,119 @@ router.get('/ordenes/persona/:id/ticket', requireAuth, async (req, res) => {
   // ---------------------------------------------------------------------------
   // TICKET 80 mm — INSTITUCIÓN
   // ---------------------------------------------------------------------------
-  router.get(
-    '/ordenes/institucion/:id/ticket',
-    requireAuth,
-    async (req, res) => {
-      const id = Number(req.params.id);
+ router.get(
+  '/ordenes/institucion/:id/ticket',
+  requireAuth,
+  async (req, res) => {
+    const id = Number(req.params.id);
 
-      try {
-        const rows = await dbSelect(
-          'SELECT * FROM ordenes_instituciones WHERE id = $1',
-          [id]
-        );
-        if (!rows.length) {
-          return res.redirect('/admin/ordenes?tab=instituciones');
-        }
-
-        const orden = rows[0];
-        const precio = Number(orden.precio || 0);
-        const abono = Number(orden.abono || 0);
-        const saldo = Math.max(precio - abono, 0);
-        const pagoEstado = derivePagoEstado(orden);
-
-        res.render('orden-ticket.ejs', {
-          title: 'Ticket — institución',
-          tipo: 'institucion',
-          idx: id,
-          orden,
-          precio,
-          abono,
-          saldo,
-          pagoEstado,
-        });
-      } catch (e) {
-        console.error('❌ Error ticket institucion:', e);
-        res.redirect('/admin/ordenes?tab=instituciones');
-      }
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.redirect('/admin/ordenes?tab=instituciones');
     }
-  );
 
+    try {
+      const rows = await dbSelect(
+        `
+        SELECT *
+        FROM ordenes_instituciones
+        WHERE id = $1
+        `,
+        [id]
+      );
+
+      if (!rows.length) {
+        return res.redirect('/admin/ordenes?tab=instituciones');
+      }
+
+      const orden = rows[0];
+
+      const detalles = await dbSelect(
+        `
+        SELECT
+          id,
+          cantidad,
+          descripcion,
+          precio_unitario,
+          subtotal
+        FROM ordenes_instituciones_detalle
+        WHERE orden_institucion_id = $1
+        ORDER BY id ASC
+        `,
+        [id]
+      );
+
+      const totalDetalle = detalles.reduce(
+        (total, item) => {
+          const cantidad = Math.max(
+            Number(item.cantidad) || 0,
+            0
+          );
+
+          const precioUnitario = Math.max(
+            Number(item.precio_unitario) || 0,
+            0
+          );
+
+          const subtotalGuardado = Number(item.subtotal);
+
+          return total + (
+            Number.isFinite(subtotalGuardado)
+              ? Math.max(subtotalGuardado, 0)
+              : cantidad * precioUnitario
+          );
+        },
+        0
+      );
+
+      const precio = Math.max(
+        Number(orden.precio || 0),
+        0
+      );
+
+      const precioBase = Math.max(
+        precio - totalDetalle,
+        0
+      );
+
+      const abono = Math.max(
+        Number(orden.abono || 0),
+        0
+      );
+
+      const saldo = Math.max(
+        precio - abono,
+        0
+      );
+
+      const pagoEstado = derivePagoEstado(orden);
+
+      return res.render('orden-ticket.ejs', {
+        title: 'Ticket — institución',
+        tipo: 'institucion',
+        idx: id,
+        orden,
+
+        precio,
+        precioBase,
+        abono,
+        saldo,
+        pagoEstado,
+
+        detalles,
+        totalDetalle,
+      });
+    } catch (e) {
+      console.error(
+        `❌ Error generando ticket de institución ${id}:`,
+        e
+      );
+
+      return res.redirect(
+        '/admin/ordenes?tab=instituciones'
+      );
+    }
+  }
+);
     // ---------------------------------------------------------------------------
   // PANEL DE CITAS (PostgreSQL)
   // ---------------------------------------------------------------------------

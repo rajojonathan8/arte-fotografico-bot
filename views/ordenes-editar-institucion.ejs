@@ -1,157 +1,1105 @@
 <%- include('_head', { title }) %>
 
-<header class="p-4 bg-white shadow">
-  <div class="max-w-4xl mx-auto flex items-center justify-between">
-    <h1 class="text-xl font-semibold">Editar orden — institución</h1>
-    <a href="/admin/ordenes?tab=instituciones"
-       class="text-sm text-slate-600 hover:text-slate-900">← Volver</a>
+<%
+  function fechaInput(valor) {
+    if (!valor) return '';
+
+    const fecha = valor instanceof Date
+      ? valor
+      : new Date(valor);
+
+    if (Number.isNaN(fecha.getTime())) {
+      return String(valor).slice(0, 10);
+    }
+
+    return fecha.toISOString().slice(0, 10);
+  }
+
+  const totalOrdenActual = Math.max(
+  Number(orden.precio || 0),
+  0
+);
+
+const adicionalesActuales = Math.max(
+  Number(totalDetalle || 0),
+  0
+);
+
+// La base de datos guarda el total completo.
+// Para mostrar el precio del paquete restamos los adicionales.
+const precioActual = Math.max(
+  totalOrdenActual - adicionalesActuales,
+  0
+);
+
+const abonoActual = Math.max(
+  Number(orden.abono || 0),
+  0
+);
+  const saldoActual = Math.max(precioActual - abonoActual, 0);
+
+const paquetes = [
+  'PAQUETE #1',
+  'PAQUETE #2',
+  'PAQUETE #3',
+  'PAQUETE #1 + COLLAGE',
+  'PAQUETE #2 + COLLAGE',
+  'PAQUETE #3 + COLLAGE',
+  'PAQUETE PERSONALIZADO',
+  'FOTOS B/N (4 fotos título + 4 certificado)',
+  'FOTOS B/N (4 fotos título + 4 cédula)',
+  'FOTOS B/N (2 fotos título + 2 certificado)'
+];
+
+  const paqueteActual = String(orden.paquete || '');
+%>
+
+<header class="border-b border-slate-200 bg-white shadow-sm">
+  <div
+    class="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between"
+  >
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-600">
+        Arte Fotográfico
+      </p>
+
+      <h1 class="mt-1 text-2xl font-bold text-slate-900">
+        Editar orden de institución
+      </h1>
+
+      <p class="mt-1 text-sm text-slate-500">
+        Actualiza la información del estudiante, las tomas y el estado de pago.
+      </p>
+    </div>
+
+    <a
+      href="/admin/ordenes?tab=instituciones"
+      class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+    >
+      ← Volver al listado
+    </a>
   </div>
 </header>
 
-<main class="max-w-4xl mx-auto p-4">
-  <form action="/admin/ordenes/institucion/<%= idx %>/editar" method="POST"
-        class="bg-white rounded-2xl shadow p-4 space-y-4">
+<main class="mx-auto max-w-6xl px-4 py-6">
 
-    <div class="grid md:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm mb-1">Institución</label>
-        <input name="institucion" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.institucion %>" required>
-      </div>
-      <div>
-    <label class="label">Nombre</label>
-    <input type="text" name="nombre" class="input"
-           value="<%= orden.nombre || '' %>">
-  </div>
-      <div>
-        <label class="block text-sm mb-1">Sección / Grupo</label>
-        <input name="seccion" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.seccion %>">
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">Paquete</label>
-        <input name="paquete" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.paquete %>">
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">Teléfono</label>
-        <input name="telefono" class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.telefono %>">
-      </div>
-    </div>
-
-    <div class="grid md:grid-cols-3 gap-4">
-      <div>
-        <label class="block text-sm mb-1">Toma principal</label>
-        <input type="number" name="toma_principal"
-               class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.toma_principal || 0 %>">
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">Collage 1</label>
-        <input type="number" name="collage1"
-               class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.collage1 || 0 %>">
-      </div>
-
-      <div>
-        <label class="block text-sm mb-1">Collage 2</label>
-        <input type="number" name="collage2"
-               class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.collage2 || 0 %>">
-      </div>
-       <div>
-    <label class="label">Collage 3</label>
-    <input type="number" name="collage3" class="input"
-           value="<%= orden.collage3 || 0 %>">
-  </div>
-    </div>
-
-    <div class="grid md:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm mb-1">Fecha toma</label>
-        <input type="date" name="fecha_toma"
-               class="w-full border rounded-lg px-3 py-2"
-               value="<%= orden.fecha_toma %>">
-      </div>
-      <div>
-  <label class="block text-sm font-medium mb-1">Fecha de entrega</label>
-  <input
-    type="date"
-    name="fecha_entrega"
-    value="<%= orden.fecha_entrega || '' %>"
-    class="w-full px-4 py-2 rounded border"
-  />
-</div>
-
-
-      <div>
-        <label class="block text-sm mb-1">Urgencia</label>
-        <select name="urgencia" class="w-full border rounded-lg px-3 py-2">
-          <option value="Normal" <%= orden.urgencia === 'Normal' ? 'selected' : '' %>>Normal</option>
-          <option value="Urgente" <%= orden.urgencia === 'Urgente' ? 'selected' : '' %>>Urgente</option>
-          <option value="Muy urgente" <%= orden.urgencia === 'Muy urgente' ? 'selected' : '' %>>Muy urgente</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="grid md:grid-cols-3 gap-4">
+  <!-- RESUMEN DE LA ORDEN -->
+  <section
+    class="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+  >
+    <div
+      class="border-b border-slate-200 bg-gradient-to-r from-slate-900 to-slate-800 px-5 py-4 text-white"
+    >
+      <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-    <label class="label">Precio</label>
-    <input type="number" step="0.01" name="precio" class="input"
-           value="<%= orden.precio || 0 %>">
-  </div>
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-300">
+            Orden institucional
+          </p>
 
-       <div>
-    <label class="label">Abonado (total)</label>
-    <input type="number" step="0.01" name="abono" class="input"
-           value="<%= orden.abono || 0 %>">
-    <p class="help-text">
-      Este es el total abonado (suma de pagos). Puedes corregirlo manualmente si lo necesitas.
+          <h2 class="mt-1 text-xl font-bold">
+            <%= orden.institucion || 'Institución sin registrar' %>
+          </h2>
+        </div>
+
+        <div class="text-sm text-slate-300">
+          ID:
+          <span class="font-bold text-white">
+            <%= orden.id || idx %>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid gap-4 px-5 py-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div>
+        <p class="text-xs font-semibold uppercase text-slate-400">
+          Estudiante
+        </p>
+
+        <p class="mt-1 font-semibold text-slate-800">
+          <%= orden.nombre || '-' %>
+        </p>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold uppercase text-slate-400">
+          Grado
+        </p>
+
+        <p class="mt-1 font-semibold text-slate-800">
+          <%= orden.grado || '-' %>
+        </p>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold uppercase text-slate-400">
+          Sección
+        </p>
+
+        <p class="mt-1 font-semibold text-slate-800">
+          <%= orden.seccion || '-' %>
+        </p>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold uppercase text-slate-400">
+          Paquete
+        </p>
+
+        <p class="mt-1 font-semibold text-slate-800">
+          <%= orden.paquete || '-' %>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <form
+    action="/admin/ordenes/institucion/<%= idx %>/editar"
+    method="POST"
+    class="space-y-6"
+  >
+
+    <!-- INFORMACIÓN GENERAL -->
+    <section
+      class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
+        <h2 class="text-lg font-bold text-slate-900">
+          1. Información general
+        </h2>
+
+        <p class="mt-1 text-sm text-slate-500">
+          Información de la institución y del estudiante.
+        </p>
+      </div>
+
+      <div class="grid gap-5 p-5 md:grid-cols-2">
+        <div>
+          <label
+            for="institucion"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Institución
+          </label>
+
+          <input
+            id="institucion"
+            type="text"
+            name="institucion"
+            value="<%= orden.institucion || '' %>"
+            required
+            autocomplete="organization"
+            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+          >
+        </div>
+
+        <div>
+          <label
+            for="nombre"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Nombre del estudiante
+          </label>
+
+          <input
+            id="nombre"
+            type="text"
+            name="nombre"
+            value="<%= orden.nombre || '' %>"
+            required
+            autocomplete="name"
+            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+          >
+        </div>
+
+        <div>
+          <label
+            for="grado"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Grado
+          </label>
+
+          <input
+            id="grado"
+            type="text"
+            name="grado"
+            value="<%= orden.grado || '' %>"
+            placeholder="Ejemplo: 2° General"
+            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+          >
+        </div>
+
+        <div>
+          <label
+            for="seccion"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Sección o grupo
+          </label>
+
+          <input
+            id="seccion"
+            type="text"
+            name="seccion"
+            value="<%= orden.seccion || '' %>"
+            placeholder="Ejemplo: A"
+            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+          >
+        </div>
+
+        <div>
+          <label
+            for="paquete"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Paquete
+          </label>
+
+          <select
+            id="paquete"
+            name="paquete"
+            required
+            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+          >
+            <option value="">Seleccionar paquete</option>
+
+            <% paquetes.forEach(function(paquete) { %>
+              <option
+                value="<%= paquete %>"
+                <%= paqueteActual === paquete ? 'selected' : '' %>
+              >
+                <%= paquete %>
+              </option>
+            <% }) %>
+
+            <% if (paqueteActual && !paquetes.includes(paqueteActual)) { %>
+              <option value="<%= paqueteActual %>" selected>
+                <%= paqueteActual %>
+              </option>
+            <% } %>
+          </select>
+        </div>
+
+        <div>
+          <label
+            for="telefono"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Teléfono
+          </label>
+
+          <input
+            id="telefono"
+            type="tel"
+            name="telefono"
+            value="<%= orden.telefono || '' %>"
+            placeholder="Ejemplo: 7000-0000"
+            autocomplete="tel"
+            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+          >
+        </div>
+      </div>
+    </section>
+
+    <!-- COLOR -->
+    <section
+      class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div class="border-b border-slate-200 bg-emerald-600 px-5 py-4">
+        <h2 class="text-lg font-bold text-slate-950">
+          2. Fotografías a color
+        </h2>
+
+        <p class="mt-1 text-sm text-slate-600">
+          Registra los números de las tomas y el collage a color.
+        </p>
+      </div>
+
+      <div class="grid gap-5 p-5 md:grid-cols-2">
+        <div>
+          <label
+            for="color_toma_principal"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Toma principal
+          </label>
+
+          <input
+            id="color_toma_principal"
+            type="text"
+            name="color_toma_principal"
+            value="<%= orden.color_toma_principal || '' %>"
+            placeholder="Número de toma"
+            class="w-full rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+          >
+        </div>
+
+        <div>
+          <label
+            for="color_toma_secundaria"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Toma secundaria
+          </label>
+
+          <input
+            id="color_toma_secundaria"
+            type="text"
+            name="color_toma_secundaria"
+            value="<%= orden.color_toma_secundaria || '' %>"
+            placeholder="Número de toma"
+            class="w-full rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+          >
+        </div>
+
+        <div>
+          <label
+            for="color_collage_letras"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Collage
+          </label>
+
+          <input
+            id="color_collage_letras"
+            type="text"
+            name="color_collage_letras"
+            value="<%= orden.color_collage_letras || '' %>"
+            placeholder="Número o referencia del collage"
+            class="w-full rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+          >
+        </div>
+
+       
+      </div>
+    </section>
+
+    <!-- BLANCO Y NEGRO -->
+    <section
+      class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div class="border-b border-slate-200 bg-emerald-600 px-5 py-4">
+        <h2 class="text-lg font-bold text-slate-900">
+          3. Fotografías en blanco y negro
+        </h2>
+
+        <p class="mt-1 text-sm text-slate-600">
+  Registra los números de las tomas en blanco y negro.
+</p>
+      </div>
+
+      <div class="grid gap-5 p-5 md:grid-cols-2 lg:grid-cols-3">
+        <div>
+          <label
+            for="byn_toma_principal"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Toma principal
+          </label>
+
+          <input
+            id="byn_toma_principal"
+            type="text"
+            name="byn_toma_principal"
+            value="<%= orden.byn_toma_principal || '' %>"
+            placeholder="Número de toma"
+            class="w-full rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-slate-700 focus:ring-2 focus:ring-slate-200"
+          >
+        </div>
+
+        <div>
+          <label
+            for="byn_toma_secundaria"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Toma secundaria
+          </label>
+
+          <input
+            id="byn_toma_secundaria"
+            type="text"
+            name="byn_toma_secundaria"
+            value="<%= orden.byn_toma_secundaria || '' %>"
+            placeholder="Número de toma"
+            class="w-full rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-slate-700 focus:ring-2 focus:ring-slate-200"
+          >
+        </div>
+
+       
+
+       
+      </div>
+    </section>
+
+    <!-- FECHAS Y ENTREGA -->
+    <section
+      class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div class="border-b border-slate-200 bg-emerald-600 px-5 py-4">
+        <h2 class="text-lg font-bold text-slate-950">
+          4. Fechas y entrega
+        </h2>
+
+        <p class="mt-1 text-sm text-slate-600">
+          Actualiza las fechas, la prioridad y el estado de entrega.
+        </p>
+      </div>
+
+      <div class="grid gap-5 p-5 md:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <label
+            for="fecha_toma"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Fecha de toma
+          </label>
+
+          <input
+            id="fecha_toma"
+            type="date"
+            name="fecha_toma"
+            value="<%= fechaInput(orden.fecha_toma) %>"
+            class="w-full rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          >
+        </div>
+
+        <div>
+          <label
+            for="fecha_entrega"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Fecha de entrega
+          </label>
+
+          <input
+            id="fecha_entrega"
+            type="date"
+            name="fecha_entrega"
+            value="<%= fechaInput(orden.fecha_entrega) %>"
+            class="w-full rounded-xl border border-slate-300 px-4 py-2.5 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          >
+        </div>
+
+        <div>
+          <label
+            for="urgencia"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Urgencia
+          </label>
+
+          <select
+            id="urgencia"
+            name="urgencia"
+            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          >
+            <option
+              value="Normal"
+              <%= (orden.urgencia || 'Normal') === 'Normal' ? 'selected' : '' %>
+            >
+              Normal
+            </option>
+
+            <option
+              value="Urgente"
+              <%= orden.urgencia === 'Urgente' ? 'selected' : '' %>
+            >
+              Urgente
+            </option>
+
+            <option
+              value="Muy urgente"
+              <%= orden.urgencia === 'Muy urgente' ? 'selected' : '' %>
+            >
+              Muy urgente
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label
+            for="entrega"
+            class="mb-1.5 block text-sm font-semibold text-slate-700"
+          >
+            Estado de entrega
+          </label>
+
+          <select
+            id="entrega"
+            name="entrega"
+            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          >
+            <option
+              value="Pendiente"
+              <%= orden.entrega !== 'Entregado' ? 'selected' : '' %>
+            >
+              Pendiente
+            </option>
+
+            <option
+              value="Entregado"
+              <%= orden.entrega === 'Entregado' ? 'selected' : '' %>
+            >
+              Entregado
+            </option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+   <!-- PAGO Y PRODUCTOS ADICIONALES -->
+<section
+  class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+>
+  <div class="border-b border-slate-200 bg-emerald-600 px-5 py-4">
+    <h2 class="text-lg font-bold text-slate-950">
+      5. Información de pago
+    </h2>
+
+    <p class="mt-1 text-sm text-slate-600">
+      El total se calcula sumando el precio del paquete y los productos adicionales.
     </p>
   </div>
 
-      <div>
-        <label class="block text-sm mb-1">Estado de pago</label>
-        <select name="pago_estado" class="w-full border rounded-lg px-3 py-2">
-          <option value="Pendiente"
-            <%= (orden.pago_estado || 'Pendiente') === 'Pendiente' ? 'selected' : '' %>>
-            Pendiente
-          </option>
-          <option value="Abono"
-            <%= orden.pago_estado === 'Abono' ? 'selected' : '' %>>
-            Abono
-          </option>
-          <option value="Pagado"
-            <%= orden.pago_estado === 'Pagado' ? 'selected' : '' %>>
-            Pagado
-          </option>
-        </select>
+  <div class="grid gap-5 p-5 md:grid-cols-2 lg:grid-cols-5">
+
+    <div>
+      <label
+        for="precio"
+        class="mb-1.5 block text-sm font-semibold text-slate-700"
+      >
+        Precio del paquete
+      </label>
+
+      <div class="relative">
+        <span
+          class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 font-semibold text-slate-500"
+        >
+          $
+        </span>
+
+        <input
+          id="precio"
+          type="number"
+          min="0"
+          step="0.01"
+          name="precio"
+          value="<%= precioActual.toFixed(2) %>"
+          class="w-full rounded-xl border border-slate-300 py-2.5 pl-8 pr-4 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+        >
       </div>
     </div>
 
     <div>
-      <label class="block text-sm mb-1">Entrega</label>
-      <select name="entrega" class="w-full border rounded-lg px-3 py-2">
-        <option value="Pendiente" <%= orden.entrega !== 'Entregado' ? 'selected' : '' %>>Pendiente</option>
-        <option value="Entregado" <%= orden.entrega === 'Entregado' ? 'selected' : '' %>>Entregado</option>
+      <label class="mb-1.5 block text-sm font-semibold text-slate-700">
+        Total adicionales
+      </label>
+
+      <div
+        class="flex min-h-[46px] items-center rounded-xl border border-sky-200 bg-sky-50 px-4"
+      >
+        <span class="mr-1 font-bold text-sky-700">$</span>
+
+        <span
+          id="totalAdicionalesVista"
+          class="text-lg font-extrabold text-sky-700"
+        >
+          <%= Number(totalDetalle || 0).toFixed(2) %>
+        </span>
+      </div>
+    </div>
+
+    <div>
+      <label class="mb-1.5 block text-sm font-semibold text-slate-700">
+        Total de la orden
+      </label>
+
+      <div
+        class="flex min-h-[46px] items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4"
+      >
+        <span class="mr-1 font-bold text-emerald-700">$</span>
+
+        <span
+          id="totalOrdenVista"
+          class="text-lg font-extrabold text-emerald-700"
+        >
+          <%= totalOrdenActual.toFixed(2) %>
+        </span>
+      </div>
+    </div>
+
+    <div>
+      <label
+        for="abono"
+        class="mb-1.5 block text-sm font-semibold text-slate-700"
+      >
+        Abonado
+      </label>
+
+      <div class="relative">
+        <span
+          class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 font-semibold text-slate-500"
+        >
+          $
+        </span>
+
+        <input
+          id="abono"
+          type="number"
+          min="0"
+          step="0.01"
+          name="abono"
+          value="<%= abonoActual.toFixed(2) %>"
+          class="w-full rounded-xl border border-slate-300 py-2.5 pl-8 pr-4 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+        >
+      </div>
+    </div>
+
+    <div>
+      <label class="mb-1.5 block text-sm font-semibold text-slate-700">
+        Saldo
+      </label>
+
+      <div
+        class="flex min-h-[46px] items-center rounded-xl border border-amber-200 bg-amber-50 px-4"
+      >
+        <span class="mr-1 font-bold text-amber-700">$</span>
+
+        <span
+          id="saldoVista"
+          class="text-lg font-extrabold text-amber-700"
+        >
+         <%= Math.max(totalOrdenActual - abonoActual, 0).toFixed(2) %>
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="grid gap-5 border-t border-slate-200 p-5 md:grid-cols-2">
+
+    <div>
+      <label
+        for="pago_estado"
+        class="mb-1.5 block text-sm font-semibold text-slate-700"
+      >
+        Estado de pago
+      </label>
+
+      <select
+        id="pago_estado"
+        name="pago_estado"
+        class="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+      >
+        <option
+          value="Pendiente"
+          <%= (orden.pago_estado || 'Pendiente') === 'Pendiente' ? 'selected' : '' %>
+        >
+          Pendiente
+        </option>
+
+        <option
+          value="Abono"
+          <%= orden.pago_estado === 'Abono' ? 'selected' : '' %>
+        >
+          Abono
+        </option>
+
+        <option
+          value="Pagado"
+          <%= orden.pago_estado === 'Pagado' ? 'selected' : '' %>
+        >
+          Pagado
+        </option>
       </select>
     </div>
 
-    <div class="flex justify-end gap-2 pt-2">
-      <a href="/admin/ordenes?tab=instituciones"
-         class="px-4 py-2 rounded-lg border text-sm text-slate-600 hover:bg-slate-50">
-        Cancelar
-      </a>
-      <button type="submit"
-              class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700">
-        Guardar cambios
+  </div>
+
+  <!-- PRODUCTOS ADICIONALES -->
+  <div class="border-t border-slate-200 p-5">
+
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h3 class="font-bold text-slate-900">
+          Productos o servicios adicionales
+        </h3>
+
+        <p class="mt-1 text-sm text-slate-500">
+          Agrega fotos grupales, copias, ampliaciones u otros productos.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        id="btnAgregarItem"
+        class="inline-flex items-center justify-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-sky-700"
+      >
+        + Agregar producto
       </button>
     </div>
+
+    <div class="overflow-x-auto rounded-xl border border-slate-200">
+      <table class="min-w-full text-sm">
+
+        <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+          <tr>
+            <th class="px-3 py-3 text-left">
+              Cantidad
+            </th>
+
+            <th class="px-3 py-3 text-left">
+              Descripción
+            </th>
+
+            <th class="px-3 py-3 text-right">
+              Precio unitario
+            </th>
+
+            <th class="px-3 py-3 text-right">
+              Subtotal
+            </th>
+
+            <th class="px-3 py-3 text-center">
+              Acción
+            </th>
+          </tr>
+        </thead>
+
+        <tbody
+          id="listaItems"
+          class="divide-y divide-slate-100"
+        >
+          <% (detalles || []).forEach(function(item) { %>
+            <tr class="fila-item">
+              <td class="px-3 py-3">
+                <input
+                  type="number"
+                  name="items_cantidad[]"
+                  min="1"
+                  step="1"
+                  value="<%= Number(item.cantidad || 1) %>"
+                  required
+                  class="item-cantidad w-24 rounded-lg border border-slate-300 px-3 py-2"
+                >
+              </td>
+
+              <td class="px-3 py-3">
+                <input
+                  type="text"
+                  name="items_descripcion[]"
+                  value="<%= item.descripcion || '' %>"
+                  required
+                  class="w-full min-w-[240px] rounded-lg border border-slate-300 px-3 py-2"
+                >
+              </td>
+
+              <td class="px-3 py-3">
+                <input
+                  type="number"
+                  name="items_precio_unitario[]"
+                  min="0"
+                  step="0.01"
+                  value="<%= Number(item.precio_unitario || 0).toFixed(2) %>"
+                  required
+                  class="item-precio ml-auto block w-32 rounded-lg border border-slate-300 px-3 py-2 text-right"
+                >
+              </td>
+
+              <td class="px-3 py-3 text-right font-bold text-slate-700">
+                $<span class="item-subtotal">
+                  <%= (
+                    Number(item.cantidad || 0) *
+                    Number(item.precio_unitario || 0)
+                  ).toFixed(2) %>
+                </span>
+              </td>
+
+              <td class="px-3 py-3 text-center">
+                <button
+                  type="button"
+                  class="btn-eliminar-item rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100"
+                >
+                  Eliminar
+                </button>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <div
+      id="mensajeSinItems"
+      class="<%= detalles && detalles.length ? 'hidden' : '' %> px-4 py-6 text-center text-sm text-slate-500"
+    >
+      No hay productos adicionales.
+    </div>
+
+  </div>
+</section>
+
+    <!-- DESCRIPCIÓN -->
+    <section
+      class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div class="border-b border-slate-200 bg-violet-600 px-5 py-4">
+        <h2 class="text-lg font-bold text-slate-950">
+          6. Descripción y observaciones
+        </h2>
+
+        <p class="mt-1 text-sm text-slate-600">
+          Agrega indicaciones especiales relacionadas con esta orden.
+        </p>
+      </div>
+
+      <div class="p-5">
+        <label
+          for="descripcion"
+          class="mb-1.5 block text-sm font-semibold text-slate-700"
+        >
+          Descripción
+        </label>
+
+        <textarea
+          id="descripcion"
+          name="descripcion"
+          rows="5"
+          placeholder="Ejemplo: utilizar toga azul, incluir fotografía grupal..."
+          class="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+        ><%= orden.descripcion || '' %></textarea>
+      </div>
+    </section>
+
+    <!-- BOTONES -->
+    <section
+      class="sticky bottom-0 z-10 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur"
+    >
+      <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+        <a
+          href="/admin/ordenes?tab=instituciones"
+          class="inline-flex items-center justify-center rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          Cancelar
+        </a>
+
+        <div class="flex flex-col gap-3 sm:flex-row">
+          <a
+            href="/admin/ordenes/institucion/<%= idx %>/ticket"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center justify-center rounded-xl border border-slate-900 px-5 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-900 hover:text-white"
+          >
+            🖨 Imprimir ticket
+          </a>
+
+          <button
+            type="submit"
+            class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+          >
+            Guardar cambios
+          </button>
+        </div>
+      </div>
+    </section>
+
   </form>
 </main>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const listaItems = document.getElementById('listaItems');
+    const mensajeSinItems = document.getElementById('mensajeSinItems');
+    const btnAgregarItem = document.getElementById('btnAgregarItem');
+
+    const precioInput = document.getElementById('precio');
+    const abonoInput = document.getElementById('abono');
+    const saldoVista = document.getElementById('saldoVista');
+    const pagoEstado = document.getElementById('pago_estado');
+
+    const totalAdicionalesVista =
+      document.getElementById('totalAdicionalesVista');
+
+    const totalOrdenVista =
+      document.getElementById('totalOrdenVista');
+
+    function numeroSeguro(valor) {
+      const numero = Number.parseFloat(valor);
+      return Number.isFinite(numero) ? numero : 0;
+    }
+
+    function actualizarTotales() {
+      let totalAdicionales = 0;
+
+      listaItems
+        .querySelectorAll('.fila-item')
+        .forEach(function (fila) {
+          const cantidadInput =
+            fila.querySelector('.item-cantidad');
+
+          const precioUnitarioInput =
+            fila.querySelector('.item-precio');
+
+          const subtotalVista =
+            fila.querySelector('.item-subtotal');
+
+          const cantidad = Math.max(
+            Math.floor(numeroSeguro(cantidadInput.value)),
+            0
+          );
+
+          const precioUnitario = Math.max(
+            numeroSeguro(precioUnitarioInput.value),
+            0
+          );
+
+          const subtotal = cantidad * precioUnitario;
+
+          subtotalVista.textContent = subtotal.toFixed(2);
+          totalAdicionales += subtotal;
+        });
+
+      const precioBase = Math.max(
+        numeroSeguro(precioInput.value),
+        0
+      );
+
+      const abono = Math.max(
+        numeroSeguro(abonoInput.value),
+        0
+      );
+
+      const totalOrden = precioBase + totalAdicionales;
+      const saldo = Math.max(totalOrden - abono, 0);
+
+      totalAdicionalesVista.textContent =
+        totalAdicionales.toFixed(2);
+
+      totalOrdenVista.textContent =
+        totalOrden.toFixed(2);
+
+      saldoVista.textContent =
+        saldo.toFixed(2);
+
+      if (totalOrden > 0 && abono >= totalOrden) {
+        pagoEstado.value = 'Pagado';
+      } else if (abono > 0) {
+        pagoEstado.value = 'Abono';
+      } else {
+        pagoEstado.value = 'Pendiente';
+      }
+
+      mensajeSinItems.classList.toggle(
+        'hidden',
+        listaItems.querySelectorAll('.fila-item').length > 0
+      );
+    }
+
+    function conectarFila(fila) {
+      fila
+        .querySelectorAll('.item-cantidad, .item-precio')
+        .forEach(function (input) {
+          input.addEventListener('input', actualizarTotales);
+        });
+
+      fila
+        .querySelector('.btn-eliminar-item')
+        .addEventListener('click', function () {
+          fila.remove();
+          actualizarTotales();
+        });
+    }
+
+    function escaparHtml(valor) {
+      return String(valor || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function agregarItem(datos = {}) {
+      const fila = document.createElement('tr');
+
+      fila.className = 'fila-item';
+
+      fila.innerHTML = `
+        <td class="px-3 py-3">
+          <input
+            type="number"
+            name="items_cantidad[]"
+            min="1"
+            step="1"
+            value="${escaparHtml(datos.cantidad || 1)}"
+            required
+            class="item-cantidad w-24 rounded-lg border border-slate-300 px-3 py-2"
+          >
+        </td>
+
+        <td class="px-3 py-3">
+          <input
+            type="text"
+            name="items_descripcion[]"
+            value="${escaparHtml(datos.descripcion || '')}"
+            placeholder="Descripción del producto"
+            required
+            class="w-full min-w-[240px] rounded-lg border border-slate-300 px-3 py-2"
+          >
+        </td>
+
+        <td class="px-3 py-3">
+          <input
+            type="number"
+            name="items_precio_unitario[]"
+            min="0"
+            step="0.01"
+            value="${escaparHtml(datos.precio || '0.00')}"
+            required
+            class="item-precio ml-auto block w-32 rounded-lg border border-slate-300 px-3 py-2 text-right"
+          >
+        </td>
+
+        <td class="px-3 py-3 text-right font-bold text-slate-700">
+          $<span class="item-subtotal">0.00</span>
+        </td>
+
+        <td class="px-3 py-3 text-center">
+          <button
+            type="button"
+            class="btn-eliminar-item rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100"
+          >
+            Eliminar
+          </button>
+        </td>
+      `;
+
+      listaItems.appendChild(fila);
+      conectarFila(fila);
+      actualizarTotales();
+
+      const descripcionInput = fila.querySelector(
+        'input[name="items_descripcion[]"]'
+      );
+
+      descripcionInput.focus();
+    }
+
+    listaItems
+      .querySelectorAll('.fila-item')
+      .forEach(conectarFila);
+
+    btnAgregarItem.addEventListener('click', function () {
+      agregarItem();
+    });
+
+    precioInput.addEventListener('input', actualizarTotales);
+    abonoInput.addEventListener('input', actualizarTotales);
+
+    actualizarTotales();
+  });
+</script>
 
 <%- include('_foot') %>

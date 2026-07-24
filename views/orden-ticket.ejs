@@ -196,28 +196,77 @@
     </div>
   </div>
 
-  <%
-    function formatFecha(value) {
-      if (!value) return '';
-      const d = (value instanceof Date) ? value : new Date(value);
-      if (isNaN(d.getTime())) return '';
-      return d.toISOString().slice(0, 10);
-    }
+ <%
+  function formatFecha(value) {
+    if (!value) return '';
 
-    const precioLocal = Number(precio ?? orden.precio ?? 0) || 0;
-    const abonoLocal  = Number(abono  ?? orden.abono  ?? 0) || 0;
-    const saldoLocal  = Math.max(precioLocal - abonoLocal, 0);
-    const fechaToma   = formatFecha(orden.fecha_toma);
-    const fechaEnt    = formatFecha(orden.fecha_entrega);
+    const d = value instanceof Date
+      ? value
+      : new Date(value);
 
-    const detallesSafe = Array.isArray(detalles) ? detalles : [];
-    const totalDetalle = detallesSafe.reduce((acc, it) => {
-      const c = Number(it.cantidad || 0);
-      const pu = Number(it.precio_unitario || 0);
-      return acc + (c * pu);
-    }, 0);
-  %>
+    if (Number.isNaN(d.getTime())) return '';
 
+    return d.toISOString().slice(0, 10);
+  }
+
+  const esInstitucion = tipo === 'institucion';
+  const esPersona = tipo === 'persona';
+
+  const precioLocal =
+    Number(precio ?? orden.precio ?? 0) || 0;
+
+  const abonoLocal =
+    Number(abono ?? orden.abono ?? 0) || 0;
+
+  const saldoLocal = Math.max(
+    precioLocal - abonoLocal,
+    0
+  );
+
+  const fechaToma = formatFecha(orden.fecha_toma);
+  const fechaEnt = formatFecha(orden.fecha_entrega);
+
+  const detallesSafe =
+    typeof detalles !== 'undefined' &&
+    Array.isArray(detalles)
+      ? detalles
+      : [];
+
+  const qrEntregaSeguro =
+    typeof qrEntregaDataUrl !== 'undefined'
+      ? qrEntregaDataUrl
+      : '';
+
+  const totalDetalleLocal = detallesSafe.reduce(
+    (acc, item) => {
+      const cantidad = Math.max(
+        Number(item.cantidad) || 0,
+        0
+      );
+
+      const precioUnitario = Math.max(
+        Number(item.precio_unitario) || 0,
+        0
+      );
+
+      const subtotalGuardado = Number(item.subtotal);
+
+      return acc + (
+        Number.isFinite(subtotalGuardado)
+          ? Math.max(subtotalGuardado, 0)
+          : cantidad * precioUnitario
+      );
+    },
+    0
+  );
+
+  const precioBaseLocal = esInstitucion
+    ? Math.max(
+        precioLocal - totalDetalleLocal,
+        0
+      )
+    : precioLocal;
+%>
   <div class="ticket-wrapper">
     <div class="ticket">
 
@@ -267,76 +316,155 @@
       <hr />
 
       <!-- CLIENTE / INSTITUCIÓN -->
-      <div class="small">
-        <div class="label">Orden de:</div>
-        <div>
-          <% if (tipo === 'persona') { %>
-            <%= orden.nombre || '' %>
-          <% } else { %>
-            <%= orden.institucion || '' %>
-            <% if (orden.nombre) { %><br />Contacto: <%= orden.nombre %><% } %>
-          <% } %>
-        </div>
+<div class="small">
 
-        <% if (orden.telefono) { %>
-          <div class="mt-2">
-            <span class="label">Tel:</span> <%= orden.telefono %>
-          </div>
-        <% } %>
+  <% if (esPersona) { %>
 
-        <% if (tipo === 'persona' && (orden.evento || orden.atendido_por)) { %>
-          <div class="mt-2">
-            <% if (orden.evento) { %>
-              <div><span class="label">Evento:</span> <%= orden.evento %></div>
-            <% } %>
-            <% if (orden.atendido_por) { %>
-              <div><span class="label">Atendido por:</span> <%= orden.atendido_por %></div>
-            <% } %>
-          </div>
-        <% } %>
+    <div class="label">Orden de:</div>
+    <div>
+      <%= orden.nombre || '-' %>
+    </div>
+
+    <% if (orden.telefono) { %>
+      <div class="mt-2">
+        <span class="label">Tel:</span>
+        <%= orden.telefono %>
       </div>
+    <% } %>
 
-      <hr />
+    <% if (orden.evento) { %>
+      <div class="mt-2">
+        <span class="label">Evento:</span>
+        <%= orden.evento %>
+      </div>
+    <% } %>
+
+    <% if (orden.atendido_por) { %>
+      <div class="mt-2">
+        <span class="label">Atendido por:</span>
+        <%= orden.atendido_por %>
+      </div>
+    <% } %>
+
+  <% } else { %>
+
+    <div class="row">
+      <span class="label">Institución:</span>
+      <span><%= orden.institucion || '-' %></span>
+    </div>
+
+    <div class="row">
+      <span class="label">Estudiante:</span>
+      <span><%= orden.nombre || '-' %></span>
+    </div>
+
+    <div class="row">
+      <span class="label">Grado:</span>
+      <span><%= orden.grado || '-' %></span>
+    </div>
+
+    <div class="row">
+      <span class="label">Sección:</span>
+      <span><%= orden.seccion || '-' %></span>
+    </div>
+
+    <div class="row">
+      <span class="label">Paquete:</span>
+      <span><%= orden.paquete || '-' %></span>
+    </div>
+
+    <% if (orden.telefono) { %>
+      <div class="row">
+        <span class="label">Teléfono:</span>
+        <span><%= orden.telefono %></span>
+      </div>
+    <% } %>
+
+  <% } %>
+
+</div>
+
+<hr />
 
       <!-- DETALLE BÁSICO -->
-      <div class="small">
-        <% if (tipo === 'institucion') { %>
-          <% if (orden.seccion) { %>
-            <div class="row">
-              <span class="label">Sección:</span>
-              <span><%= orden.seccion %></span>
-            </div>
-          <% } %>
+<div class="small">
 
-          <% if (orden.paquete) { %>
-            <div class="row">
-              <span class="label">Paquete:</span>
-              <span><%= orden.paquete %></span>
-            </div>
-          <% } %>
+  <% if (esInstitucion) { %>
 
-          <div class="row">
-            <span class="label">Tomas:</span>
-            <span>
-              Princ: <%= orden.toma_principal || 0 %>,
-              C1: <%= orden.collage1 || 0 %>,
-              C2: <%= orden.collage2 || 0 %>,
-              C3: <%= orden.collage3 || 0 %>
-            </span>
-          </div>
-        <% } else { %>
-          <div class="row">
-            <span class="label">N° toma:</span>
-            <span><%= orden.numero_toma || '' %></span>
-          </div>
-        <% } %>
-      </div>
+    <!-- ================= COLOR ================= -->
+   <!-- ================= COLOR ================= -->
+<div class="mt-2">
+  <div class="label center">
+    FOTOGRAFÍAS A COLOR
+  </div>
+
+  <div class="row">
+    <span class="label">Principal:</span>
+    <span>
+      <%= orden.color_toma_principal || '-' %>
+    </span>
+  </div>
+
+  <div class="row">
+    <span class="label">Secundaria:</span>
+    <span>
+      <%= orden.color_toma_secundaria || '-' %>
+    </span>
+  </div>
+
+  <div class="row">
+    <span class="label">Collage:</span>
+    <span>
+      <%= orden.color_collage_letras || '-' %>
+    </span>
+  </div>
+</div>
+
+    <hr />
+
+   <!-- ============ BLANCO Y NEGRO ============ -->
+<div class="mt-2">
+  <div class="label center">
+    FOTOGRAFÍAS EN BLANCO Y NEGRO
+  </div>
+
+  <div class="row">
+    <span class="label">Principal:</span>
+    <span>
+      <%= orden.byn_toma_principal || '-' %>
+    </span>
+  </div>
+
+  <div class="row">
+    <span class="label">Secundaria:</span>
+    <span>
+      <%= orden.byn_toma_secundaria || '-' %>
+    </span>
+  </div>
+</div>
+
+   
+
+  <% } else { %>
+
+    <div class="row">
+      <span class="label">N.º toma:</span>
+      <span><%= orden.numero_toma || '-' %></span>
+    </div>
+
+  <% } %>
+
+</div>
 
       <!-- ✅ NUEVO: DETALLE ORDENADO -->
-      <% if (tipo === 'persona' && detallesSafe.length) { %>
+      <% if (detallesSafe.length) { %>
         <hr />
         <div class="small detalle-wrap">
-          <div class="label">Detalle:</div>
+          <div class="label">
+  <%= esInstitucion
+    ? 'Productos adicionales:'
+    : 'Detalle de productos:' %>
+</div>
 
           <div class="detalle-head">
             <div>Cant</div>
@@ -348,7 +476,11 @@
           <% detallesSafe.forEach(function(it){ 
                const c = Number(it.cantidad || 0);
                const pu = Number(it.precio_unitario || 0);
-               const sub = c * pu;
+               const subtotalGuardado = Number(it.subtotal);
+
+const sub = Number.isFinite(subtotalGuardado)
+  ? subtotalGuardado
+  : c * pu;
           %>
             <div class="detalle-row">
               <div class="cant"><%= c %></div>
@@ -359,8 +491,12 @@
           <% }) %>
 
           <div class="detalle-total">
-            <span class="labelt">Total detalle:</span>
-            <span>$ <%= totalDetalle.toFixed(2) %></span>
+           <span class="labelt">
+  <%= esInstitucion
+    ? 'Total adicionales:'
+    : 'Total detalle:' %>
+</span>
+            <span>$ <%= totalDetalleLocal.toFixed(2) %></span>
           </div>
         </div>
       <% } %>
@@ -368,24 +504,65 @@
       <hr />
 
       <!-- PAGO -->
-      <div class="small">
-        <div class="row">
-          <span class="label">Precio:</span>
-          <span>$ <%= precioLocal.toFixed(2) %></span>
-        </div>
-        <div class="row">
-          <span class="label">Abono:</span>
-          <span>$ <%= abonoLocal.toFixed(2) %></span>
-        </div>
-        <div class="row">
-          <span class="label">Saldo:</span>
-          <span>$ <%= saldoLocal.toFixed(2) %></span>
-        </div>
-        <div class="row">
-          <span class="label">Pago:</span>
-          <span><%= pagoEstado || '' %></span>
-        </div>
-      </div>
+      <!-- PAGO -->
+<div class="small">
+
+  <% if (esInstitucion) { %>
+
+    <div class="row">
+      <span class="label">Precio paquete:</span>
+      <span>
+        $ <%= precioBaseLocal.toFixed(2) %>
+      </span>
+    </div>
+
+    <div class="row">
+      <span class="label">Adicionales:</span>
+      <span>
+        $ <%= totalDetalleLocal.toFixed(2) %>
+      </span>
+    </div>
+
+    <div class="row">
+      <span class="label">Total:</span>
+      <span>
+        $ <%= precioLocal.toFixed(2) %>
+      </span>
+    </div>
+
+  <% } else { %>
+
+    <div class="row">
+      <span class="label">Precio:</span>
+      <span>
+        $ <%= precioLocal.toFixed(2) %>
+      </span>
+    </div>
+
+  <% } %>
+
+  <div class="row">
+    <span class="label">Abono:</span>
+    <span>
+      $ <%= abonoLocal.toFixed(2) %>
+    </span>
+  </div>
+
+  <div class="row">
+    <span class="label">Saldo:</span>
+    <span>
+      $ <%= saldoLocal.toFixed(2) %>
+    </span>
+  </div>
+
+  <div class="row">
+    <span class="label">Pago:</span>
+    <span>
+      <%= pagoEstado || 'Pendiente' %>
+    </span>
+  </div>
+
+</div>
 
       <div class="small mt-2">
         * Todo abono o reservación de evento no es reembolsable.
@@ -397,9 +574,14 @@
       <hr />
 
       <div class="small">
-        Observaciones:
-        <div class="observaciones"></div>
-      </div>
+  Observaciones:
+
+  <div class="observaciones">
+    <% if (esInstitucion && orden.descripcion) { %>
+      <%= orden.descripcion %>
+    <% } %>
+  </div>
+</div>
 
       <div class="center small mt-2">
         ¡Gracias por su preferencia! Escanea el código para chatear.<br />
@@ -410,11 +592,21 @@
           <img src="/admin-public/qr-code.png" alt="Arte Fotográfico">
         </div>
       </div>
-      <% if (qrEntregaDataUrl) { %>
+      <% if (qrEntregaSeguro) { %>
   <div style="text-align:center; margin-top:10px;">
-    
-    <img src="<%= qrEntregaDataUrl %>" alt="QR entrega" style="width:160px; height:auto; margin:6px auto;" />
-    
+    <div style="font-size:14px; font-weight:900;">
+      Confirmar entrega
+    </div>
+
+    <img
+      src="<%= qrEntregaSeguro %>"
+      alt="QR de entrega"
+      style="width:160px; height:auto; margin:6px auto;"
+    />
+
+    <div style="font-size:12px;">
+      Escanear e ingresar PIN de empleado
+    </div>
   </div>
 <% } %>
 

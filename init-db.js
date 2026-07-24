@@ -122,7 +122,24 @@ const sqlMejorasOrdenesInstituciones = `
     ADD COLUMN IF NOT EXISTS fotos_blanco_negro TEXT,
     ADD COLUMN IF NOT EXISTS campos_extra JSONB NOT NULL DEFAULT '{}'::jsonb;
 `;
+// ============================================================================
+// TOMAS Y COLLAGES DE INSTITUCIONES
+// COLOR + BLANCO Y NEGRO
+// ============================================================================
 
+const sqlTomasInstitucionesV3 = `
+  ALTER TABLE ordenes_instituciones
+
+    ADD COLUMN IF NOT EXISTS color_toma_principal TEXT,
+    ADD COLUMN IF NOT EXISTS color_toma_secundaria TEXT,
+    ADD COLUMN IF NOT EXISTS color_collage_letras TEXT,
+    ADD COLUMN IF NOT EXISTS color_adicionales TEXT,
+
+    ADD COLUMN IF NOT EXISTS byn_toma_principal TEXT,
+    ADD COLUMN IF NOT EXISTS byn_toma_secundaria TEXT,
+    ADD COLUMN IF NOT EXISTS byn_collage_letras TEXT,
+    ADD COLUMN IF NOT EXISTS byn_adicionales TEXT;
+`;
 const sqlCamposTextoInstituciones = `
   ALTER TABLE ordenes_instituciones
     ALTER COLUMN toma_principal DROP DEFAULT,
@@ -179,6 +196,36 @@ const sqlCamposTextoInstituciones = `
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `;
+// Tabla de productos adicionales para órdenes institucionales
+const sqlOrdenesInstitucionesDetalle = `
+  CREATE TABLE IF NOT EXISTS ordenes_instituciones_detalle (
+    id SERIAL PRIMARY KEY,
+
+    orden_institucion_id INTEGER NOT NULL
+      REFERENCES ordenes_instituciones(id)
+      ON DELETE CASCADE,
+
+    cantidad INTEGER NOT NULL DEFAULT 1
+      CHECK (cantidad > 0),
+
+    descripcion TEXT NOT NULL,
+
+    precio_unitario NUMERIC(10,2) NOT NULL DEFAULT 0
+      CHECK (precio_unitario >= 0),
+
+    subtotal NUMERIC(10,2) NOT NULL DEFAULT 0
+      CHECK (subtotal >= 0),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+
+  CREATE INDEX IF NOT EXISTS
+    idx_ordenes_instituciones_detalle_orden
+  ON ordenes_instituciones_detalle (
+    orden_institucion_id
+  );
+`;
+
       
 const sqlAlterEventoAtendidoPersonas = `
   ALTER TABLE ordenes_personas
@@ -219,6 +266,9 @@ console.log('🟢 Columnas editor (editado/editado_at/impreso_at) OK');
     await client.query(sqlMejorasOrdenesInstituciones);
 console.log('🟢 Nuevos campos de instituciones OK');
 
+await client.query(sqlTomasInstitucionesV3);
+console.log('🟢 Campos Color y Blanco y Negro de instituciones OK');
+
 await client.query(sqlCamposTextoInstituciones);
 console.log('🟢 Toma principal y collages convertidos a texto OK');
       // 👇 NUEVO
@@ -228,7 +278,10 @@ console.log('🟢 Toma principal y collages convertidos a texto OK');
 
     await client.query(sqlOrdenesPersonasDetalle);
     console.log('🟢 Tabla "ordenes_personas_detalle" OK');
-
+await client.query(sqlOrdenesInstitucionesDetalle);
+console.log(
+  '🟢 Tabla "ordenes_instituciones_detalle" OK'
+);
 
 
     // Ya lo tenías:

@@ -1,0 +1,528 @@
+<%- include('_head', { title }) %>
+
+<header class="border-b border-slate-800 bg-slate-950">
+  <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400">
+        Arte Fotográfico
+      </p>
+
+      <h1 class="mt-1 text-xl font-bold text-white">
+        Configurar órdenes institucionales
+      </h1>
+    </div>
+
+    <a
+      href="/admin/ordenes/instituciones/importar"
+      class="text-sm font-semibold text-slate-300 transition hover:text-white"
+    >
+      ← Cancelar importación
+    </a>
+  </div>
+</header>
+
+<main class="mx-auto max-w-6xl space-y-6 p-4">
+
+  <!-- Progreso -->
+  <section class="rounded-2xl border border-slate-700 bg-slate-900/80 p-4">
+    <div class="grid gap-3 text-center text-xs sm:grid-cols-4">
+
+      <div class="rounded-xl bg-emerald-500/20 px-3 py-3 font-bold text-emerald-300">
+        ✓ 1. PDF seleccionado
+      </div>
+
+      <div class="rounded-xl bg-emerald-500/20 px-3 py-3 font-bold text-emerald-300">
+        ✓ 2. Alumnos revisados
+      </div>
+
+      <div class="rounded-xl bg-emerald-600 px-3 py-3 font-bold text-white">
+        3. Configurar orden
+      </div>
+
+      <div class="rounded-xl bg-slate-800 px-3 py-3 font-semibold text-slate-400">
+        4. Importar
+      </div>
+
+    </div>
+  </section>
+
+  <% if (error) { %>
+    <div class="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm font-semibold text-red-300">
+      ⚠️ <%= error %>
+    </div>
+  <% } %>
+
+  <!-- Resumen -->
+  <section class="grid gap-4 md:grid-cols-3">
+
+    <div class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5">
+      <p class="text-xs font-semibold uppercase text-slate-500">
+        Alumnos a importar
+      </p>
+
+      <p class="mt-2 text-3xl font-extrabold text-emerald-300">
+        <%= alumnos.length %>
+      </p>
+    </div>
+
+    <div class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 md:col-span-2">
+      <p class="text-xs font-semibold uppercase text-slate-500">
+        Funcionamiento
+      </p>
+
+      <p class="mt-2 text-sm leading-6 text-slate-300">
+        Los datos que ingreses serán aplicados a todos los alumnos. Después podrás editar individualmente cualquier orden.
+      </p>
+    </div>
+
+  </section>
+
+  <form
+    action="/admin/ordenes/instituciones/importar/confirmar"
+    method="POST"
+    id="formConfigurarImportacion"
+    class="space-y-6"
+  >
+
+    <!-- Conservamos los alumnos -->
+    <% alumnos.forEach(function(nombre) { %>
+      <input
+        type="hidden"
+        name="alumnos[]"
+        value="<%= nombre %>"
+      >
+    <% }) %>
+
+    <!-- INFORMACIÓN GENERAL -->
+    <section class="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80">
+
+      <div class="border-b border-slate-700 bg-slate-950 px-5 py-4">
+        <h2 class="text-base font-bold text-white">
+          📋 Información general
+        </h2>
+
+        <p class="mt-1 text-xs text-slate-400">
+          Estos datos se aplicarán a las <%= alumnos.length %> órdenes.
+        </p>
+      </div>
+
+      <div class="grid gap-5 p-5 md:grid-cols-2">
+
+        <div>
+          <label
+            for="institucion"
+            class="mb-1 block text-xs font-bold uppercase text-slate-400"
+          >
+            Institución *
+          </label>
+
+          <input
+            type="text"
+            id="institucion"
+            name="institucion"
+            list="listaInstituciones"
+            required
+            value="<%= datos.institucion || '' %>"
+            placeholder="Nombre de la institución"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+          >
+
+          <datalist id="listaInstituciones">
+            <% (institucionesExistentes || []).forEach(function(nombre) { %>
+              <option value="<%= nombre %>"></option>
+            <% }) %>
+          </datalist>
+        </div>
+
+        <div>
+          <label
+            for="grado"
+            class="mb-1 block text-xs font-bold uppercase text-slate-400"
+          >
+            Grado *
+          </label>
+
+          <input
+            type="text"
+            id="grado"
+            name="grado"
+            required
+            value="<%= datos.grado || '' %>"
+            placeholder="Ejemplo: 2° General"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+          >
+        </div>
+
+        <div>
+          <label
+            for="seccion"
+            class="mb-1 block text-xs font-bold uppercase text-slate-400"
+          >
+            Sección *
+          </label>
+
+          <input
+            type="text"
+            id="seccion"
+            name="seccion"
+            required
+            value="<%= datos.seccion || '' %>"
+            placeholder="Ejemplo: A"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+          >
+        </div>
+
+        <div>
+          <label
+            for="paquete"
+            class="mb-1 block text-xs font-bold uppercase text-slate-400"
+          >
+            Paquete
+          </label>
+
+          <select
+            id="paquete"
+            name="paquete"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+          >
+            <option value="">Sin asignar</option>
+            <option value="PAQUETE #1">PAQUETE #1</option>
+            <option value="PAQUETE #2">PAQUETE #2</option>
+            <option value="PAQUETE #3">PAQUETE #3</option>
+            <option value="PAQUETE #1 + COLLAGE">PAQUETE #1 + COLLAGE</option>
+            <option value="PAQUETE #2 + COLLAGE">PAQUETE #2 + COLLAGE</option>
+            <option value="PAQUETE #3 + COLLAGE">PAQUETE #3 + COLLAGE</option>
+            <option value="PAQUETE PERSONALIZADO">PAQUETE PERSONALIZADO</option>
+          </select>
+        </div>
+
+        <div>
+          <label
+            for="fecha_toma"
+            class="mb-1 block text-xs font-bold uppercase text-slate-400"
+          >
+            Fecha de toma
+          </label>
+
+          <input
+            type="date"
+            id="fecha_toma"
+            name="fecha_toma"
+            value="<%= datos.fecha_toma || '' %>"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+          >
+        </div>
+
+        <div>
+          <label
+            for="fecha_entrega"
+            class="mb-1 block text-xs font-bold uppercase text-slate-400"
+          >
+            Fecha de entrega
+          </label>
+
+          <input
+            type="date"
+            id="fecha_entrega"
+            name="fecha_entrega"
+            value="<%= datos.fecha_entrega || '' %>"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+          >
+        </div>
+
+      </div>
+    </section>
+
+    <!-- FOTOGRAFÍAS COLOR -->
+    <section class="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80">
+
+      <div class="border-b border-slate-700 bg-slate-950 px-5 py-4">
+        <h2 class="text-base font-bold text-white">
+          📷 Fotografías a color
+        </h2>
+      </div>
+
+      <div class="grid gap-5 p-5 md:grid-cols-2 lg:grid-cols-4">
+
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+            Toma principal
+          </label>
+
+          <input
+            type="text"
+            name="color_toma_principal"
+            placeholder="Ejemplo: 1 de 8×10"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-500"
+          >
+        </div>
+
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+            Toma secundaria
+          </label>
+
+          <input
+            type="text"
+            name="color_toma_secundaria"
+            placeholder="Ejemplo: 2 de 5×7"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-500"
+          >
+        </div>
+
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+            Collage
+          </label>
+
+          <input
+            type="text"
+            name="color_collage_letras"
+            placeholder="Ejemplo: 1 collage"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-500"
+          >
+        </div>
+
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+            Adicionales
+          </label>
+
+          <input
+            type="text"
+            name="color_adicionales"
+            placeholder="Opcional"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-amber-500"
+          >
+        </div>
+
+      </div>
+    </section>
+
+    <!-- BLANCO Y NEGRO -->
+    <section class="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80">
+
+      <div class="border-b border-slate-700 bg-slate-950 px-5 py-4">
+        <h2 class="text-base font-bold text-white">
+          ⚫ Fotografías en blanco y negro
+        </h2>
+      </div>
+
+      <div class="grid gap-5 p-5 md:grid-cols-2 lg:grid-cols-4">
+
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+            Toma principal
+          </label>
+
+          <input
+            type="text"
+            name="byn_toma_principal"
+            placeholder="Ejemplo: 4 tamaño cédula"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-slate-400"
+          >
+        </div>
+
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+            Toma secundaria
+          </label>
+
+          <input
+            type="text"
+            name="byn_toma_secundaria"
+            placeholder="Opcional"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-slate-400"
+          >
+        </div>
+
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+            Collage
+          </label>
+
+          <input
+            type="text"
+            name="byn_collage_letras"
+            placeholder="Opcional"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-slate-400"
+          >
+        </div>
+
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+            Adicionales
+          </label>
+
+          <input
+            type="text"
+            name="byn_adicionales"
+            placeholder="Opcional"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-slate-400"
+          >
+        </div>
+
+      </div>
+    </section>
+
+    <!-- PAGO Y ESTADOS -->
+    <section class="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80">
+
+      <div class="border-b border-slate-700 bg-slate-950 px-5 py-4">
+        <h2 class="text-base font-bold text-white">
+          💲 Pago y estado
+        </h2>
+      </div>
+
+      <div class="grid gap-5 p-5 md:grid-cols-2 lg:grid-cols-4">
+
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+            Precio por alumno
+          </label>
+
+          <input
+            type="number"
+            name="precio"
+            id="precio"
+            min="0"
+            step="0.01"
+            value="0"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+          >
+        </div>
+
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+            Abono por alumno
+          </label>
+
+          <input
+            type="number"
+            name="abono"
+            id="abono"
+            min="0"
+            step="0.01"
+            value="0"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+          >
+        </div>
+
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+            Urgencia
+          </label>
+
+          <select
+            name="urgencia"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+          >
+            <option value="Normal">Normal</option>
+            <option value="Urgente">Urgente</option>
+            <option value="Muy urgente">Muy urgente</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+            Entrega
+          </label>
+
+          <select
+            name="entrega"
+            class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+          >
+            <option value="Pendiente">Pendiente</option>
+            <option value="Entregado">Entregado</option>
+          </select>
+        </div>
+
+      </div>
+
+      <div class="border-t border-slate-700 p-5">
+        <label class="mb-1 block text-xs font-bold uppercase text-slate-400">
+          Descripción general
+        </label>
+
+        <textarea
+          name="descripcion"
+          rows="3"
+          placeholder="Observaciones que se aplicarán a todas las órdenes"
+          class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none focus:border-emerald-500"
+        ></textarea>
+      </div>
+    </section>
+
+    <!-- Confirmación -->
+    <section class="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5">
+
+      <h2 class="font-bold text-amber-300">
+        Antes de importar
+      </h2>
+
+      <p class="mt-2 text-sm leading-6 text-slate-300">
+        Se comprobarán posibles duplicados usando institución, alumno, grado y sección. Los registros existentes no se volverán a crear.
+      </p>
+
+      <label class="mt-4 flex cursor-pointer items-start gap-3">
+        <input
+          type="checkbox"
+          required
+          class="mt-1 h-4 w-4 accent-emerald-600"
+        >
+
+        <span class="text-sm text-slate-200">
+          Confirmo que revisé los <strong><%= alumnos.length %> alumnos</strong> y que la información es correcta.
+        </span>
+      </label>
+
+    </section>
+
+    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
+
+      <a
+        href="/admin/ordenes/instituciones/importar"
+        class="inline-flex items-center justify-center rounded-xl border border-slate-600 px-5 py-3 text-sm font-bold text-slate-200 transition hover:bg-slate-800"
+      >
+        Cancelar
+      </a>
+
+      <button
+        type="submit"
+        id="btnImportar"
+        class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-7 py-3 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        Importar <%= alumnos.length %> órdenes
+      </button>
+
+    </div>
+  </form>
+</main>
+
+<script>
+  const formulario = document.getElementById(
+    'formConfigurarImportacion'
+  );
+
+  const btnImportar = document.getElementById('btnImportar');
+
+  formulario.addEventListener('submit', function (event) {
+    const cantidad = <%- JSON.stringify(alumnos.length) %>;
+
+    const confirmado = window.confirm(
+      'Se crearán hasta ' +
+      cantidad +
+      ' órdenes institucionales. ¿Deseas continuar?'
+    );
+
+    if (!confirmado) {
+      event.preventDefault();
+      return;
+    }
+
+    btnImportar.disabled = true;
+    btnImportar.textContent = 'Importando órdenes...';
+  });
+</script>
+
+<%- include('_foot') %>

@@ -1,192 +1,984 @@
 <%- include('_head', { title }) %>
 
-<main class="max-w-3xl mx-auto p-4">
-  <h1 class="text-2xl font-semibold mb-6">Nueva orden — Institución</h1>
+<%
+  const form = (typeof datos !== 'undefined' && datos) ? datos : {};
 
-  <form action="/admin/ordenes/nueva-institucion" method="POST" class="space-y-4">
+  function valor(nombre, respaldo = '') {
+    const v = form[nombre];
 
-    <!-- Institución -->
+    if (Array.isArray(v)) {
+      return v.length ? v[0] : respaldo;
+    }
+
+    return v !== undefined && v !== null ? v : respaldo;
+  }
+%>
+
+<main class="max-w-6xl mx-auto p-4 space-y-6">
+
+  <!-- ====================================================== -->
+  <!-- ENCABEZADO -->
+  <!-- ====================================================== -->
+  <header class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
     <div>
-      <label class="block text-sm font-medium mb-1">Institución</label>
-      <input
-        type="text"
-        name="institucion"
-        class="w-full px-4 py-2 rounded border"
-        placeholder="Nombre de la institución"
-        required
-      />
+      <h1 class="text-2xl font-bold text-slate-100">
+        Nueva orden — Institución
+      </h1>
+
+      <p class="mt-1 text-sm text-slate-400">
+        Registra la institución, el estudiante y las tomas fotográficas.
+      </p>
     </div>
 
-    <!-- Nombre alumno / contacto -->
-    <div>
-      <label class="block text-sm font-medium mb-1">Nombre</label>
-      <input
-        type="text"
-        name="nombre"
-        class="w-full px-4 py-2 rounded border"
-        placeholder="Nombre del alumno / contacto"
-      />
-    </div>
+    <a
+      href="/admin/ordenes?tab=instituciones"
+      class="text-sm text-sky-300 hover:text-sky-200"
+    >
+      ← Volver a órdenes
+    </a>
+  </header>
 
-    <!-- Sección / Grupo + Paquete -->
-    <div class="grid md:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm font-medium mb-1">Sección / Grupo</label>
-        <input
-          type="text"
-          name="seccion"
-          class="w-full px-4 py-2 rounded border"
-          placeholder="Ej.: 9° A, 3° Bachillerato…"
-        />
+  <!-- ====================================================== -->
+  <!-- MENSAJE DE ERROR -->
+  <!-- ====================================================== -->
+  <% if (typeof error !== 'undefined' && error) { %>
+    <div
+      class="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+    >
+      <%= error %>
+    </div>
+  <% } %>
+
+  <form
+    method="POST"
+    action="/admin/ordenes/nueva-institucion"
+    class="space-y-6"
+  >
+
+    <!-- ====================================================== -->
+    <!-- BLOQUE 1: INSTITUCIÓN Y ESTUDIANTE -->
+    <!-- ====================================================== -->
+    <section
+      class="rounded-2xl border border-slate-700 bg-slate-900/60 p-4 md:p-5"
+    >
+      <div class="mb-4">
+        <h2 class="text-base font-semibold text-slate-100">
+          Datos de la institución y del estudiante
+        </h2>
+
+        <p class="mt-1 text-xs text-slate-400">
+          Información general para identificar la orden.
+        </p>
       </div>
 
-      <div>
-        <label class="block text-sm font-medium mb-1">Paquete</label>
-        <input
-          type="text"
-          name="paquete"
-          class="w-full px-4 py-2 rounded border"
-          placeholder="Paquete contratado (A, B, C…)"
-        />
-      </div>
-    </div>
+      <div class="grid gap-4 md:grid-cols-2">
 
-    <!-- Toma principal + Collages -->
-    <div>
-      <label class="block text-sm font-medium mb-1">Tomas y collages</label>
-      <div class="grid md:grid-cols-4 gap-4">
         <div>
-          <span class="block text-xs text-slate-600 mb-1">Toma principal</span>
-          <input
-            type="number"
-            name="toma_principal"
-            class="w-full px-4 py-2 rounded border"
-            value="0"
-          />
-        </div>
-        <div>
-          <span class="block text-xs text-slate-600 mb-1">Collage 1</span>
-          <input
-            type="number"
-            name="collage1"
-            class="w-full px-4 py-2 rounded border"
-            value="0"
-          />
-        </div>
-        <div>
-          <span class="block text-xs text-slate-600 mb-1">Collage 2</span>
-          <input
-            type="number"
-            name="collage2"
-            class="w-full px-4 py-2 rounded border"
-            value="0"
-          />
-        </div>
-        <div>
-          <span class="block text-xs text-slate-600 mb-1">Collage 3</span>
-          <input
-            type="number"
-            name="collage3"
-            class="w-full px-4 py-2 rounded border"
-            value="0"
-          />
-        </div>
-      </div>
-    </div>
+          <label
+            for="institucion"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Institución *
+          </label>
 
-    <!-- Fechas / teléfono -->
-    <div class="grid md:grid-cols-3 gap-4">
-  <div>
-    <label class="block text-sm font-medium mb-1">Fecha pedido</label>
-    <input type="date" name="fecha_toma" class="w-full px-4 py-2 rounded border" />
-  </div>
-  <div>
-    <label class="block text-sm font-medium mb-1">Fecha de entrega</label>
-    <input type="date" name="fecha_entrega" class="w-full px-4 py-2 rounded border" />
-  </div>
-  <div>
-    <label class="block text-sm font-medium mb-1">Teléfono de contacto</label>
-    <input type="text" name="telefono" class="w-full px-4 py-2 rounded border" placeholder="5037XXXXXX" />
-  </div>
+          <input
+            id="institucion"
+            name="institucion"
+            type="text"
+            required
+            value="<%= valor('institucion') %>"
+            placeholder="Ej: Colegio Centro América"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+          />
+        </div>
+
+        <div>
+          <label
+            for="nombre"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Nombre del estudiante *
+          </label>
+
+          <input
+            id="nombre"
+            name="nombre"
+            type="text"
+            required
+            value="<%= valor('nombre') %>"
+            placeholder="Nombre completo del estudiante"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+          />
+        </div>
+
+        <div>
+          <label
+            for="grado"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Grado *
+          </label>
+
+          <input
+            id="grado"
+            name="grado"
+            type="text"
+            required
+            value="<%= valor('grado') %>"
+            placeholder="Ej: 2° General"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+          />
+        </div>
+
+        <div>
+          <label
+            for="seccion"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Sección / grupo *
+          </label>
+
+          <input
+            id="seccion"
+            name="seccion"
+            type="text"
+            required
+            value="<%= valor('seccion') %>"
+            placeholder="Ej: A, B, 2° A"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+          />
+        </div>
+
+        <div>
+  <label
+    for="paquete"
+    class="mb-1 block text-xs font-semibold text-slate-200"
+  >
+    Paquete *
+  </label>
+
+  <select
+    id="paquete"
+    name="paquete"
+    required
+    class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+  >
+    <option value="">Seleccione un paquete</option>
+
+    <option
+      value="PAQUETE #1"
+      <%= valor('paquete') === 'PAQUETE #1' ? 'selected' : '' %>
+    >
+      PAQUETE #1
+    </option>
+
+    <option
+      value="PAQUETE #2"
+      <%= valor('paquete') === 'PAQUETE #2' ? 'selected' : '' %>
+    >
+      PAQUETE #2
+    </option>
+
+    <option
+      value="PAQUETE #3"
+      <%= valor('paquete') === 'PAQUETE #3' ? 'selected' : '' %>
+    >
+      PAQUETE #3
+    </option>
+
+    <option
+      value="PAQUETE #1 + COLLAGE"
+      <%= valor('paquete') === 'PAQUETE #1 + COLLAGE' ? 'selected' : '' %>
+    >
+      PAQUETE #1 + COLLAGE
+    </option>
+
+    <option
+      value="PAQUETE #2 + COLLAGE"
+      <%= valor('paquete') === 'PAQUETE #2 + COLLAGE' ? 'selected' : '' %>
+    >
+      PAQUETE #2 + COLLAGE
+    </option>
+
+    <option
+      value="PAQUETE #3 + COLLAGE"
+      <%= valor('paquete') === 'PAQUETE #3 + COLLAGE' ? 'selected' : '' %>
+    >
+      PAQUETE #3 + COLLAGE
+    </option>
+
+    <option
+      value="PAQUETE PERSONALIZADO"
+      <%= valor('paquete') === 'PAQUETE PERSONALIZADO' ? 'selected' : '' %>
+    >
+      PAQUETE PERSONALIZADO
+    </option>
+
+    <option
+  value="FOTOS B/N (4 fotos título + 4 certificado)"
+  <%= valor('paquete') === 'FOTOS B/N (4 fotos título + 4 certificado)' ? 'selected' : '' %>
+>
+  FOTOS B/N (4 fotos título + 4 certificado)
+</option>
+
+<option
+  value="FOTOS B/N (4 fotos título + 4 cédula)"
+  <%= valor('paquete') === 'FOTOS B/N (4 fotos título + 4 cédula)' ? 'selected' : '' %>
+>
+  FOTOS B/N (4 fotos título + 4 cédula)
+</option>
+
+<option
+  value="FOTOS B/N (2 fotos título + 2 certificado)"
+  <%= valor('paquete') === 'FOTOS B/N (2 fotos título + 2 certificado)' ? 'selected' : '' %>
+>
+  FOTOS B/N (2 fotos título + 2 certificado)
+</option>
+  </select>
 </div>
 
-    <!-- Urgencia -->
+        <div class="md:col-span-2">
+          <label
+            for="telefono"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Teléfono de contacto
+          </label>
+
+          <input
+            id="telefono"
+            name="telefono"
+            type="text"
+            value="<%= valor('telefono') %>"
+            placeholder="Ej: 7815-6115"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+          />
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================== -->
+    <!-- BLOQUE 2: COLOR -->
+    <!-- ====================================================== -->
+    <section
+      class="rounded-2xl border border-sky-700/50 bg-slate-900/60 p-4 md:p-5"
+    >
+      <div class="mb-4 flex flex-wrap items-center gap-2">
+        <h2 class="text-base font-semibold text-slate-100">
+          Tomas y collages
+        </h2>
+
+        <span
+          class="rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-xs font-semibold text-sky-300"
+        >
+          COLOR
+        </span>
+      </div>
+
+      <div class="grid gap-4 sm:grid-cols-2">
+
+        <div>
+          <label
+            for="color_toma_principal"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Toma principal *
+          </label>
+
+          <input
+            id="color_toma_principal"
+            name="color_toma_principal"
+            type="text"
+            required
+            value="<%= valor('color_toma_principal') %>"
+            placeholder="Ej: 7918"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-sky-500"
+          />
+        </div>
+
+        <div>
+          <label
+            for="color_toma_secundaria"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Toma secundaria
+          </label>
+
+          <input
+            id="color_toma_secundaria"
+            name="color_toma_secundaria"
+            type="text"
+            value="<%= valor('color_toma_secundaria') %>"
+            placeholder="Ej: 7928"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-sky-500"
+          />
+        </div>
+
+        <div>
+          <label
+            for="color_collage_letras"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Collage
+          </label>
+
+          <input
+            id="color_collage_letras"
+            name="color_collage_letras"
+            type="text"
+            value="<%= valor('color_collage_letras') %>"
+            placeholder="Ej: 7941"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-sky-500"
+          />
+        </div>
+
+        
+
+      </div>
+    </section>
+
+    <!-- ====================================================== -->
+    <!-- BLOQUE 3: BLANCO Y NEGRO -->
+    <!-- ====================================================== -->
+    <section
+      class="rounded-2xl border border-slate-600 bg-slate-900/60 p-4 md:p-5"
+    >
+      <div class="mb-4 flex flex-wrap items-center gap-2">
+        <h2 class="text-base font-semibold text-slate-100">
+          Tomas
+        </h2>
+
+        <span
+          class="rounded-full border border-slate-500 bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-200"
+        >
+          BLANCO Y NEGRO
+        </span>
+      </div>
+
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+        <div>
+          <label
+            for="byn_toma_principal"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Toma principal *
+          </label>
+
+          <input
+            id="byn_toma_principal"
+            name="byn_toma_principal"
+            type="text"
+            required
+            value="<%= valor('byn_toma_principal') %>"
+            placeholder="Ej: 7918"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-slate-400"
+          />
+        </div>
+
+        <div>
+          <label
+            for="byn_toma_secundaria"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Toma secundaria
+          </label>
+
+          <input
+            id="byn_toma_secundaria"
+            name="byn_toma_secundaria"
+            type="text"
+            value="<%= valor('byn_toma_secundaria') %>"
+            placeholder="Ej: 7928"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-slate-400"
+          />
+        </div>
+
+       
+
+        
+
+      </div>
+    </section>
+
+    <!-- ====================================================== -->
+    <!-- BLOQUE 4: FECHAS Y ENTREGA -->
+    <!-- ====================================================== -->
+    <section
+      class="rounded-2xl border border-slate-700 bg-slate-900/60 p-4 md:p-5"
+    >
+      <div class="mb-4">
+        <h2 class="text-base font-semibold text-slate-100">
+          Fechas y estado de entrega
+        </h2>
+      </div>
+
+      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+
+        <div>
+          <label
+            for="fecha_toma"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Fecha de toma
+          </label>
+
+          <input
+            id="fecha_toma"
+            name="fecha_toma"
+            type="date"
+            value="<%= valor('fecha_toma') %>"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+          />
+        </div>
+
+        <div>
+          <label
+            for="fecha_entrega"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Fecha de entrega
+          </label>
+
+          <input
+            id="fecha_entrega"
+            name="fecha_entrega"
+            type="date"
+            value="<%= valor('fecha_entrega') %>"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+          />
+        </div>
+
+        <div>
+          <label
+            for="urgencia"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Urgencia
+          </label>
+
+          <select
+            id="urgencia"
+            name="urgencia"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+          >
+            <option
+              value="Normal"
+              <%= valor('urgencia', 'Normal') === 'Normal' ? 'selected' : '' %>
+            >
+              Normal
+            </option>
+
+            <option
+              value="Urgente"
+              <%= valor('urgencia') === 'Urgente' ? 'selected' : '' %>
+            >
+              Urgente
+            </option>
+
+            <option
+              value="Muy urgente"
+              <%= valor('urgencia') === 'Muy urgente' ? 'selected' : '' %>
+            >
+              Muy urgente
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label
+            for="entrega"
+            class="mb-1 block text-xs font-semibold text-slate-200"
+          >
+            Estado de entrega
+          </label>
+
+          <select
+            id="entrega"
+            name="entrega"
+            class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+          >
+            <option
+              value="Pendiente"
+              <%= valor('entrega', 'Pendiente') === 'Pendiente' ? 'selected' : '' %>
+            >
+              Pendiente
+            </option>
+
+            <option
+              value="Entregado"
+              <%= valor('entrega') === 'Entregado' ? 'selected' : '' %>
+            >
+              Entregado
+            </option>
+          </select>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================== -->
+<!-- BLOQUE 5: PAGO Y PRODUCTOS ADICIONALES -->
+<!-- ====================================================== -->
+<section
+  class="rounded-2xl border border-slate-700 bg-slate-900/60 p-4 md:p-5"
+>
+  <div class="mb-4">
+    <h2 class="text-base font-semibold text-slate-100">
+      Pago de la orden
+    </h2>
+
+    <p class="mt-1 text-xs text-slate-400">
+      Registra el precio del paquete y agrega productos o servicios adicionales.
+    </p>
+  </div>
+
+  <!-- DATOS DE PAGO -->
+  <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+
     <div>
-      <label class="block text-sm font-medium mb-1">Urgencia</label>
-      <select name="urgencia" class="w-full px-4 py-2 rounded border">
-        <option value="Normal">Normal</option>
-        <option value="Urgente">Urgente</option>
+      <label
+        for="precio"
+        class="mb-1 block text-xs font-semibold text-slate-200"
+      >
+        Precio del paquete ($)
+      </label>
+
+      <input
+        id="precio"
+        name="precio"
+        type="number"
+        min="0"
+        step="0.01"
+        value="<%= valor('precio', '0') %>"
+        placeholder="Ej: 16.50"
+        class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+      />
+    </div>
+
+    <div>
+      <label
+        for="total_adicionales_vista"
+        class="mb-1 block text-xs font-semibold text-slate-200"
+      >
+        Total adicionales ($)
+      </label>
+
+      <div
+        class="flex min-h-[42px] items-center rounded-lg border border-sky-500/30 bg-sky-500/10 px-3"
+      >
+        <span class="mr-1 font-semibold text-sky-300">$</span>
+
+        <span
+          id="totalAdicionalesVista"
+          class="font-bold text-sky-300"
+        >
+          0.00
+        </span>
+      </div>
+    </div>
+
+    <div>
+      <label
+        class="mb-1 block text-xs font-semibold text-slate-200"
+      >
+        Total de la orden
+      </label>
+
+      <div
+        class="flex min-h-[42px] items-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3"
+      >
+        <span class="mr-1 font-semibold text-emerald-300">$</span>
+
+        <span
+          id="totalOrdenVista"
+          class="text-lg font-bold text-emerald-300"
+        >
+          0.00
+        </span>
+      </div>
+    </div>
+
+    <div>
+      <label
+        for="abono_inicial"
+        class="mb-1 block text-xs font-semibold text-slate-200"
+      >
+        Abono inicial ($)
+      </label>
+
+      <input
+        id="abono_inicial"
+        name="abono_inicial"
+        type="number"
+        min="0"
+        step="0.01"
+        value="<%= valor('abono_inicial', valor('abono', '0')) %>"
+        placeholder="Ej: 10.00"
+        class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+      />
+    </div>
+
+  </div>
+
+  <div class="mt-4 grid gap-4 md:grid-cols-2">
+
+    <div>
+      <label
+        for="pago_estado"
+        class="mb-1 block text-xs font-semibold text-slate-200"
+      >
+        Estado de pago
+      </label>
+
+      <select
+        id="pago_estado"
+        name="pago_estado"
+        class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+      >
+        <option
+          value="Pendiente"
+          <%= valor('pago_estado', 'Pendiente') === 'Pendiente' ? 'selected' : '' %>
+        >
+          Pendiente
+        </option>
+
+        <option
+          value="Abono"
+          <%= valor('pago_estado') === 'Abono' ? 'selected' : '' %>
+        >
+          Abono
+        </option>
+
+        <option
+          value="Pagado"
+          <%= valor('pago_estado') === 'Pagado' ? 'selected' : '' %>
+        >
+          Pagado
+        </option>
       </select>
     </div>
 
-    <!-- Precio + Abono inicial -->
-    <div class="grid md:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-sm font-medium mb-1">Precio total ($)</label>
-        <input
-          type="number"
-          step="0.01"
-          name="precio"
-          class="w-full px-4 py-2 rounded border"
-          placeholder="Ej.: 150.00"
-        />
-      </div>
+    <div>
+      <label
+        class="mb-1 block text-xs font-semibold text-slate-200"
+      >
+        Saldo pendiente
+      </label>
 
-      <div>
-        <label class="block text-sm font-medium mb-1">
-          Abono inicial ($ opcional)
-        </label>
-        <input
-          type="number"
-          step="0.01"
-          name="abono_inicial"
-          class="w-full px-4 py-2 rounded border"
-          placeholder="Ej.: 50.00 (dejar vacío si no ha abonado)"
-        />
-        <p class="text-xs text-slate-500 mt-1">
-          Si dejas el abono vacío, se asumirá que todavía no ha abonado nada.
-        </p>
+      <div
+        class="flex min-h-[42px] items-center rounded-lg border border-amber-500/30 bg-amber-500/10 px-3"
+      >
+        <span class="mr-1 font-semibold text-amber-300">$</span>
+
+        <span
+          id="saldoVista"
+          class="font-bold text-amber-300"
+        >
+          0.00
+        </span>
       </div>
     </div>
 
-    <!-- Estado de pago + entrega -->
-    <div class="grid md:grid-cols-2 gap-4">
+  </div>
+
+  <!-- PRODUCTOS ADICIONALES -->
+  <div class="mt-6 overflow-hidden rounded-xl border border-slate-700">
+
+    <div
+      class="flex flex-col gap-3 border-b border-slate-700 bg-slate-950/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+    >
       <div>
-        <label class="block text-sm font-medium mb-1">Estado de pago</label>
-        <select name="pago_estado" class="w-full px-4 py-2 rounded border">
-          <option value="Pendiente">Pendiente</option>
-          <option value="Abono">Abono</option>
-          <option value="Pagado">Pagado</option>
-        </select>
-        <p class="text-xs text-slate-500 mt-1">
-          Si eliges <strong>Pagado</strong>, el sistema asumirá que se canceló
-          el 100% del precio.
+        <h3 class="text-sm font-bold text-slate-100">
+          Productos o servicios adicionales
+        </h3>
+
+        <p class="mt-1 text-xs text-slate-400">
+          Ejemplo: foto grupal, copias, ampliaciones o portarretratos.
         </p>
       </div>
 
-      <div>
-        <label class="block text-sm font-medium mb-1">Estado de entrega</label>
-        <select name="entrega" class="w-full px-4 py-2 rounded border">
-          <option value="Pendiente">Pendiente</option>
-          <option value="Entregado">Entregado</option>
-        </select>
-      </div>
+      <button
+        type="button"
+        id="btnAgregarItem"
+        class="inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-sky-500"
+      >
+        + Agregar producto
+      </button>
     </div>
 
-    <!-- Botones -->
-    <div class="flex justify-end space-x-2 pt-2">
-      <a href="/admin/ordenes?tab=instituciones"
-         class="px-4 py-2 rounded-lg border text-slate-700 hover:bg-slate-50">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-950 text-xs uppercase text-slate-400">
+          <tr>
+            <th class="px-3 py-3 text-left">
+              Cantidad
+            </th>
+
+            <th class="px-3 py-3 text-left">
+              Descripción
+            </th>
+
+            <th class="px-3 py-3 text-right">
+              Precio unitario
+            </th>
+
+            <th class="px-3 py-3 text-right">
+              Subtotal
+            </th>
+
+            <th class="px-3 py-3 text-center">
+              Acción
+            </th>
+          </tr>
+        </thead>
+
+        <tbody
+          id="listaItems"
+          class="divide-y divide-slate-800"
+        >
+        </tbody>
+      </table>
+    </div>
+
+    <div
+      id="mensajeSinItems"
+      class="px-4 py-6 text-center text-sm text-slate-500"
+    >
+      No hay productos adicionales.
+    </div>
+
+  </div>
+</section>
+
+    <!-- ====================================================== -->
+    <!-- BLOQUE 6: DESCRIPCIÓN -->
+    <!-- ====================================================== -->
+    <section
+      class="rounded-2xl border border-slate-700 bg-slate-900/60 p-4 md:p-5"
+    >
+      <div class="mb-4">
+        <h2 class="text-base font-semibold text-slate-100">
+          Descripción y observaciones
+        </h2>
+
+        <p class="mt-1 text-xs text-slate-400">
+          Indicaciones especiales, cambios solicitados o información adicional.
+        </p>
+      </div>
+
+      <textarea
+        id="descripcion"
+        name="descripcion"
+        rows="5"
+        placeholder="Ej: La familia solicitó entregar las ampliaciones por separado..."
+        class="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none focus:border-emerald-500"
+      ><%= valor('descripcion') %></textarea>
+    </section>
+
+    <!-- ====================================================== -->
+    <!-- ACCIONES -->
+    <!-- ====================================================== -->
+    <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+      <a
+        href="/admin/ordenes?tab=instituciones"
+        class="inline-flex items-center justify-center rounded-lg border border-slate-600 px-5 py-2.5 text-sm text-slate-200 hover:bg-slate-800"
+      >
         Cancelar
       </a>
 
-      <button type="submit"
-        class="px-4 py-2 rounded-lg text-white bg-emerald-600 hover:bg-emerald-700">
+      <button
+        type="submit"
+        class="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500"
+      >
         Guardar orden
       </button>
     </div>
 
   </form>
 </main>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const listaItems = document.getElementById('listaItems');
+    const mensajeSinItems = document.getElementById('mensajeSinItems');
+    const btnAgregarItem = document.getElementById('btnAgregarItem');
 
+    const precioInput = document.getElementById('precio');
+    const abonoInput = document.getElementById('abono_inicial');
+    const pagoEstado = document.getElementById('pago_estado');
+
+    const totalAdicionalesVista =
+      document.getElementById('totalAdicionalesVista');
+
+    const totalOrdenVista =
+      document.getElementById('totalOrdenVista');
+
+    const saldoVista =
+      document.getElementById('saldoVista');
+
+    function numeroSeguro(valor) {
+      const numero = Number.parseFloat(valor);
+      return Number.isFinite(numero) ? numero : 0;
+    }
+
+    function actualizarTotales() {
+      let totalAdicionales = 0;
+
+      listaItems
+        .querySelectorAll('.fila-item')
+        .forEach(function (fila) {
+          const cantidadInput =
+            fila.querySelector('.item-cantidad');
+
+          const precioUnitarioInput =
+            fila.querySelector('.item-precio');
+
+          const subtotalVista =
+            fila.querySelector('.item-subtotal');
+
+          const cantidad = Math.max(
+            Math.floor(numeroSeguro(cantidadInput.value)),
+            0
+          );
+
+          const precioUnitario = Math.max(
+            numeroSeguro(precioUnitarioInput.value),
+            0
+          );
+
+          const subtotal = cantidad * precioUnitario;
+
+          subtotalVista.textContent = subtotal.toFixed(2);
+          totalAdicionales += subtotal;
+        });
+
+      const precioBase = Math.max(
+        numeroSeguro(precioInput.value),
+        0
+      );
+
+      const abono = Math.max(
+        numeroSeguro(abonoInput.value),
+        0
+      );
+
+      const totalOrden = precioBase + totalAdicionales;
+      const saldo = Math.max(totalOrden - abono, 0);
+
+      totalAdicionalesVista.textContent =
+        totalAdicionales.toFixed(2);
+
+      totalOrdenVista.textContent =
+        totalOrden.toFixed(2);
+
+      saldoVista.textContent =
+        saldo.toFixed(2);
+
+      if (totalOrden > 0 && abono >= totalOrden) {
+        pagoEstado.value = 'Pagado';
+      } else if (abono > 0) {
+        pagoEstado.value = 'Abono';
+      } else {
+        pagoEstado.value = 'Pendiente';
+      }
+
+      mensajeSinItems.classList.toggle(
+        'hidden',
+        listaItems.querySelectorAll('.fila-item').length > 0
+      );
+    }
+
+    function conectarFila(fila) {
+      fila
+        .querySelectorAll('.item-cantidad, .item-precio')
+        .forEach(function (input) {
+          input.addEventListener('input', actualizarTotales);
+        });
+
+      fila
+        .querySelector('.btn-eliminar-item')
+        .addEventListener('click', function () {
+          fila.remove();
+          actualizarTotales();
+        });
+    }
+
+    function agregarItem(datos = {}) {
+      const fila = document.createElement('tr');
+
+      fila.className =
+        'fila-item bg-slate-900/40';
+
+      fila.innerHTML = `
+        <td class="px-3 py-3">
+          <input
+            type="number"
+            name="items_cantidad[]"
+            min="1"
+            step="1"
+            value="${datos.cantidad || 1}"
+            required
+            class="item-cantidad w-24 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500"
+          >
+        </td>
+
+        <td class="px-3 py-3">
+          <input
+            type="text"
+            name="items_descripcion[]"
+            value="${datos.descripcion || ''}"
+            placeholder="Descripción del producto o servicio"
+            required
+            class="w-full min-w-[240px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-500"
+          >
+        </td>
+
+        <td class="px-3 py-3">
+          <input
+            type="number"
+            name="items_precio_unitario[]"
+            min="0"
+            step="0.01"
+            value="${datos.precio || '0.00'}"
+            required
+            class="item-precio ml-auto block w-32 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-right text-sm text-white outline-none focus:border-sky-500"
+          >
+        </td>
+
+        <td class="px-3 py-3 text-right font-bold text-slate-200">
+          $<span class="item-subtotal">0.00</span>
+        </td>
+
+        <td class="px-3 py-3 text-center">
+          <button
+            type="button"
+            class="btn-eliminar-item rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20"
+          >
+            Eliminar
+          </button>
+        </td>
+      `;
+
+      listaItems.appendChild(fila);
+      conectarFila(fila);
+      actualizarTotales();
+
+      const descripcionInput = fila.querySelector(
+        'input[name="items_descripcion[]"]'
+      );
+
+      descripcionInput.focus();
+    }
+
+    btnAgregarItem.addEventListener('click', function () {
+      agregarItem();
+    });
+
+    precioInput.addEventListener('input', actualizarTotales);
+    abonoInput.addEventListener('input', actualizarTotales);
+
+    actualizarTotales();
+  });
+</script>
 <%- include('_foot') %>

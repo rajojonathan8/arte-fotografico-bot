@@ -1,0 +1,276 @@
+<%- include('_head', { title }) %>
+
+<header class="border-b border-slate-800 bg-slate-950">
+  <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400">
+        Arte Fotográfico
+      </p>
+
+      <h1 class="mt-1 text-xl font-bold text-white">
+        Vista previa del listado
+      </h1>
+    </div>
+
+    <a
+      href="/admin/ordenes/instituciones/importar"
+      class="text-sm font-semibold text-slate-300 transition hover:text-white"
+    >
+      ← Seleccionar otro PDF
+    </a>
+  </div>
+</header>
+
+<main class="mx-auto max-w-6xl space-y-6 p-4">
+
+  <!-- Progreso -->
+  <section class="rounded-2xl border border-slate-700 bg-slate-900/80 p-4">
+    <div class="grid gap-3 text-center text-xs sm:grid-cols-4">
+
+      <div class="rounded-xl bg-emerald-500/20 px-3 py-3 font-bold text-emerald-300">
+        ✓ 1. PDF seleccionado
+      </div>
+
+      <div class="rounded-xl bg-emerald-600 px-3 py-3 font-bold text-white">
+        2. Revisar alumnos
+      </div>
+
+      <div class="rounded-xl bg-slate-800 px-3 py-3 font-semibold text-slate-400">
+        3. Configurar orden
+      </div>
+
+      <div class="rounded-xl bg-slate-800 px-3 py-3 font-semibold text-slate-400">
+        4. Importar
+      </div>
+
+    </div>
+  </section>
+
+  <% if (error) { %>
+    <div class="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm font-semibold text-amber-300">
+      ⚠️ <%= error %>
+    </div>
+  <% } %>
+
+  <!-- Resumen -->
+  <section class="grid gap-4 md:grid-cols-3">
+
+    <div class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5">
+      <p class="text-xs font-semibold uppercase text-slate-500">
+        Archivo
+      </p>
+
+      <p class="mt-2 break-all font-bold text-white">
+        <%= nombreArchivo %>
+      </p>
+    </div>
+
+    <div class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5">
+      <p class="text-xs font-semibold uppercase text-slate-500">
+        Páginas procesadas
+      </p>
+
+      <p class="mt-2 text-3xl font-extrabold text-sky-300">
+        <%= totalPaginas || '-' %>
+      </p>
+    </div>
+
+    <div class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5">
+      <p class="text-xs font-semibold uppercase text-slate-500">
+        Posibles alumnos
+      </p>
+
+      <p
+        id="contadorAlumnos"
+        class="mt-2 text-3xl font-extrabold text-emerald-300"
+      >
+        <%= alumnos.length %>
+      </p>
+    </div>
+
+  </section>
+
+  <!-- Lista editable -->
+  <section class="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80">
+
+    <div class="flex flex-col gap-3 border-b border-slate-700 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 class="text-lg font-bold text-white">
+          👥 Alumnos detectados
+        </h2>
+
+        <p class="mt-1 text-xs text-slate-400">
+          Corrige los nombres o elimina las líneas que no correspondan a estudiantes.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        id="btnAgregarAlumno"
+        class="rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-bold text-emerald-300 transition hover:bg-emerald-500/20"
+      >
+        + Agregar alumno
+      </button>
+    </div>
+
+ <form
+  action="/admin/ordenes/instituciones/importar/configurar"
+  method="POST"
+      id="formVistaPrevia"
+      class="space-y-5 p-5"
+    >
+
+      <div id="listaAlumnos" class="space-y-3">
+
+        <% alumnos.forEach(function(nombre, index) { %>
+          <div class="fila-alumno flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+
+            <span class="numero-alumno w-9 shrink-0 text-center text-xs font-bold text-slate-500">
+              <%= index + 1 %>
+            </span>
+
+            <input
+              type="text"
+              name="alumnos[]"
+              value="<%= nombre %>"
+              required
+              class="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500"
+            >
+
+            <button
+              type="button"
+              class="btn-eliminar rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20"
+            >
+              Eliminar
+            </button>
+
+          </div>
+        <% }) %>
+
+      </div>
+
+      <% if (!alumnos.length) { %>
+        <div
+          id="mensajeSinAlumnos"
+          class="rounded-xl border border-slate-700 bg-slate-950/50 p-8 text-center text-sm text-slate-400"
+        >
+          No se detectaron alumnos. Puedes agregarlos manualmente.
+        </div>
+      <% } %>
+
+      <div class="flex flex-col gap-3 border-t border-slate-700 pt-5 sm:flex-row sm:justify-between">
+
+        <a
+          href="/admin/ordenes/instituciones/importar"
+          class="inline-flex items-center justify-center rounded-xl border border-slate-600 px-5 py-3 text-sm font-bold text-slate-200 transition hover:bg-slate-800"
+        >
+          ← Cambiar PDF
+        </a>
+
+        <button
+  type="submit"
+  id="btnConfigurar"
+  class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+>
+  Configurar órdenes →
+</button>
+
+      </div>
+    </form>
+  </section>
+
+  <!-- Texto extraído para diagnóstico -->
+  <details class="rounded-2xl border border-slate-700 bg-slate-900/80">
+    <summary class="cursor-pointer px-5 py-4 text-sm font-bold text-slate-300">
+      Ver texto completo extraído del PDF
+    </summary>
+
+    <div class="border-t border-slate-700 p-5">
+      <pre class="max-h-96 overflow-auto whitespace-pre-wrap rounded-xl bg-slate-950 p-4 text-xs leading-5 text-slate-400"><%= textoExtraido %></pre>
+    </div>
+  </details>
+
+</main>
+
+<script>
+  const listaAlumnos = document.getElementById('listaAlumnos');
+  const contadorAlumnos = document.getElementById('contadorAlumnos');
+  const btnAgregarAlumno = document.getElementById('btnAgregarAlumno');
+  const mensajeSinAlumnos = document.getElementById('mensajeSinAlumnos');
+
+  function actualizarNumeracion() {
+    const filas = listaAlumnos.querySelectorAll('.fila-alumno');
+
+    filas.forEach(function (fila, index) {
+      const numero = fila.querySelector('.numero-alumno');
+
+      if (numero) {
+        numero.textContent = index + 1;
+      }
+    });
+
+    contadorAlumnos.textContent = filas.length;
+
+    if (mensajeSinAlumnos) {
+      mensajeSinAlumnos.classList.toggle(
+        'hidden',
+        filas.length > 0
+      );
+    }
+  }
+
+  function conectarBotonEliminar(boton) {
+    boton.addEventListener('click', function () {
+      const fila = boton.closest('.fila-alumno');
+
+      if (fila) {
+        fila.remove();
+        actualizarNumeracion();
+      }
+    });
+  }
+
+  document
+    .querySelectorAll('.btn-eliminar')
+    .forEach(conectarBotonEliminar);
+
+  btnAgregarAlumno.addEventListener('click', function () {
+    const fila = document.createElement('div');
+
+    fila.className =
+      'fila-alumno flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/50 p-3';
+
+    fila.innerHTML = `
+      <span class="numero-alumno w-9 shrink-0 text-center text-xs font-bold text-slate-500"></span>
+
+      <input
+        type="text"
+        name="alumnos[]"
+        value=""
+        required
+        placeholder="Nombre completo del alumno"
+        class="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-emerald-500"
+      >
+
+      <button
+        type="button"
+        class="btn-eliminar rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20"
+      >
+        Eliminar
+      </button>
+    `;
+
+    listaAlumnos.appendChild(fila);
+
+    const botonEliminar = fila.querySelector('.btn-eliminar');
+    const input = fila.querySelector('input');
+
+    conectarBotonEliminar(botonEliminar);
+    actualizarNumeracion();
+    input.focus();
+  });
+
+  actualizarNumeracion();
+</script>
+
+<%- include('_foot') %>

@@ -1,5 +1,22 @@
 <%- include('_head', { title }) %>
+<%
+  function mostrarFecha(valor) {
+    if (!valor) return '-';
 
+    const fecha = valor instanceof Date
+      ? valor
+      : new Date(valor);
+
+    if (Number.isNaN(fecha.getTime())) {
+      return String(valor).slice(0, 10);
+    }
+
+    return fecha.toLocaleDateString('es-SV');
+  }
+
+  const esInstitucion = tipo === 'institucion';
+  const esPersona = tipo === 'persona';
+%>
 <main class="max-w-5xl mx-auto p-4 space-y-6">
   <!-- Header -->
   <header class="flex items-center justify-between gap-4">
@@ -81,26 +98,236 @@
 
 </div>
 
-    <% } else { %>
-      <!-- Institución (por si usas la misma vista) -->
-      <div class="text-sm text-slate-100 space-y-1">
-        <p><span class="font-semibold text-slate-300">Institución:</span> <%= orden.institucion || '' %></p>
-        <% if (orden.nombre) { %>
-          <p><span class="font-semibold text-slate-300">Contacto:</span> <%= orden.nombre %></p>
-        <% } %>
-        <p><span class="font-semibold text-slate-300">Sección:</span> <%= orden.seccion || '-' %></p>
-        <p><span class="font-semibold text-slate-300">Paquete:</span> <%= orden.paquete || '-' %></p>
-        <p><span class="font-semibold text-slate-300">Fecha toma:</span> <%= orden.fecha_toma ? orden.fecha_toma.toISOString().slice(0,10) : '-' %></p>
-        <p><span class="font-semibold text-slate-300">Fecha entrega:</span> <%= orden.fecha_entrega ? orden.fecha_entrega.toISOString().slice(0,10) : '-' %></p>
-        <p><span class="font-semibold text-slate-300">Urgencia:</span> <%= orden.urgencia || 'Normal' %></p>
-        <p><span class="font-semibold text-slate-300">Teléfono:</span> <%= orden.telefono || '-' %></p>
-        <p><span class="font-semibold text-slate-300">Entrega:</span> <%= orden.entrega || 'Pendiente' %></p>
+   <% } else { %>
+
+  <!-- =========================
+       DETALLE DE INSTITUCIÓN
+       ========================= -->
+
+  <div class="space-y-5">
+
+    <!-- Encabezado de la orden -->
+    <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400">
+          Orden institucional
+        </p>
+
+        <h2 class="mt-1 text-2xl font-bold text-white">
+          <%= orden.institucion || 'Institución sin registrar' %>
+        </h2>
+
+        <p class="mt-1 text-sm text-slate-400">
+          Orden #<%= orden.id || idx %>
+        </p>
       </div>
-    <% } %>
+
+      <div class="flex flex-wrap gap-2">
+        <span
+          class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold
+          <%= orden.entrega === 'Entregado'
+            ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
+            : 'border-amber-500/30 bg-amber-500/15 text-amber-300' %>"
+        >
+          <%= orden.entrega === 'Entregado' ? '✅ Entregado' : '⏳ Pendiente de entrega' %>
+        </span>
+
+        <span
+          class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold
+          <%= pagoEstado === 'Pagado'
+            ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300'
+            : pagoEstado === 'Abono'
+              ? 'border-sky-500/30 bg-sky-500/15 text-sky-300'
+              : 'border-rose-500/30 bg-rose-500/15 text-rose-300' %>"
+        >
+          Pago: <%= pagoEstado || 'Pendiente' %>
+        </span>
+      </div>
+    </div>
+
+    <!-- Información general -->
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Estudiante
+        </p>
+
+        <p class="mt-1 font-semibold text-slate-100">
+          <%= orden.nombre || '-' %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Grado
+        </p>
+
+        <p class="mt-1 font-semibold text-slate-100">
+          <%= orden.grado || '-' %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Sección
+        </p>
+
+        <p class="mt-1 font-semibold text-slate-100">
+          <%= orden.seccion || '-' %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Paquete
+        </p>
+
+        <p class="mt-1 font-semibold text-slate-100">
+          <%= orden.paquete || '-' %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Teléfono
+        </p>
+
+        <p class="mt-1 font-semibold text-slate-100">
+          <%= orden.telefono || '-' %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Fecha de toma
+        </p>
+
+        <p class="mt-1 font-semibold text-slate-100">
+          <%= mostrarFecha(orden.fecha_toma) %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Fecha de entrega
+        </p>
+
+        <p class="mt-1 font-semibold text-slate-100">
+          <%= mostrarFecha(orden.fecha_entrega) %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Urgencia
+        </p>
+
+        <p class="mt-1 font-semibold text-slate-100">
+          <%= orden.urgencia || 'Normal' %>
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+<% } %>
+  </section>
+<% if (esInstitucion) { %>
+
+  <!-- ========== FOTOGRAFÍAS A COLOR ========== -->
+  <section class="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80">
+
+    <div class="border-b border-slate-700 bg-amber-500/10 px-5 py-4">
+      <h2 class="text-base font-bold text-amber-300">
+        📸 Fotografías a color
+      </h2>
+
+      <p class="mt-1 text-xs text-slate-400">
+        Tomas, collage y fotografías adicionales a color.
+      </p>
+    </div>
+
+   <div class="grid gap-3 p-5 sm:grid-cols-2">
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Toma principal
+        </p>
+
+        <p class="mt-1 text-lg font-bold text-white">
+          <%= orden.color_toma_principal || '-' %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Toma secundaria
+        </p>
+
+        <p class="mt-1 text-lg font-bold text-white">
+          <%= orden.color_toma_secundaria || '-' %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Collage
+        </p>
+
+        <p class="mt-1 text-lg font-bold text-white">
+          <%= orden.color_collage_letras || '-' %>
+        </p>
+      </div>
+
+
+    </div>
   </section>
 
+  <!-- ========== BLANCO Y NEGRO ========== -->
+  <section class="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80">
+
+    <div class="border-b border-slate-700 bg-slate-500/10 px-5 py-4">
+      <h2 class="text-base font-bold text-slate-200">
+        ⚫ Fotografías en blanco y negro
+      </h2>
+
+      <p class="mt-1 text-xs text-slate-400">
+        Tomas, collage y fotografías adicionales en blanco y negro.
+      </p>
+    </div>
+
+   <div class="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Toma principal
+        </p>
+
+        <p class="mt-1 text-lg font-bold text-white">
+          <%= orden.byn_toma_principal || '-' %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-3">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Toma secundaria
+        </p>
+
+        <p class="mt-1 text-lg font-bold text-white">
+          <%= orden.byn_toma_secundaria || '-' %>
+        </p>
+      </div>
+
+     
+
+
+    </div>
+  </section>
+
+<% } %>
   <!-- ========== DETALLE DE ÍTEMS (solo persona) ========== -->
-  <% if (tipo === 'persona') { %>
+ <% if (detalles && detalles.length) { %>
     <section class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 space-y-3">
       <div class="flex items-center justify-between gap-3">
         <h2 class="text-sm font-semibold text-slate-100">
@@ -158,17 +385,123 @@
   <% } %>
 
   <!-- ========== INFORMACIÓN DE PAGO ========== -->
-  <section class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 space-y-4">
-    <h2 class="text-sm font-semibold text-slate-100">
-      Información de pago
-    </h2>
+  <!-- ========== INFORMACIÓN DE PAGO ========== -->
+<section class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4 space-y-4">
+  <h2 class="text-sm font-semibold text-slate-100">
+    Información de pago
+  </h2>
 
-    <div class="text-sm text-slate-100 space-y-1">
-      <p><span class="font-semibold text-slate-300">Precio:</span> $<%= (precio || 0).toFixed(2) %></p>
-      <p><span class="font-semibold text-slate-300">Abonado:</span> $<%= (abono || 0).toFixed(2) %></p>
-      <p><span class="font-semibold text-slate-300">Saldo:</span> $<%= (saldo || 0).toFixed(2) %></p>
-      <p><span class="font-semibold text-slate-300">Estado de pago:</span> <%= pagoEstado || 'Pendiente' %></p>
+  <% if (esInstitucion) { %>
+
+    <!-- Pago de orden institucional -->
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Precio del paquete
+        </p>
+
+        <p class="mt-1 text-xl font-extrabold text-white">
+          $<%= Number(precioBase || 0).toFixed(2) %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Productos adicionales
+        </p>
+
+        <p class="mt-1 text-xl font-extrabold text-sky-300">
+          $<%= Number(totalDetalle || 0).toFixed(2) %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Total de la orden
+        </p>
+
+        <p class="mt-1 text-xl font-extrabold text-white">
+          $<%= Number(precio || 0).toFixed(2) %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Abonado
+        </p>
+
+        <p class="mt-1 text-xl font-extrabold text-sky-300">
+          $<%= Number(abono || 0).toFixed(2) %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Saldo
+        </p>
+
+        <p class="mt-1 text-xl font-extrabold text-amber-300">
+          $<%= Number(saldo || 0).toFixed(2) %>
+        </p>
+      </div>
+
     </div>
+
+  <% } else { %>
+
+    <!-- Pago de orden personal -->
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Precio
+        </p>
+
+        <p class="mt-1 text-xl font-extrabold text-white">
+          $<%= Number(precio || 0).toFixed(2) %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Abonado
+        </p>
+
+        <p class="mt-1 text-xl font-extrabold text-sky-300">
+          $<%= Number(abono || 0).toFixed(2) %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Saldo
+        </p>
+
+        <p class="mt-1 text-xl font-extrabold text-amber-300">
+          $<%= Number(saldo || 0).toFixed(2) %>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+        <p class="text-[11px] font-semibold uppercase text-slate-500">
+          Estado
+        </p>
+
+        <p class="mt-1 text-lg font-bold
+          <%= pagoEstado === 'Pagado'
+            ? 'text-emerald-300'
+            : pagoEstado === 'Abono'
+              ? 'text-sky-300'
+              : 'text-rose-300' %>"
+        >
+          <%= pagoEstado || 'Pendiente' %>
+        </p>
+      </div>
+
+    </div>
+
+  <% } %>
 
     <!-- Botones de acciones de pago (los mismos de antes) -->
     <% if (tipo === 'persona') { %>
@@ -209,15 +542,77 @@
     <% } %>
   </section>
 
-  <!-- Historial de abonos (placeholder, como lo tenías) -->
+ <% if (esPersona) { %>
+
   <section class="bg-slate-900/80 border border-slate-700 rounded-2xl p-4">
     <h2 class="text-sm font-semibold text-slate-100 mb-1">
       Historial de abonos
     </h2>
+
     <p class="text-sm text-slate-400">
       No hay pagos registrados.
     </p>
   </section>
+
+<% } else { %>
+
+  <!-- DESCRIPCIÓN -->
+  <section class="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80">
+
+    <div class="border-b border-slate-700 px-5 py-4">
+      <h2 class="text-base font-bold text-slate-100">
+        📝 Descripción y observaciones
+      </h2>
+    </div>
+
+    <div class="p-5">
+      <% if (orden.descripcion) { %>
+        <p class="whitespace-pre-wrap text-sm leading-6 text-slate-200">
+          <%= orden.descripcion %>
+        </p>
+      <% } else { %>
+        <p class="text-sm italic text-slate-500">
+          Esta orden no tiene observaciones registradas.
+        </p>
+      <% } %>
+    </div>
+
+  </section>
+
+  <!-- ACCIONES -->
+  <section class="rounded-2xl border border-slate-700 bg-slate-900/80 p-4">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+      <a
+        href="/admin/ordenes?tab=instituciones"
+        class="inline-flex items-center justify-center rounded-xl border border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
+      >
+        ← Volver al listado
+      </a>
+
+      <div class="flex flex-col gap-3 sm:flex-row">
+
+        <a
+          href="/admin/ordenes/institucion/<%= idx %>/editar"
+          class="inline-flex items-center justify-center rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-sky-500"
+        >
+          ✏️ Editar orden
+        </a>
+
+        <a
+          href="/admin/ordenes/institucion/<%= idx %>/ticket"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-500"
+        >
+          🖨 Imprimir ticket
+        </a>
+
+      </div>
+    </div>
+  </section>
+
+<% } %>
 </main>
 
 <%- include('_foot') %>
