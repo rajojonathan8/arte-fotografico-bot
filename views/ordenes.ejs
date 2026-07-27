@@ -888,7 +888,7 @@
 <% if (tab === 'instituciones') { %>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    const opciones =  JSON.stringify(opcionesInstituciones || {}) ;
+    const opciones = <%- JSON.stringify(opcionesInstituciones || {}) %>;
 
     const selectInstitucion =
       document.getElementById('institucion');
@@ -908,10 +908,10 @@
     }
 
     const gradoInicial =
-      JSON.stringify(filtroGrado || '') ;
+      <%- JSON.stringify(filtroGrado || '') %>;
 
     const seccionInicial =
-      JSON.stringify(filtroSeccion || '') ;
+      <%- JSON.stringify(filtroSeccion || '') %>;
 
     function normalizar(valor) {
       return String(valor || '')
