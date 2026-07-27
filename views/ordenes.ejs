@@ -197,23 +197,12 @@
     </label>
 
     <select
-      id="grado"
-      name="grado"
-      class="min-w-[170px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
-    >
-      <option value="">Todos</option>
-
-      <% (gradosDisponibles || []).forEach(function(grado) { %>
-        <option
-          value="<%= grado %>"
-          <%= filtroGrado === String(grado).trim().toLowerCase()
-            ? 'selected'
-            : '' %>
-        >
-          <%= grado %>
-        </option>
-      <% }) %>
-    </select>
+  id="grado"
+  name="grado"
+  class="min-w-[170px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+>
+  <option value="">Todos</option>
+</select>
   </div>
 
   <div>
@@ -224,24 +213,13 @@
       Sección
     </label>
 
-    <select
-      id="seccion"
-      name="seccion"
-      class="min-w-[130px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
-    >
-      <option value="">Todas</option>
-
-      <% (seccionesDisponibles || []).forEach(function(seccion) { %>
-        <option
-          value="<%= seccion %>"
-          <%= filtroSeccion === String(seccion).trim().toLowerCase()
-            ? 'selected'
-            : '' %>
-        >
-          <%= seccion %>
-        </option>
-      <% }) %>
-    </select>
+   <select
+  id="seccion"
+  name="seccion"
+  class="min-w-[170px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+>
+  <option value="">Todas</option>
+</select>
   </div>
 
 <% } %>
@@ -907,5 +885,200 @@
 
 
 </main>
+<% if (tab === 'instituciones') { %>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const opciones = <%- JSON.stringify(opcionesInstituciones || {}) %>;
 
+    const selectInstitucion =
+      document.getElementById('institucion');
+
+    const selectGrado =
+      document.getElementById('grado');
+
+    const selectSeccion =
+      document.getElementById('seccion');
+
+    if (
+      !selectInstitucion ||
+      !selectGrado ||
+      !selectSeccion
+    ) {
+      return;
+    }
+
+    const gradoInicial =
+      <%- JSON.stringify(filtroGrado || '') %>;
+
+    const seccionInicial =
+      <%- JSON.stringify(filtroSeccion || '') %>;
+
+    function normalizar(valor) {
+      return String(valor || '')
+        .trim()
+        .toLowerCase();
+    }
+
+    function limpiarSelect(
+      select,
+      textoInicial
+    ) {
+      select.innerHTML = '';
+
+      const opcion = document.createElement('option');
+      opcion.value = '';
+      opcion.textContent = textoInicial;
+
+      select.appendChild(opcion);
+    }
+
+    function obtenerClaveInstitucion(valorSeleccionado) {
+      return Object.keys(opciones).find(
+        (institucion) =>
+          normalizar(institucion) ===
+          normalizar(valorSeleccionado)
+      );
+    }
+
+    function cargarGrados(
+      conservarSeleccion = true
+    ) {
+      const institucionSeleccionada =
+        selectInstitucion.value;
+
+      const gradoAnterior =
+        conservarSeleccion
+          ? selectGrado.value || gradoInicial
+          : '';
+
+      limpiarSelect(selectGrado, 'Todos');
+      limpiarSelect(selectSeccion, 'Todas');
+
+      if (!institucionSeleccionada) {
+        return;
+      }
+
+      const claveInstitucion =
+        obtenerClaveInstitucion(
+          institucionSeleccionada
+        );
+
+      if (!claveInstitucion) {
+        return;
+      }
+
+      const grados = Object.keys(
+        opciones[claveInstitucion] || {}
+      ).sort((a, b) =>
+        a.localeCompare(b, 'es', {
+          numeric: true,
+          sensitivity: 'base',
+        })
+      );
+
+      grados.forEach((grado) => {
+        const option =
+          document.createElement('option');
+
+        option.value = grado;
+        option.textContent = grado;
+
+        if (
+          normalizar(grado) ===
+          normalizar(gradoAnterior)
+        ) {
+          option.selected = true;
+        }
+
+        selectGrado.appendChild(option);
+      });
+
+      cargarSecciones(conservarSeleccion);
+    }
+
+    function cargarSecciones(
+      conservarSeleccion = true
+    ) {
+      const institucionSeleccionada =
+        selectInstitucion.value;
+
+      const gradoSeleccionado =
+        selectGrado.value;
+
+      const seccionAnterior =
+        conservarSeleccion
+          ? selectSeccion.value || seccionInicial
+          : '';
+
+      limpiarSelect(selectSeccion, 'Todas');
+
+      if (
+        !institucionSeleccionada ||
+        !gradoSeleccionado
+      ) {
+        return;
+      }
+
+      const claveInstitucion =
+        obtenerClaveInstitucion(
+          institucionSeleccionada
+        );
+
+      if (!claveInstitucion) {
+        return;
+      }
+
+      const claveGrado = Object.keys(
+        opciones[claveInstitucion] || {}
+      ).find(
+        (grado) =>
+          normalizar(grado) ===
+          normalizar(gradoSeleccionado)
+      );
+
+      if (!claveGrado) {
+        return;
+      }
+
+      const secciones =
+        opciones[claveInstitucion][claveGrado] ||
+        [];
+
+      secciones.forEach((seccion) => {
+        const option =
+          document.createElement('option');
+
+        option.value = seccion;
+        option.textContent = seccion;
+
+        if (
+          normalizar(seccion) ===
+          normalizar(seccionAnterior)
+        ) {
+          option.selected = true;
+        }
+
+        selectSeccion.appendChild(option);
+      });
+    }
+
+    selectInstitucion.addEventListener(
+      'change',
+      function () {
+        cargarGrados(false);
+      }
+    );
+
+    selectGrado.addEventListener(
+      'change',
+      function () {
+        cargarSecciones(false);
+      }
+    );
+
+    // Cargar las opciones actuales al abrir la página.
+    cargarGrados(true);
+  });
+</script>
+<% } %>
 <%- include('_foot') %>

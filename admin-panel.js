@@ -1400,7 +1400,59 @@ const seccionesDisponibles = [
     sensitivity: 'base',
   })
 );
+const opcionesInstituciones = (ordenesInstitucionesAll || []).reduce(
+  (mapa, orden) => {
+    const institucion = String(
+      orden.institucion || ''
+    ).trim();
 
+    const grado = String(
+      orden.grado || ''
+    ).trim();
+
+    const seccion = String(
+      orden.seccion || ''
+    ).trim();
+
+    if (!institucion) {
+      return mapa;
+    }
+
+    if (!mapa[institucion]) {
+      mapa[institucion] = {};
+    }
+
+    if (grado) {
+      if (!mapa[institucion][grado]) {
+        mapa[institucion][grado] = [];
+      }
+
+      if (
+        seccion &&
+        !mapa[institucion][grado].includes(seccion)
+      ) {
+        mapa[institucion][grado].push(seccion);
+      }
+    }
+
+    return mapa;
+  },
+  {}
+);
+
+// Ordenar grados y secciones
+Object.keys(opcionesInstituciones).forEach((institucion) => {
+  const grados = opcionesInstituciones[institucion];
+
+  Object.keys(grados).forEach((grado) => {
+    grados[grado].sort((a, b) =>
+      a.localeCompare(b, 'es', {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    );
+  });
+});
 function normalizarFechaFiltro(valor) {
   if (!valor) return '';
 
@@ -1575,7 +1627,7 @@ if (tab === 'personas') {
   ordenesPersonas: (tab === 'personas') ? pagPersonas.items : ordenesPersonas,
   filtroInstitucion,
 filtroSeccion,
-
+opcionesInstituciones,
 institucionesDisponibles,
 seccionesDisponibles,
   fechaDesde,
