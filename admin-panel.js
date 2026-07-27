@@ -1345,6 +1345,14 @@ const pageSize = 20; // puedes cambiar a 30 si quieres
     const filtroPago = (req.query.pago || '').trim();
     // Nuevo filtro exclusivo para instituciones
 const filtroGrado = (req.query.grado || '').trim().toLowerCase();
+
+const filtroInstitucion = String(
+  req.query.institucion || ''
+).trim().toLowerCase();
+
+const filtroSeccion = String(
+  req.query.seccion || ''
+).trim().toLowerCase();
     // 🔵 Cargar desde PostgreSQL
     let ordenesInstitucionesAll = [];
     let ordenesPersonasAll = [];
@@ -1367,6 +1375,32 @@ const gradosDisponibles = [
       .filter(Boolean)
   ),
 ].sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+const institucionesDisponibles = [
+  ...new Set(
+    (ordenesInstitucionesAll || [])
+      .map((o) => String(o.institucion || '').trim())
+      .filter(Boolean)
+  ),
+].sort((a, b) =>
+  a.localeCompare(b, 'es', {
+    numeric: true,
+    sensitivity: 'base',
+  })
+);
+
+const seccionesDisponibles = [
+  ...new Set(
+    (ordenesInstitucionesAll || [])
+      .map((o) => String(o.seccion || '').trim())
+      .filter(Boolean)
+  ),
+].sort((a, b) =>
+  a.localeCompare(b, 'es', {
+    numeric: true,
+    sensitivity: 'base',
+  })
+);
+
 function normalizarFechaFiltro(valor) {
   if (!valor) return '';
 
@@ -1386,7 +1420,7 @@ function normalizarFechaFiltro(valor) {
   return d.toISOString().slice(0, 10);
 }
 
-    function pasaFiltrosGenerales(o) {
+   function pasaFiltrosGenerales(o, tipoOrden) {
   // 🔹 Fecha de toma
   if (fechaDesde || fechaHasta) {
     const f = normalizarFechaFiltro(o.fecha_toma);
@@ -1462,23 +1496,53 @@ if (fechaEntregaDesde || fechaEntregaHasta) {
     if (p !== filtroPago.toLowerCase()) return false;
   }
 // Filtro por grado: solo afecta registros de instituciones
-if (filtroGrado) {
-  const gradoOrden = String(o.grado || '').trim().toLowerCase();
+// Filtros exclusivos de instituciones
+if (tipoOrden === 'institucion') {
+  if (filtroInstitucion) {
+    const institucionOrden = String(
+      o.institucion || ''
+    ).trim().toLowerCase();
 
-  if (gradoOrden !== filtroGrado) {
-    return false;
+    if (institucionOrden !== filtroInstitucion) {
+      return false;
+    }
+  }
+
+  if (filtroGrado) {
+    const gradoOrden = String(
+      o.grado || ''
+    ).trim().toLowerCase();
+
+    if (gradoOrden !== filtroGrado) {
+      return false;
+    }
+  }
+
+  if (filtroSeccion) {
+    const seccionOrden = String(
+      o.seccion || ''
+    ).trim().toLowerCase();
+
+    if (seccionOrden !== filtroSeccion) {
+      return false;
+    }
   }
 }
   return true;
 }
 
 
-    const ordenesInstituciones = (ordenesInstitucionesAll || []).filter(
-      pasaFiltrosGenerales
-    );
-    const ordenesPersonas = (ordenesPersonasAll || []).filter(
-      pasaFiltrosGenerales
-    );
+  const ordenesInstituciones = (
+  ordenesInstitucionesAll || []
+).filter((orden) =>
+  pasaFiltrosGenerales(orden, 'institucion')
+);
+
+const ordenesPersonas = (
+  ordenesPersonasAll || []
+).filter((orden) =>
+  pasaFiltrosGenerales(orden, 'persona')
+);
 
    // ================= PAGINACIÓN PRO (solo personas) =================
 let pagPersonas = null;
@@ -1509,7 +1573,11 @@ if (tab === 'personas') {
   tab,
   ordenesInstituciones,
   ordenesPersonas: (tab === 'personas') ? pagPersonas.items : ordenesPersonas,
+  filtroInstitucion,
+filtroSeccion,
 
+institucionesDisponibles,
+seccionesDisponibles,
   fechaDesde,
   fechaHasta,
   fechaEntregaDesde,
