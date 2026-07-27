@@ -159,6 +159,35 @@
         </select>
       </div>
 <% if (tab === 'instituciones') { %>
+
+  <div>
+    <label
+      for="institucion"
+      class="mb-1 block text-[11px] font-semibold uppercase text-slate-300"
+    >
+      Institución
+    </label>
+
+    <select
+      id="institucion"
+      name="institucion"
+      class="min-w-[190px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+    >
+      <option value="">Todas</option>
+
+      <% (institucionesDisponibles || []).forEach(function(institucion) { %>
+        <option
+          value="<%= institucion %>"
+          <%= filtroInstitucion === String(institucion).trim().toLowerCase()
+            ? 'selected'
+            : '' %>
+        >
+          <%= institucion %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+
   <div>
     <label
       for="grado"
@@ -170,20 +199,51 @@
     <select
       id="grado"
       name="grado"
-      class="w-full min-w-[150px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+      class="min-w-[170px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
     >
       <option value="">Todos</option>
 
       <% (gradosDisponibles || []).forEach(function(grado) { %>
         <option
           value="<%= grado %>"
-          <%= filtroGrado === String(grado).toLowerCase() ? 'selected' : '' %>
+          <%= filtroGrado === String(grado).trim().toLowerCase()
+            ? 'selected'
+            : '' %>
         >
           <%= grado %>
         </option>
       <% }) %>
     </select>
   </div>
+
+  <div>
+    <label
+      for="seccion"
+      class="mb-1 block text-[11px] font-semibold uppercase text-slate-300"
+    >
+      Sección
+    </label>
+
+    <select
+      id="seccion"
+      name="seccion"
+      class="min-w-[130px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
+    >
+      <option value="">Todas</option>
+
+      <% (seccionesDisponibles || []).forEach(function(seccion) { %>
+        <option
+          value="<%= seccion %>"
+          <%= filtroSeccion === String(seccion).trim().toLowerCase()
+            ? 'selected'
+            : '' %>
+        >
+          <%= seccion %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+
 <% } %>
       <div class="flex gap-2">
         <button
@@ -200,7 +260,7 @@
       </div>
     </form>
 
-    <%
+  <%
   if (
     fechaDesde ||
     fechaHasta ||
@@ -237,23 +297,17 @@
         <% } %>
         <% if (filtroInstitucion) { %>
   , institución
-  <span class="font-semibold">
-    <%= filtroInstitucion %>
-  </span>
+  <span class="font-semibold"><%= filtroInstitucion %></span>
 <% } %>
 
 <% if (filtroGrado) { %>
   , grado
-  <span class="font-semibold">
-    <%= filtroGrado %>
-  </span>
+  <span class="font-semibold"><%= filtroGrado %></span>
 <% } %>
 
 <% if (filtroSeccion) { %>
   , sección
-  <span class="font-semibold">
-    <%= filtroSeccion %>
-  </span>
+  <span class="font-semibold"><%= filtroSeccion %></span>
 <% } %>
         .
       </p>
@@ -263,96 +317,311 @@
   <!-- =============================================================== -->
   <!-- Tabla de INSTITUCIONES -->
   <!-- =============================================================== -->
- <% if (tab === 'instituciones') { %>
-
-  <!-- Institución -->
-  <div>
-    <label
-      for="institucion"
-      class="mb-1 block text-[11px] font-semibold uppercase text-slate-300"
-    >
-      Institución
-    </label>
-
-    <select
-      id="institucion"
-      name="institucion"
-      class="w-full min-w-[190px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
-    >
-      <option value="">Todas</option>
-
-      <% (institucionesDisponibles || []).forEach(function(institucion) { %>
-        <option
-          value="<%= institucion %>"
-          <%= filtroInstitucion === String(institucion).toLowerCase()
-            ? 'selected'
-            : '' %>
-        >
-          <%= institucion %>
-        </option>
-      <% }) %>
-    </select>
+  <% if (tab === 'instituciones') { %>
+    <section class="bg-white rounded-2xl shadow p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold">Libro de instituciones</h2>
+        <div class="mt-2 mb-4 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+  <div class="bg-slate-50 rounded-xl px-3 py-2">
+    <p class="text-slate-500">Total facturado</p>
+    <p class="text-sm font-semibold">$<%= (resumenInstituciones.totalPrecio || 0).toFixed(2) %></p>
   </div>
-
-  <!-- Grado -->
-  <div>
-    <label
-      for="grado"
-      class="mb-1 block text-[11px] font-semibold uppercase text-slate-300"
-    >
-      Grado
-    </label>
-
-    <select
-      id="grado"
-      name="grado"
-      class="w-full min-w-[150px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
-    >
-      <option value="">Todos</option>
-
-      <% (gradosDisponibles || []).forEach(function(grado) { %>
-        <option
-          value="<%= grado %>"
-          <%= filtroGrado === String(grado).toLowerCase()
-            ? 'selected'
-            : '' %>
-        >
-          <%= grado %>
-        </option>
-      <% }) %>
-    </select>
+  <div class="bg-slate-50 rounded-xl px-3 py-2">
+    <p class="text-slate-500">Total abonado</p>
+    <p class="text-sm font-semibold">$<%= (resumenInstituciones.totalAbono || 0).toFixed(2) %></p>
   </div>
-
-  <!-- Sección -->
-  <div>
-    <label
-      for="seccion"
-      class="mb-1 block text-[11px] font-semibold uppercase text-slate-300"
-    >
-      Sección
-    </label>
-
-    <select
-      id="seccion"
-      name="seccion"
-      class="w-full min-w-[130px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-emerald-500"
-    >
-      <option value="">Todas</option>
-
-      <% (seccionesDisponibles || []).forEach(function(seccion) { %>
-        <option
-          value="<%= seccion %>"
-          <%= filtroSeccion === String(seccion).toLowerCase()
-            ? 'selected'
-            : '' %>
-        >
-          <%= seccion %>
-        </option>
-      <% }) %>
-    </select>
+  <div class="bg-slate-50 rounded-xl px-3 py-2">
+    <p class="text-slate-500">Saldo pendiente</p>
+    <p class="text-sm font-semibold">$<%= (resumenInstituciones.totalSaldo || 0).toFixed(2) %></p>
   </div>
+  <div class="bg-slate-50 rounded-xl px-3 py-2">
+    <p class="text-slate-500">Órdenes (filtro actual)</p>
+    <p class="text-sm font-semibold"><%= resumenInstituciones.cantidad || 0 %></p>
+  </div>
+</div>
 
-<% } %>
+        <div class="flex flex-wrap items-center gap-2">
+
+  <a
+    href="/admin/ordenes/instituciones/importar"
+    class="inline-flex items-center gap-2 rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+  >
+    <span>📥</span>
+    Importar listado PDF
+  </a>
+
+  <a
+    href="/admin/ordenes/nueva-institucion"
+    class="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+  >
+    <span>+</span>
+    Nueva orden
+  </a>
+
+</div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-50 text-slate-600">
+            <tr>
+              <th class="px-3 py-2 text-left">Institución</th>
+              <th class="px-3 py-2 text-left">Nombre</th>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-200">
+  Grado
+</th>
+              <th class="px-3 py-2 text-left">Sección</th>
+              <th class="px-3 py-2 text-left">Paquete</th>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-slate-200">
+  Color
+</th>
+
+<th class="px-3 py-3 text-left text-xs font-semibold text-slate-200">
+  Blanco y negro
+</th>
+              <th class="px-3 py-2 text-left">Fecha toma</th>
+              <th class="px-3 py-2 text-left">Fecha entrega</th>  <!-- ⬅️ NUEVA -->
+              <th class="px-3 py-2 text-left">Teléfono</th>
+              <th class="px-3 py-2 text-right">Precio</th>
+              <th class="px-3 py-2 text-right">Abonado</th>
+              <th class="px-3 py-2 text-right">Saldo</th>
+              <th class="px-3 py-2 text-center">Pago</th>
+              <th class="px-3 py-2 text-center">Entrega</th>
+              <th class="px-3 py-2 text-center">Urgencia</th>
+              <th class="px-3 py-2 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <% if (!ordenesInstituciones || ordenesInstituciones.length === 0) { %>
+              <tr>
+                <td colspan="15" class="px-3 py-4 text-center text-slate-500">
+                  No hay órdenes de instituciones registradas para este filtro.
+                </td>
+              </tr>
+            <% } else { %>
+              <% ordenesInstituciones.forEach((o, idx) => { 
+                   const precio = Number(o.precio || 0);
+                   const abono = Number(o.abono || 0);
+                   const saldo = Math.max(precio - abono, 0);
+                   let pago = o.pago_estado || 'Pendiente';
+                   if (!o.pago_estado) {
+                     if (precio <= 0 && abono <= 0) pago = 'Pendiente';
+                     else if (abono >= precio && precio > 0) pago = 'Pagado';
+                     else if (abono > 0 && abono < precio) pago = 'Abono';
+                   }
+              %>
+                <tr class="hover:bg-slate-50">
+                  <td class="px-3 py-2"><%= o.institucion %></td>
+                  <td class="px-3 py-2"><%= o.nombre || '' %></td>
+                  <td class="px-3 py-3 align-top text-sm text-slate-200">
+  <%= o.grado || '-' %>
+</td>
+                  <td class="px-3 py-2"><%= o.seccion %></td>
+                  <td class="px-3 py-2"><%= o.paquete %></td>
+                  <td class="px-3 py-3 align-top text-xs text-slate-200">
+  <div class="space-y-1 min-w-[150px]">
+    <div>
+      <span class="text-slate-400">Principal:</span>
+      <%= o.color_toma_principal || '-' %>
+    </div>
+
+    <div>
+      <span class="text-slate-400">Secundaria:</span>
+      <%= o.color_toma_secundaria || '-' %>
+    </div>
+
+    <div>
+      <span class="text-slate-400">Collage:</span>
+      <%= o.color_collage_letras || '-' %>
+    </div>
+
+    <% if (o.color_adicionales) { %>
+      <div>
+        <span class="text-slate-400">Adicional:</span>
+        <%= o.color_adicionales %>
+      </div>
+    <% } %>
+  </div>
+</td>
+
+<td class="px-3 py-3 align-top text-xs text-slate-200">
+  <div class="space-y-1 min-w-[150px]">
+    <div>
+      <span class="text-slate-400">Principal:</span>
+      <%= o.byn_toma_principal || '-' %>
+    </div>
+
+    <div>
+      <span class="text-slate-400">Secundaria:</span>
+      <%= o.byn_toma_secundaria || '-' %>
+    </div>
+
+    <div>
+      <span class="text-slate-400">Collage:</span>
+      <%= o.byn_collage_letras || '-' %>
+    </div>
+
+    <% if (o.byn_adicionales) { %>
+      <div>
+        <span class="text-slate-400">Adicional:</span>
+        <%= o.byn_adicionales %>
+      </div>
+    <% } %>
+  </div>
+</td>
+                  <td class="px-3 py-2"><%= fechaCorta(o.fecha_toma) %></td>
+<td class="px-3 py-2"><%= fechaCorta(o.fecha_entrega) %></td>
+                  <td class="px-3 py-2"><%= o.telefono %></td>
+                  <td class="px-3 py-2 text-right">$<%= precio.toFixed(2) %></td>
+                  <td class="px-3 py-2 text-right">$<%= abono.toFixed(2) %></td>
+                  <td class="px-3 py-2 text-right">$<%= saldo.toFixed(2) %></td>
+                  <td class="px-3 py-2 text-center">
+                    <% if (pago === 'Pagado') { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-emerald-500 text-white font-semibold">
+      Pagado
+    </span>
+                    <% } else if (pago === 'Abono') { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-sky-100 text-sky-700">
+                        Abono
+                      </span>
+                    <% } else { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-amber-100 text-amber-700">
+                        Pendiente
+                      </span>
+                    <% } %>
+                  </td>
+                  <td class="px-3 py-2 text-center">
+  <%
+    const estadoInst = o.entrega || o.estado_entrega || 'Pendiente';
+    const siguienteEstadoInst = (estadoInst === 'Pendiente') ? 'Entregado' : 'Pendiente';
+  %>
+
+  <form method="POST" action="/admin/ordenes/institucion/entrega" class="inline">
+    <input type="hidden" name="id" value="<%= o.id %>">
+    <input type="hidden" name="estado" value="<%= siguienteEstadoInst %>">
+
+    <button
+      type="submit"
+      class="inline-flex px-3 py-1 rounded-full text-xs font-semibold
+             <%= estadoInst === 'Pendiente'
+                  ? 'bg-amber-400 text-slate-900'
+                  : 'bg-emerald-500 text-white' %>">
+      <%= estadoInst %>
+    </button>
+  </form>
+</td>
+
+                  <td class="px-3 py-2 text-center">
+                    <% const urgInst = o.urgencia || 'Normal'; %>
+                    <% if (urgInst === 'Urgente' || urgInst === 'Muy urgente') { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-red-100 text-red-700">
+                        <%= urgInst %>
+                      </span>
+                    <% } else { %>
+                      <span class="inline-flex px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700">
+                        <%= urgInst %>
+                      </span>
+                    <% } %>
+                  </td>
+                  <td class="px-3 py-2 text-center">
+                    <div class="flex flex-col gap-1 items-start text-xs">
+                      <div class="flex gap-2">
+                        <a href="/admin/ordenes/institucion/<%= o.id  %>"
+                           class="text-slate-600 hover:underline">
+                          Ver
+                        </a>
+                        <a href="/admin/ordenes/institucion/<%= o.id  %>/editar"
+                           class="text-emerald-700 hover:underline">
+                          Editar
+                        </a>
+
+                       
+                        <form
+                          action="/admin/ordenes/institucion/<%= o.id  %>/eliminar"
+                          method="POST"
+                          onsubmit="return confirm('¿Seguro que deseas eliminar esta orden de institución?');"
+                          class="inline">
+                          <button type="submit"
+                                  class="text-red-600 hover:underline">
+                            Eliminar
+                          </button>
+                        </form>
+                        <a href="/admin/ordenes/institucion/<%= o.id  %>/ticket" target="_blank">Ticket 80mm</a>
+
+                          <a href="/admin/ordenes/institucion/<%= o.id  %>/recibo"
+       target="_blank"
+       class="text-xs text-blue-600 hover:underline">
+      Recibo
+    </a>
+                      </div>
+                      <div class="flex gap-2">
+                        <!-- Abonar -->
+                        <a href="#"
+                           class="text-sky-700 hover:underline"
+                           onclick="
+                             event.preventDefault();
+                             var monto = prompt('Monto a abonar para esta institución (US$):');
+                             if(!monto) return;
+                             var f = document.createElement('form');
+                             f.method = 'POST';
+                             f.action = '/admin/ordenes/institucion/<%= o.id %>/abonar';
+                             var input = document.createElement('input');
+                             input.type = 'hidden';
+                             input.name = 'monto';
+                             input.value = monto;
+                             f.appendChild(input);
+                             document.body.appendChild(f);
+                             f.submit();
+                           ">
+                          Abonar
+                        </a>
+
+                        <!-- Marcar pagado -->
+                        <form
+                          action="/admin/ordenes/institucion/<%= o.id  %>/marcar-pagado"
+                          method="POST"
+                          class="inline"
+                          onsubmit="return confirm('¿Marcar como pagado el total de esta orden?');">
+                          <button type="submit"
+                                  class="text-emerald-700 hover:underline">
+                            Marcar pagado
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+
+       <div class="mt-4 grid gap-3 sm:grid-cols-4 text-xs">
+        <div class="rounded-xl border border-slate-200 px-3 py-2">
+          <p class="text-slate-500">Órdenes (filtradas)</p>
+          <p class="text-lg font-semibold"><%= resumenInstituciones.cantidad %></p>
+        </div>
+        <div class="rounded-xl border border-slate-200 px-3 py-2">
+          <p class="text-slate-500">Total precio</p>
+          <p class="text-lg font-semibold">
+            $<%= resumenInstituciones.totalPrecio.toFixed(2) %>
+          </p>
+        </div>
+        <div class="rounded-xl border border-slate-200 px-3 py-2">
+          <p class="text-slate-500">Total abonado</p>
+          <p class="text-lg font-semibold">
+            $<%= resumenInstituciones.totalAbono.toFixed(2) %>
+          </p>
+        </div>
+        <div class="rounded-xl border border-slate-200 px-3 py-2">
+          <p class="text-slate-500">Saldo pendiente</p>
+          <p class="text-lg font-semibold text-amber-700">
+            $<%= resumenInstituciones.totalSaldo.toFixed(2) %>
+          </p>
+        </div>
+    </section>
+  <% } %>
 
   <!-- =============================================================== -->
   <!-- Tabla de PERSONAS -->
